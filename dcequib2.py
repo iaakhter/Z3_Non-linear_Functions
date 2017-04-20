@@ -169,20 +169,22 @@ def oscl(s,I,V,a,VlowVhighs,g_cc,g_fwd = 1):
 
 		s.add(I[i] == (VoutFwd[i] - V[i])*g_fwd + (VoutCc[i] - V[i])*g_cc)
 
-def osclRefine(s,I,V,a,hyperRectangle,g_cc,g_fwd = 1):
+def osclRefine(s,I,V,a,hyperRectangles,g_cc,g_fwd = 1):
 	lenV = len(V)
 	VoutFwd = RealVector('VoutFwd',lenV)
 	VoutCc = RealVector('VoutCc',lenV)
 	Vin = [V[i % lenV] for i in range(-1,lenV-1)]
 	Vcc = [V[(i + lenV/2) % lenV] for i in range(lenV)]
 	for i in range(lenV):
-		boundin = [hyperRectangle[0][(i-1) % lenV],hyperRectangle[1][i % lenV]]
-		boundcc = [hyperRectangle[0][(i+lenV/2)%lenV],hyperRectangle[1][(i+lenV/2)%lenV]]
-		#print "boundin ", boundin
-		claimFwd = triangleBounds(a,Vin[i],VoutFwd[i],boundin[0],boundin[1])
-		claimCc = triangleBounds(a,Vcc[i],VoutCc[i],boundcc[0],boundcc[1])
-		s.add(claimFwd)
-		s.add(claimCc)
+		for j in range(len(hyperRectangles)):
+			hyperRectangle = hyperRectangles[j]
+			boundin = [hyperRectangle[0][(i-1) % lenV],hyperRectangle[1][(i-1) % lenV]]
+			boundcc = [hyperRectangle[0][(i+lenV/2)%lenV],hyperRectangle[1][(i+lenV/2)%lenV]]
+			#print "boundin ", boundin
+			claimFwd = triangleBounds(a,Vin[i],VoutFwd[i],boundin[0],boundin[1])
+			claimCc = triangleBounds(a,Vcc[i],VoutCc[i],boundcc[0],boundcc[1])
+			s.add(claimFwd)
+			s.add(claimCc)
 
 		s.add(I[i] == (VoutFwd[i] - V[i])*g_fwd + (VoutCc[i] - V[i])*g_cc)
 
@@ -270,11 +272,11 @@ def findHyper(I,V,a,VlowVhighs,g_fwd,g_cc,distances):
 					solVoltArray[index] = val
 					lowVoltArray[index] = val-distances[index]
 					highVoltArray[index] = val+distances[index]
-					'''if(lowVoltArray[index] < 0 and highVoltArray[index]>0):
+					if(lowVoltArray[index] < 0 and highVoltArray[index]>0):
 						if(val >= 0):
 							lowVoltArray[index] = 0.0
 						elif(val < 0):
-							highVoltArray[index] = 0.0'''
+							highVoltArray[index] = 0.0
 
 				elif(dName[0]=="V" and dName[4]=="F"):
 					index = int(dName[len(dName) - 1])
@@ -322,6 +324,98 @@ def findHyper(I,V,a,VlowVhighs,g_fwd,g_cc,distances):
 			s.add(Or(*[Or(V[i] < newHyperRectangle[0][i] - distances[i], 
 							V[i] > newHyperRectangle[1][i] + distances[i]) for i in range(len(V))]))
 			#return
+
+
+def refine(I,V,a,hyperrectangle,g_fwd,g_cc):
+	print "Finding solutions within hyperrectangle"
+	print "low bounds: ", hyperrectangle[0]
+	print "upper bounds: ", hyperrectangle[1]
+	s = Solver()
+	s.add(And(*[And(V[i]>=hyperrectangle[0][i], V[i]<=hyperrectangle[1][i]) for i in range(len(V))]))
+	oldSol = array([(hyperrectangle[0][i]+hyperrectangle[1][i])/2.0 for i in range(len(V))])
+	hyperrectangles = [hyperrectangle]
+	count = 0
+
+	while True:
+		s.push()
+		osclRefine(s,I,V,a,hyperrectangles,g_cc,g_fwd)
+		is_equilibrium = And(*[I[i]==0 for i in range(len(V))])
+		s.add(is_equilibrium)
+		ch = s.check()
+		if ch==sat:
+			VoutFwd = range(0,len(V))
+			VoutCc = range(0,len(V))
+			solVoltArray = zeros((len(V)))
+			m = s.model()
+			for d in m.decls():
+				dName = str(d.name())
+				firstLetter = dName[0]
+				if(dName[0]=="V" and dName[1]=="_"):
+					index = int(dName[len(dName) - 1])
+					val = float(Fraction(str(m[d])))
+					#print "index: ", index, " val: ", val
+					solVoltArray[index] = val
+					'''if(lowVoltArray[index] < 0 and highVoltArray[index]>0):
+						if(val >= 0):
+							lowVoltArray[index] = 0.0
+						elif(val < 0):
+							highVoltArray[index] = 0.0'''
+
+				elif(dName[0]=="V" and dName[4]=="F"):
+					index = int(dName[len(dName) - 1])
+					val = float(Fraction(str(m[d])))
+					#print "index: ", index, " val: ", val
+					VoutFwd[index] = val
+
+				elif(dName[0]=="V" and dName[4]=="C"):
+					index = int(dName[len(dName) - 1])
+					val = float(Fraction(str(m[d])))
+					#print "index: ", index, " val: ", val
+					VoutCc[index] = val
+			#print "VoutFwd: "
+			#print VoutFwd
+			#print "VoutCC: "
+			#print VoutCc
+			print "sol: "
+			print solVoltArray
+			print "Check solution "
+			Inum = oscNum(solVoltArray,a,g_cc,g_fwd)
+			print "I should be close to 0"
+			print Inum
+			s.pop()
+
+			print "Checking with smaller triangle bounds"
+
+			'''newHyperrectangles = []
+			for hyper in hyperrectangles:
+				midVolt = [(hyper[0][i]+hyper[1][i])/2.0 for i in range(len(V))]
+				leftHyperrectangle = [hyper[0],solVoltArray]
+				rightHyperrectangle = [solVoltArray,hyper[1]]
+				newHyperrectangles.append(leftHyperrectangle)
+				newHyperrectangles.append(rightHyperrectangle)
+			hyperrectangles = newHyperrectangles'''
+			hyperFirst = hyperrectangles[0]
+			hyperLast = hyperrectangles[len(hyperrectangles)-1]
+			leftHyperrectangle = [hyperFirst[0],solVoltArray]
+			rightHyperrectangle = [solVoltArray,hyperLast[1]]
+			hyperrectangles = [leftHyperrectangle,rightHyperrectangle]
+
+			diffBetweenSoln = solVoltArray - oldSol
+			if linalg.norm(diffBetweenSoln) < 1e-6:
+				print "Final Solution: "
+				print solVoltArray
+				return solVoltArray
+
+			oldSol = solVoltArray
+			count+=1
+		
+		else:
+			s.pop()
+			print "No solution found"
+			return None
+
+
+
 
 
 
@@ -507,21 +601,17 @@ def testInvRegion(g_cc):
 	print "refining hyperrectangles"
 	sols = []
 	for i in range(len(allHyperRectangles)):
-		print "Finding solution for hyper rectangle ", i
-		sol = findSolWithNewtons(a,g_fwd,g_cc,allHyperRectangles[i])
-		if sol != None:
+		print "Refining hyper rectangle ", i
+		sol = refine(I,V,a,allHyperRectangles[i],g_fwd,g_cc)
+		if sol!=None:
+			print "Refined solution: "
+			print sol
 			sols.append(sol)
-			print "solution: ", sol
-			'''alpha = 0.1
-			if checkIfSolnUniqueInHyperrect(a,g_fwd,g_cc,allHyperRectangles[i],sol,alpha):
-				print "Solution is unique"
-			else:
-				print "Solution is not unique"'''
 		else:
-			print "No true solution found"
+			print "No solution found"
 		print ""
 	
-	ifFoundAllSolutions(VlowVhighs,a,g_fwd,g_cc,sols)
+	'''ifFoundAllSolutions(VlowVhighs,a,g_fwd,g_cc,sols)
 	print ""
 
 	print "Number of refined solutions ", len(sols)
@@ -534,7 +624,7 @@ def testInvRegion(g_cc):
 		print Vtest
 		print "Inum should be zero"
 		print Inum
-		print ""
+		print ""'''
 
 
-testInvRegion(2.0)
+testInvRegion(0.5)

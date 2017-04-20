@@ -376,24 +376,14 @@ def refine(I,V,a,hyperrectangle,g_fwd,g_cc):
 			#print VoutFwd
 			#print "VoutCC: "
 			#print VoutCc
-			print "sol: "
-			print solVoltArray
-			print "Check solution "
-			Inum = oscNum(solVoltArray,a,g_cc,g_fwd)
-			print "I should be close to 0"
-			print Inum
+			#print "sol: "
+			#print solVoltArray
+			#print "Check solution "
+			#Inum = oscNum(solVoltArray,a,g_cc,g_fwd)
+			#print "I should be close to 0"
+			#print Inum
 			s.pop()
 
-			print "Checking with smaller triangle bounds"
-
-			'''newHyperrectangles = []
-			for hyper in hyperrectangles:
-				midVolt = [(hyper[0][i]+hyper[1][i])/2.0 for i in range(len(V))]
-				leftHyperrectangle = [hyper[0],solVoltArray]
-				rightHyperrectangle = [solVoltArray,hyper[1]]
-				newHyperrectangles.append(leftHyperrectangle)
-				newHyperrectangles.append(rightHyperrectangle)
-			hyperrectangles = newHyperrectangles'''
 			hyperFirst = hyperrectangles[0]
 			hyperLast = hyperrectangles[len(hyperrectangles)-1]
 			leftHyperrectangle = [hyperFirst[0],solVoltArray]
@@ -413,11 +403,6 @@ def refine(I,V,a,hyperrectangle,g_fwd,g_cc):
 			s.pop()
 			print "No solution found"
 			return None
-
-
-
-
-
 
 def findSolWithNewtons(a,g_fwd,g_cc,hyperRectangle):
 	print "lower bounds ", hyperRectangle[0]
@@ -627,4 +612,4 @@ def testInvRegion(g_cc):
 		print ""'''
 
 
-testInvRegion(0.5)
+testInvRegion(2.0)

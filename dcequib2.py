@@ -335,7 +335,7 @@ def refine(I,V,a,hyperrectangle,g_fwd,g_cc):
 	oldSol = array([(hyperrectangle[0][i]+hyperrectangle[1][i])/2.0 for i in range(len(V))])
 	hyperrectangles = [hyperrectangle]
 	count = 0
-
+	InumNorms = []
 	while True:
 		s.push()
 		osclRefine(s,I,V,a,hyperrectangles,g_cc,g_fwd)
@@ -376,12 +376,12 @@ def refine(I,V,a,hyperrectangle,g_fwd,g_cc):
 			#print VoutFwd
 			#print "VoutCC: "
 			#print VoutCc
-			#print "sol: "
-			#print solVoltArray
-			#print "Check solution "
-			#Inum = oscNum(solVoltArray,a,g_cc,g_fwd)
-			#print "I should be close to 0"
-			#print Inum
+			print "sol: "
+			print solVoltArray
+			print "Check solution "
+			Inum = oscNum(solVoltArray,a,g_cc,g_fwd)
+			print "I should be close to 0"
+			print Inum
 			s.pop()
 
 			hyperFirst = hyperrectangles[0]
@@ -391,9 +391,9 @@ def refine(I,V,a,hyperrectangle,g_fwd,g_cc):
 			hyperrectangles = [leftHyperrectangle,rightHyperrectangle]
 
 			diffBetweenSoln = solVoltArray - oldSol
+			InumNorms.append(linalg.norm(diffBetweenSoln))
 			if linalg.norm(diffBetweenSoln) < 1e-6:
-				print "Final Solution: "
-				print solVoltArray
+				plt.plot(arange(len(InumNorms)),InumNorms)
 				return solVoltArray
 
 			oldSol = solVoltArray
@@ -401,7 +401,7 @@ def refine(I,V,a,hyperrectangle,g_fwd,g_cc):
 		
 		else:
 			s.pop()
-			print "No solution found"
+			plt.plot(arange(len(InumNorms)),InumNorms)
 			return None
 
 def findSolWithNewtons(a,g_fwd,g_cc,hyperRectangle):
@@ -587,6 +587,7 @@ def testInvRegion(g_cc):
 	sols = []
 	for i in range(len(allHyperRectangles)):
 		print "Refining hyper rectangle ", i
+		plt.figure(i)
 		sol = refine(I,V,a,allHyperRectangles[i],g_fwd,g_cc)
 		if sol!=None:
 			print "Refined solution: "
@@ -595,6 +596,9 @@ def testInvRegion(g_cc):
 		else:
 			print "No solution found"
 		print ""
+	plt.show()
+	print "All refined solutions "
+	print sols
 	
 	'''ifFoundAllSolutions(VlowVhighs,a,g_fwd,g_cc,sols)
 	print ""
@@ -612,4 +616,4 @@ def testInvRegion(g_cc):
 		print ""'''
 
 
-testInvRegion(2.0)
+testInvRegion(0.5)

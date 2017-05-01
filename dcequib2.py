@@ -216,10 +216,10 @@ def findScale(I,V,a,VlowVhighs,g_fwd,g_cc):
 	
 
 # s is solver. I and V are an array of Z3 symbolic  values.
-# Vlow and Vhigh are an array of python numberical ints.
+# VlowVhighs contain indicate how triangle bounds are created
 # This function finds hyper rectangles containing DC equilibrium points 
 # for our oscillator model. Each hyper rectangle has length and width
-# equalling distance and is stored in allHyperRectangles 
+# equalling distance
 def findHyper(I,V,a,VlowVhighs,g_fwd,g_cc,distances):
 	allHyperRectangles = []
 	s = Solver()
@@ -233,20 +233,6 @@ def findHyper(I,V,a,VlowVhighs,g_fwd,g_cc,distances):
 		oscl(s,I,V,a,VlowVhighs,g_cc,g_fwd)
 		is_equilibrium = And(*[I[i]==0 for i in range(len(V))])
 		s.add(is_equilibrium)
-		'''s.push()
-		python_syntax_is_silly = True
-		if(python_syntax_is_silly):
-			s.add(And(*[Or(V[i] == -0.3024*(1 - 2*(i % 2)),V[i] == 0.3024*(1 - 2*(i % 2))) for i in range(len(V))]))
-			ch = s.check()
-			if(ch == sat):
-				print "s accepts the expected solution"
-			else:
-				print "s rejects the expected solution"
-				print s
-				return s
-		s.pop()
-		if count==2:
-			return'''
 
 		#print "solver "
 		#print s
@@ -258,16 +244,11 @@ def findHyper(I,V,a,VlowVhighs,g_fwd,g_cc,distances):
 			highVoltArray = range(0,len(V))
 			solVoltArray = range(0,len(V))
 			m = s.model()
-			#print "refuted, here's a counter-example"
-			#print "solution number ", count
-			#print "  " + str(m)
 			for d in m.decls():
 				dName = str(d.name())
-				firstLetter = dName[0]
+				index = int(dName[len(dName) - 1])
+				val = float(Fraction(str(m[d])))
 				if(dName[0]=="V" and dName[1]=="_"):
-					index = int(dName[len(dName) - 1])
-					val = float(Fraction(str(m[d])))
-					#print "index: ", index, " val: ", val
 					solVoltArray[index] = val
 					lowVoltArray[index] = val-distances[index]
 					highVoltArray[index] = val+distances[index]
@@ -278,15 +259,9 @@ def findHyper(I,V,a,VlowVhighs,g_fwd,g_cc,distances):
 							highVoltArray[index] = 0.0
 
 				elif(dName[0]=="V" and dName[4]=="F"):
-					index = int(dName[len(dName) - 1])
-					val = float(Fraction(str(m[d])))
-					#print "index: ", index, " val: ", val
 					VoutFwd[index] = val
 
 				elif(dName[0]=="V" and dName[4]=="C"):
-					index = int(dName[len(dName) - 1])
-					val = float(Fraction(str(m[d])))
-					#print "index: ", index, " val: ", val
 					VoutCc[index] = val
 			print "VoutFwd: "
 			print VoutFwd
@@ -298,8 +273,8 @@ def findHyper(I,V,a,VlowVhighs,g_fwd,g_cc,distances):
 			_,_,Inum = oscNum(solVoltArray,a,g_cc,g_fwd)
 			print "I should be close to 0"
 			print Inum
-			#create hyperrectangle around the solution formed and add it to 
-			#allHyperRectangles
+			
+			#create hyperrectangle around the solution formed 
 			newHyperRectangle = [lowVoltArray,highVoltArray]
 
 		else:
@@ -322,8 +297,6 @@ def findHyper(I,V,a,VlowVhighs,g_fwd,g_cc,distances):
 			# Add the constraint so that Z3 can find solutions outside the hyper rectangle just constructed
 			s.add(Or(*[Or(V[i] < newHyperRectangle[0][i] - distances[i], 
 							V[i] > newHyperRectangle[1][i] + distances[i]) for i in range(len(V))]))
-			#return
-
 
 def refine(I,V,a,hyperrectangle,g_fwd,g_cc,hyperNumber,figure):
 	print "Finding solutions within hyperrectangle"
@@ -352,18 +325,13 @@ def refine(I,V,a,hyperrectangle,g_fwd,g_cc,hyperNumber,figure):
 			for d in m.decls():
 				dName = str(d.name())
 				firstLetter = dName[0]
+				index = int(dName[len(dName) - 1])
+				val = float(Fraction(str(m[d])))
 				if(dName[0]=="V" and dName[1]=="_"):
-					index = int(dName[len(dName) - 1])
-					val = float(Fraction(str(m[d])))
 					solVoltArray[index] = val
 				elif(dName[0]=="V" and dName[4]=="F"):
-					index = int(dName[len(dName) - 1])
-					val = float(Fraction(str(m[d])))
 					VoutFwd[index] = val
-
 				elif(dName[0]=="V" and dName[4]=="C"):
-					index = int(dName[len(dName) - 1])
-					val = float(Fraction(str(m[d])))
 					VoutCc[index] = val
 			#print "VoutFwd: "
 			#print VoutFwd

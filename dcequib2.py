@@ -52,8 +52,10 @@ def oscNum(V,a,g_cc,g_fwd = 1):
 	lenV = len(V)
 	Vin = [V[i % lenV] for i in range(-1,lenV-1)]
 	Vcc = [V[(i + lenV/2) % lenV] for i in range(lenV)]
-	return [((tanhFun(a,Vin[i])-V[i])*g_fwd
-			+(tanhFun(a,Vcc[i])-V[i])*g_cc) for i in range(lenV)]
+	VoutFwd = [tanhFun(a,Vin[i]) for i in range(lenV)]
+	VoutCc = [tanhFun(a,Vcc[i]) for i in range(lenV)]
+	return (VoutFwd, VoutCc, [((tanhFun(a,Vin[i])-V[i])*g_fwd
+			+(tanhFun(a,Vcc[i])-V[i])*g_cc) for i in range(lenV)])
 
 
 '''Get jacobian of rambus oscillator at V
@@ -121,21 +123,6 @@ def trapezoidBounds(a,Vin,Vout, Vlow, Vhigh):
 
 
 
-# s is solver. I and V are an array of Z3 symbolic  values.
-# Vlow and Vhigh are an array of python numberical ints.
-# This function simulates mobius oscillator
-'''def oscl(s,I,V,a,Vlow,Vhigh,g_cc,g_fwd = 1):
-	lenV = len(V)
-	VoutFwd = RealVector('VoutFwd',lenV)
-	VoutCc = RealVector('VoutCc',lenV)
-	Vin = [V[i % lenV] for i in range(-1,lenV-1)]
-	Vcc = [V[(i + lenV/2) % lenV] for i in range(lenV)]
-	for i in range(len(Vin)):
-		inverter(s,a,Vin[i],VoutFwd[i],Vlow[i],Vhigh[i])
-	for i in range(len(Vcc)):
-		inverter(s,a,Vcc[i],VoutCc[i],Vlow[i],Vhigh[i])
-	s.add(And(*[I[i] == (VoutFwd[i] - V[i])*g_fwd + (VoutCc[i] - V[i])*g_cc for i in range(lenV)]))'''
-
 def oscl(s,I,V,a,VlowVhighs,g_cc,g_fwd = 1):
 	lenV = len(V)
 	VoutFwd = RealVector('VoutFwd',lenV)
@@ -145,7 +132,11 @@ def oscl(s,I,V,a,VlowVhighs,g_cc,g_fwd = 1):
 	allVlowVhighs = []
 	for i in range(lenV):
 		allVlowVhighs.append(VlowVhighs)
+
 	for i in range(lenV):
+		# For each voltage in V, there are two inverters involved
+		# Use all possible combinations of triangle bounds for those 
+		# two inverters 
 		for j in range(len(allVlowVhighs[i])):
 			for k in range(len(allVlowVhighs[i])):
 				boundin = allVlowVhighs[(i-1)%lenV][j]
@@ -154,6 +145,9 @@ def oscl(s,I,V,a,VlowVhighs,g_cc,g_fwd = 1):
 				claimCc = triangleBounds(a,Vcc[i],VoutCc[i],boundcc[0][i],boundcc[1][i])
 				s.add(claimFwd)
 				s.add(claimCc)
+
+				# Need trapezoid bounds for the left most and right most 
+				# bounds
 				if j==0:
 					claimTrapFwd1 = trapezoidBounds(a, Vin[i], VoutFwd[i], boundin[0][i], boundin[1][i])
 					s.add(claimTrapFwd1)
@@ -169,6 +163,12 @@ def oscl(s,I,V,a,VlowVhighs,g_cc,g_fwd = 1):
 
 		s.add(I[i] == (VoutFwd[i] - V[i])*g_fwd + (VoutCc[i] - V[i])*g_cc)
 
+# Use only the triangle bounds for the constraints (not the trapezoid) bounds
+# Each voltage is only bound by the corresponding indices in hyperRectangles
+# For example, hyperRectangles can be of the form [[[a,b,c,d],[e,f,g,h]],[[A,B,C,D],[E,F,G,H]]]. 
+# This means that V[0] is constrained to be in the triangle bounded by [a,e] and that
+# bounded by [A,E]. V[1] is constrained to be in in the triangle bounded by [b,f] and that
+# bounded by [B,F] and so on.
 def osclRefine(s,I,V,a,hyperRectangles,g_cc,g_fwd = 1):
 	lenV = len(V)
 	VoutFwd = RealVector('VoutFwd',lenV)
@@ -180,7 +180,6 @@ def osclRefine(s,I,V,a,hyperRectangles,g_cc,g_fwd = 1):
 			hyperRectangle = hyperRectangles[j]
 			boundin = [hyperRectangle[0][(i-1) % lenV],hyperRectangle[1][(i-1) % lenV]]
 			boundcc = [hyperRectangle[0][(i+lenV/2)%lenV],hyperRectangle[1][(i+lenV/2)%lenV]]
-			#print "boundin ", boundin
 			claimFwd = triangleBounds(a,Vin[i],VoutFwd[i],boundin[0],boundin[1])
 			claimCc = triangleBounds(a,Vcc[i],VoutCc[i],boundcc[0],boundcc[1])
 			s.add(claimFwd)
@@ -296,7 +295,7 @@ def findHyper(I,V,a,VlowVhighs,g_fwd,g_cc,distances):
 			print "sol: "
 			print solVoltArray
 			print "Check solution "
-			Inum = oscNum(solVoltArray,a,g_cc,g_fwd)
+			_,_,Inum = oscNum(solVoltArray,a,g_cc,g_fwd)
 			print "I should be close to 0"
 			print Inum
 			#create hyperrectangle around the solution formed and add it to 
@@ -326,7 +325,7 @@ def findHyper(I,V,a,VlowVhighs,g_fwd,g_cc,distances):
 			#return
 
 
-def refine(I,V,a,hyperrectangle,g_fwd,g_cc):
+def refine(I,V,a,hyperrectangle,g_fwd,g_cc,hyperNumber,figure):
 	print "Finding solutions within hyperrectangle"
 	print "low bounds: ", hyperrectangle[0]
 	print "upper bounds: ", hyperrectangle[1]
@@ -336,16 +335,19 @@ def refine(I,V,a,hyperrectangle,g_fwd,g_cc):
 	hyperrectangles = [hyperrectangle]
 	count = 0
 	InumNorms = []
+	VoutFwdErrors = []
+	VoutCcErrors = []
 	while True:
+		print "Iteration # ", count
 		s.push()
 		osclRefine(s,I,V,a,hyperrectangles,g_cc,g_fwd)
 		is_equilibrium = And(*[I[i]==0 for i in range(len(V))])
 		s.add(is_equilibrium)
 		ch = s.check()
+		solVoltArray = zeros((len(V)))
 		if ch==sat:
 			VoutFwd = range(0,len(V))
 			VoutCc = range(0,len(V))
-			solVoltArray = zeros((len(V)))
 			m = s.model()
 			for d in m.decls():
 				dName = str(d.name())
@@ -353,24 +355,15 @@ def refine(I,V,a,hyperrectangle,g_fwd,g_cc):
 				if(dName[0]=="V" and dName[1]=="_"):
 					index = int(dName[len(dName) - 1])
 					val = float(Fraction(str(m[d])))
-					#print "index: ", index, " val: ", val
 					solVoltArray[index] = val
-					'''if(lowVoltArray[index] < 0 and highVoltArray[index]>0):
-						if(val >= 0):
-							lowVoltArray[index] = 0.0
-						elif(val < 0):
-							highVoltArray[index] = 0.0'''
-
 				elif(dName[0]=="V" and dName[4]=="F"):
 					index = int(dName[len(dName) - 1])
 					val = float(Fraction(str(m[d])))
-					#print "index: ", index, " val: ", val
 					VoutFwd[index] = val
 
 				elif(dName[0]=="V" and dName[4]=="C"):
 					index = int(dName[len(dName) - 1])
 					val = float(Fraction(str(m[d])))
-					#print "index: ", index, " val: ", val
 					VoutCc[index] = val
 			#print "VoutFwd: "
 			#print VoutFwd
@@ -379,30 +372,42 @@ def refine(I,V,a,hyperrectangle,g_fwd,g_cc):
 			print "sol: "
 			print solVoltArray
 			print "Check solution "
-			Inum = oscNum(solVoltArray,a,g_cc,g_fwd)
+			VoutFwdnum,VoutCcnum,Inum = oscNum(solVoltArray,a,g_cc,g_fwd)
 			print "I should be close to 0"
 			print Inum
 			s.pop()
 
-			hyperFirst = hyperrectangles[0]
-			hyperLast = hyperrectangles[len(hyperrectangles)-1]
+			hyperFirst = array(hyperrectangles[0])
+			hyperLast = array(hyperrectangles[len(hyperrectangles)-1])
 			leftHyperrectangle = [hyperFirst[0],solVoltArray]
 			rightHyperrectangle = [solVoltArray,hyperLast[1]]
 			hyperrectangles = [leftHyperrectangle,rightHyperrectangle]
 
 			diffBetweenSoln = solVoltArray - oldSol
-			InumNorms.append(linalg.norm(diffBetweenSoln))
-			if linalg.norm(diffBetweenSoln) < 1e-6:
-				plt.plot(arange(len(InumNorms)),InumNorms)
-				return solVoltArray
+			InumNorms.append(log10(linalg.norm(Inum)))
+			VoutFwdErrors.append(log10(abs(array(VoutFwdnum)-VoutFwd)))
+			VoutCcErrors.append(log10(abs(array(VoutCcnum)-VoutCc)))
+			if linalg.norm(diffBetweenSoln) < 1e-5:
+				break
 
 			oldSol = solVoltArray
 			count+=1
 		
 		else:
 			s.pop()
-			plt.plot(arange(len(InumNorms)),InumNorms)
-			return None
+			solVoltArray =  []
+			break
+	
+	if figure:
+		legends = ["VoutFwd0", "VoutFwd1", "VoutFwd2", "VoutFwd3",
+		"VoutCc0","VoutCc1","VoutCc2","VoutCc3","InumNorm"]
+		plt.figure(hyperNumber)
+		#plt.plot(arange(len(InumNorms)),InumNorms)
+		plt.plot(arange(len(InumNorms)), VoutFwdErrors,arange(len(InumNorms)), VoutCcErrors)
+		plt.xlabel("Number of Iterations")
+		plt.ylabel("Log of error")
+		plt.legend(legends)
+	return solVoltArray
 
 def findSolWithNewtons(a,g_fwd,g_cc,hyperRectangle):
 	print "lower bounds ", hyperRectangle[0]
@@ -569,8 +574,6 @@ def testInvRegion(g_cc):
 	overallHyperRectangle = findScale(I,V,a,VlowVhighs,g_fwd,g_cc)
 	minOptSol = overallHyperRectangle[0]
 	maxOptSol = overallHyperRectangle[1]
-	#minOptSol = [-0.6429559706071334, -0.6429559706071334, -0.6429559706071334, -0.6429559706071334]
-	#maxOptSol = [0.6429559706071334, 0.6429559706071334, 0.6429559706071334, 0.6429559706071334]
 	VlowVhighs = [[minOptSol,[minOptSol[0]/2.0,minOptSol[1]/2.0,minOptSol[2]/2.0,minOptSol[3]/2.0]],
 				  [[minOptSol[0]/2.0,minOptSol[1]/2.0,minOptSol[2]/2.0,minOptSol[3]/2.0],[0.0, 0.0, 0.0, 0.0]],
 				  [[0.0, 0.0, 0.0, 0.0],[maxOptSol[0]/2.0,maxOptSol[1]/2.0,maxOptSol[2]/2.0,maxOptSol[3]/2.0]],
@@ -585,25 +588,24 @@ def testInvRegion(g_cc):
 	print ""
 	print "refining hyperrectangles"
 	sols = []
+	figure = True
 	for i in range(len(allHyperRectangles)):
 		print "Refining hyper rectangle ", i
-		plt.figure(i)
-		sol = refine(I,V,a,allHyperRectangles[i],g_fwd,g_cc)
-		if sol!=None:
+		sol = refine(I,V,a,allHyperRectangles[i],g_fwd,g_cc,i,figure)
+		if len(sol) ==0:
+			print "No solution found"
+		else:
 			print "Refined solution: "
 			print sol
 			sols.append(sol)
-		else:
-			print "No solution found"
 		print ""
-	plt.show()
+	if figure:
+		plt.show()
+	print "total number of hyperrectangles: ", len(allHyperRectangles)
 	print "All refined solutions "
 	print sols
 	
-	'''ifFoundAllSolutions(VlowVhighs,a,g_fwd,g_cc,sols)
-	print ""
-
-	print "Number of refined solutions ", len(sols)
+	'''print "Number of refined solutions ", len(sols)
 	print "Checking if refined solutions are correct"
 	# Checking the refined hyperrectangle with numerical computation
 	for i in range(len(sols)):

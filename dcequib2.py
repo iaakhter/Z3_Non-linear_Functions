@@ -12,6 +12,7 @@ from z3 import *
 from numpy import *
 import copy
 import matplotlib.pyplot as plt
+from mpmath import mp, iv
 
 def is_number(s):
 	try:
@@ -67,10 +68,75 @@ def getJacobian(V,a,g_cc,g_fwd = 1):
 	jacobian = zeros((lenV, lenV))
 	for i in range(lenV):
 		jacobian[i,i] = -(g_fwd+g_cc)
-		jacobian[i,(i-1)%lenV] = g_fwd*tanhFunder(a,V[i%lenV])
+		jacobian[i,(i-1)%lenV] = g_fwd*tanhFunder(a,V[(i-1)%lenV])
 		jacobian[i,(i + lenV/2) % lenV] = g_cc*tanhFunder(a,V[(i + lenV/2) % lenV])
 
 	return jacobian
+
+def getJacobianInterval(hyperRectangle,a,g_cc,g_fwd=1):
+	lowerBound = hyperRectangle[0]
+	upperBound = hyperRectangle[1]
+	lenV = len(lowerBound)
+	jacobian = zeros((lenV, lenV,2))
+	jacobian[:,:,0] = jacobian[:,:,0] 
+	jacobian[:,:,1] = jacobian[:,:,1]
+	for i in range(lenV):
+		jacobian[i,i,0] = -(g_fwd+g_cc)
+		jacobian[i,i,1] = -(g_fwd+g_cc)
+		gfwdVal1 = g_fwd*tanhFunder(a,lowerBound[(i-1)%lenV])
+		gfwdVal2 = g_fwd*tanhFunder(a,upperBound[(i-1)%lenV])
+		jacobian[i,(i-1)%lenV,0] = min(gfwdVal1,gfwdVal2)
+		jacobian[i,(i-1)%lenV,1] = max(gfwdVal1,gfwdVal2)
+		gccVal1 = g_cc*tanhFunder(a,lowerBound[(i + lenV/2) % lenV])
+		gccVal2 = g_cc*tanhFunder(a,upperBound[(i + lenV/2) % lenV])
+		jacobian[i,(i + lenV/2) % lenV,0] = min(gccVal1,gccVal2)
+		jacobian[i,(i + lenV/2) % lenV,1] = max(gccVal1,gccVal2)
+
+	return jacobian
+
+# taken from http://repository.uwyo.edu/cgi/viewcontent.cgi?article=1468&context=ela
+# Inverse Interval Matrix: A Survey by Jiri Rohn and Raena Farhadsefat
+def getInverseOfIntervalMatrix(mat,bound):
+	'''numVolts = mat.shape[0]
+	inverse = zeros((numVolts,numVolts,2))
+	upperBounds = mat[:,:,1]
+	lowerBounds = mat[:,:,0]
+	midMat = (upperBounds + lowerBounds)/2.0
+	delta = midMat - lowerBounds
+	midMatInverse = linalg.inv(midMat)
+	midMatInverseAbs = absolute(midMatInverse)
+	I = identity(numVolts)
+	M = linalg.inv(I - dot(midMatInverseAbs,delta))
+	print "midMat"
+	print midMat
+	print "midMatInverse"
+	print midMatInverse
+	print "delta"
+	print delta
+	print "M"
+	print M
+	Tu = zeros((numVolts,numVolts))
+	for i in range(numVolts):
+		Tu[i,i] = M[i,i]
+	Tv = linalg.inv(2*Tu - I)
+
+	BlowTilda = -dot(M,midMatInverseAbs)+dot(Tu,(midMatInverse + midMatInverseAbs))
+	BhighTilda = dot(M,midMatInverseAbs)+dot(Tu,(midMatInverse - midMatInverseAbs))
+	print "BlowTilda"
+	print BlowTilda
+	print "multBlow"
+	print dot(Tv,BlowTilda)
+
+	print "BhighTilda"
+	print BhighTilda
+	print "multhigh"
+	print dot(Tv,BhighTilda)
+	inverse[:,:,0] = minimum(BlowTilda,dot(Tv,BlowTilda))
+	inverse[:,:,1] = maximum(BhighTilda,dot(Tv,BhighTilda))
+	spectralRadius = linalg.eigvals(dot(midMatInverseAbs,delta))
+	print "spectralRadius: ", spectralRadius
+	return inverse'''
+	return iv.inverse(mat)
 
 def triangleBounds(a, Vin, Vout, Vlow, Vhigh):
 	tanhFunVlow = tanhFun(a,Vlow)
@@ -122,7 +188,15 @@ def trapezoidBounds(a,Vin,Vout, Vlow, Vhigh):
 							Vout <  tanhFunVhigh))
 
 
-
+# Use triangle and trapezoid bounds for the constraints
+# VlowVhighs indicate how triangle and trapezoid bounds are created
+# to approximate the non linear solution.
+# For example, VlowVhighs can be of the form [[[a,b,c,d],[e,f,g,h]],[[A,B,C,D],[E,F,G,H]]]
+# This means that each voltage in V (V[0] or V[1] or V[2] or so on) is 
+# constrained by triangles bound by [a,e] and by [b,f] and by [c,g] and by [d,h] and
+# by [A,E] and by [B,F] and so on. The bounds are all in increasing order meaning that
+# a < e = A < E, b < f = B < F and so on. Trapezoid bounds are applied 
+# for voltages outside the bounds
 def oscl(s,I,V,a,VlowVhighs,g_cc,g_fwd = 1):
 	lenV = len(V)
 	VoutFwd = RealVector('VoutFwd',lenV)
@@ -163,7 +237,9 @@ def oscl(s,I,V,a,VlowVhighs,g_cc,g_fwd = 1):
 
 		s.add(I[i] == (VoutFwd[i] - V[i])*g_fwd + (VoutCc[i] - V[i])*g_cc)
 
-# Use only the triangle bounds for the constraints (not the trapezoid) bounds
+# Use only the triangle bounds for the constraints (not the trapezoid bounds).
+# hyperRectangles is a list of hyper rectangles and each triangle bound is constrained
+# within a hyperrectangle
 # Each voltage is only bound by the corresponding indices in hyperRectangles
 # For example, hyperRectangles can be of the form [[[a,b,c,d],[e,f,g,h]],[[A,B,C,D],[E,F,G,H]]]. 
 # This means that V[0] is constrained to be in the triangle bounded by [a,e] and that
@@ -310,6 +386,7 @@ def refine(I,V,a,hyperrectangle,g_fwd,g_cc,hyperNumber,figure):
 	InumNorms = []
 	VoutFwdErrors = []
 	VoutCcErrors = []
+	finalSol = zeros((len(V)))
 	while True:
 		print "Iteration # ", count
 		s.push()
@@ -356,6 +433,7 @@ def refine(I,V,a,hyperrectangle,g_fwd,g_cc,hyperNumber,figure):
 			VoutFwdErrors.append(log10(abs(array(VoutFwdnum)-VoutFwd)))
 			VoutCcErrors.append(log10(abs(array(VoutCcnum)-VoutCc)))
 			if linalg.norm(diffBetweenSoln) < 1e-5:
+				finalSol = solVoltArray
 				break
 
 			oldSol = solVoltArray
@@ -363,7 +441,7 @@ def refine(I,V,a,hyperrectangle,g_fwd,g_cc,hyperNumber,figure):
 		
 		else:
 			s.pop()
-			solVoltArray =  []
+			finalSol =  []
 			break
 	
 	if figure:
@@ -374,7 +452,7 @@ def refine(I,V,a,hyperrectangle,g_fwd,g_cc,hyperNumber,figure):
 		plt.plot(arange(len(InumNorms)), VoutFwdErrors,arange(len(InumNorms)), VoutCcErrors)
 		plt.xlabel("Number of Iterations")
 		plt.ylabel("Log of error")
-		plt.legend(legends)
+		plt.legend(legends,prop={'size':8})
 	return solVoltArray
 
 def findSolWithNewtons(a,g_fwd,g_cc,hyperRectangle):
@@ -399,6 +477,47 @@ def findSolWithNewtons(a,g_fwd,g_cc,hyperRectangle):
 			sol = None
 			break
 	return sol
+
+def checkExistenceOfSolution(a,g_fwd,g_cc,hyperRectangle):
+	print "lower bounds ", hyperRectangle[0]
+	print "upper bounds ",hyperRectangle[1]
+
+	#TODO need to take care/check if it matters that the jacobian has
+	#zero elements
+	jac = getJacobianInterval(hyperRectangle,a,g_cc,g_fwd)
+	jacIv = iv.matrix(len(hyperRectangle[0]),len(hyperRectangle[1]))
+	for i in range(len(hyperRectangle[0])):
+		for j in range(len(hyperRectangle[1])):
+			jacIv[i,j] = iv.mpf([jac[i,j,0],jac[i,j,1]])
+
+
+	'''inverseJac = getInverseOfIntervalMatrix(jac,0.1)
+	print "inverseJac"
+	print inverseJac'''
+
+	print "jacIv"
+	print jacIv
+	midPoint = array([(hyperRectangle[0][i]+hyperRectangle[1][i])/2.0 for i in range(len(hyperRectangle[0]))])
+	_,_,IMidPoint = array(oscNum(midPoint,a,g_cc,g_fwd))
+	'''nInterval1 = midPoint - dot(inverseJac[:,:,0],IMidPoint)
+	nInterval2 = midPoint - dot(inverseJac[:,:,1],IMidPoint)'''
+
+	nInterval1 = midPoint - iv.lu_solve(jacIv[:,:,0],IMidPoint)
+	nInterval2 = midPoint - iv.lu_solve(jacIv[:,:,1],IMidPoint)
+	newtonInterval = zeros((len(nInterval1),2))
+	for i in range(len(nInterval1)):
+		newtonInterval[i][0] = min(nInterval1[i],nInterval2[i])
+		newtonInterval[i][1] = max(nInterval1[i],nInterval2[i])
+
+	print "newtonLowerBounds ", newtonInterval[:,0]
+	print "newtonUpperBounds ", newtonInterval[:,1]
+
+	for i in range(len(hyperRectangle[0])):
+		if newtonInterval[i][0] < hyperRectangle[0][i] or newtonInterval[i][0] > hyperRectangle[1][i]:
+			return False
+		if newtonInterval[i][1] < hyperRectangle[0][i] or newtonInterval[i][1] > hyperRectangle[1][i]:
+			return False
+	return True
 
 def checkIfSolnUniqueInHyperrect(a,g_fwd,g_cc,hyperRectangle,sol,alpha=0.1,r=1.0):
 	lowerBound = array(hyperRectangle[0])
@@ -554,7 +673,14 @@ def testInvRegion(g_cc):
 	
 	print "total number of hyperrectangles: ", len(allHyperRectangles)
 	print ""
-	print "refining hyperrectangles"
+	
+	print "Checking existence of solutions within hyperrectangles"
+	for i in range(len(allHyperRectangles)):
+		print "Checking existience within hyperrectangle ", i
+		solExists = checkExistenceOfSolution(a,g_fwd,g_cc,allHyperRectangles[i])
+		print "solution Exists?: ", solExists
+
+	'''print "refining hyperrectangles"
 	sols = []
 	figure = True
 	for i in range(len(allHyperRectangles)):
@@ -571,7 +697,7 @@ def testInvRegion(g_cc):
 		plt.show()
 	print "total number of hyperrectangles: ", len(allHyperRectangles)
 	print "All refined solutions "
-	print sols
+	print sols'''
 	
 	'''print "Number of refined solutions ", len(sols)
 	print "Checking if refined solutions are correct"

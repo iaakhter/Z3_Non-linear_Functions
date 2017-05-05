@@ -73,9 +73,9 @@ def getJacobian(V,a,g_cc,g_fwd = 1):
 
 	return jacobian
 
-def getJacobianInterval(hyperRectangle,a,g_cc,g_fwd=1):
-	lowerBound = hyperRectangle[0]
-	upperBound = hyperRectangle[1]
+def getJacobianInterval(bounds,a,g_cc,g_fwd=1):
+	lowerBound = bounds[:,0]
+	upperBound = bounds[:,1]
 	lenV = len(lowerBound)
 	jacobian = zeros((lenV, lenV,2))
 	jacobian[:,:,0] = jacobian[:,:,0] 
@@ -478,7 +478,7 @@ def findSolWithNewtons(a,g_fwd,g_cc,hyperRectangle):
 			break
 	return sol
 
-def checkExistenceOfSolution(a,g_fwd,g_cc,hyperRectangle):
+'''def checkExistenceOfSolution(a,g_fwd,g_cc,hyperRectangle):
 	print "lower bounds ", hyperRectangle[0]
 	print "upper bounds ",hyperRectangle[1]
 
@@ -491,16 +491,16 @@ def checkExistenceOfSolution(a,g_fwd,g_cc,hyperRectangle):
 			jacIv[i,j] = iv.mpf([jac[i,j,0],jac[i,j,1]])
 
 
-	'''inverseJac = getInverseOfIntervalMatrix(jac,0.1)
-	print "inverseJac"
-	print inverseJac'''
+	#inverseJac = getInverseOfIntervalMatrix(jac,0.1)
+	#print "inverseJac"
+	#print inverseJac
 
 	print "jacIv"
 	print jacIv
 	midPoint = array([(hyperRectangle[0][i]+hyperRectangle[1][i])/2.0 for i in range(len(hyperRectangle[0]))])
 	_,_,IMidPoint = array(oscNum(midPoint,a,g_cc,g_fwd))
-	'''nInterval1 = midPoint - dot(inverseJac[:,:,0],IMidPoint)
-	nInterval2 = midPoint - dot(inverseJac[:,:,1],IMidPoint)'''
+	#nInterval1 = midPoint - dot(inverseJac[:,:,0],IMidPoint)
+	#nInterval2 = midPoint - dot(inverseJac[:,:,1],IMidPoint)
 
 	nInterval1 = midPoint - iv.lu_solve(jacIv[:,:,0],IMidPoint)
 	nInterval2 = midPoint - iv.lu_solve(jacIv[:,:,1],IMidPoint)
@@ -517,7 +517,116 @@ def checkExistenceOfSolution(a,g_fwd,g_cc,hyperRectangle):
 			return False
 		if newtonInterval[i][1] < hyperRectangle[0][i] or newtonInterval[i][1] > hyperRectangle[1][i]:
 			return False
-	return True
+	return True'''
+
+def multiplyRegularMatWithIntervalMat(regMat,intervalMat):
+	mat1 = dot(regMat,intervalMat[:,:,0])
+	mat2 = dot(regMat,intervalMat[:,:,1])
+	result = zeros((regMat.shape[0],regMat.shape[1],2))
+	result[:,:,0] = minimum(mat1,mat2)
+	result[:,:,1] = maximum(mat1,mat2)
+	return result
+
+def subtractIntervalMatFromRegularMat(regMat,intervalMat):
+	mat1 = regMat - intervalMat[:,:,0]
+	mat2 = regMat - intervalMat[:,:,1]
+	result = zeros((regMat.shape[0],regMat.shape[1],2))
+	result[:,:,0] = minimum(mat1,mat2)
+	result[:,:,1] = maximum(mat1,mat2)
+	return result
+
+def multiplyIntervalMatWithIntervalVec(mat,vec):
+	mat1 = dot(mat[:,:,0],vec[:,0])
+	mat2 = dot(mat[:,:,1],vec[:,0])
+	mat3 = dot(mat[:,:,0],vec[:,1])
+	mat4 = dot(mat[:,:,1],vec[:,1])
+	result = zeros((mat.shape[0],vec.shape[1]))
+	result[:,0] = minimum(minimum(mat1,mat2),minimum(mat3,mat4))
+	result[:,1] = maximum(maximum(mat1,mat2),maximum(mat3,mat4))
+	return result
+
+
+def checkExistenceOfSolution(a,g_fwd,g_cc,hyperRectangle):
+	print "lower bounds ", hyperRectangle[0]
+	print "upper bounds ",hyperRectangle[1]
+	numVolts = len(hyperRectangle[0])
+
+	startBounds = zeros((numVolts,2))
+	startBounds[:,0] = hyperRectangle[0]
+	startBounds[:,1] = hyperRectangle[1]
+	
+	iteration = 0
+	while True:
+		print "iteration number: ", iteration
+		midPoint = (startBounds[:,0] + startBounds[:,1])/2.0
+		print "midPoint"
+		print midPoint
+		_,_,IMidPoint = array(oscNum(midPoint,a,g_cc,g_fwd))
+		jacMidPoint = getJacobian(midPoint,a,g_cc,g_fwd)
+		C = linalg.inv(jacMidPoint)
+		I = identity(numVolts)
+
+		jacInterval = getJacobianInterval(startBounds,a,g_cc,g_fwd)
+		C_IMidPoint = dot(C,IMidPoint)
+
+		C_jacInterval = multiplyRegularMatWithIntervalMat(C,jacInterval)
+		I_minus_C_jacInterval = subtractIntervalMatFromRegularMat(I,C_jacInterval)
+		xi_minus_midPoint = zeros((numVolts,2))
+		for i in range(numVolts):
+			xi_minus_midPoint[i][0] = hyperRectangle[0][i] - midPoint[i]
+			xi_minus_midPoint[i][1] = hyperRectangle[1][i] - midPoint[i]
+
+		lastTerm = multiplyIntervalMatWithIntervalVec(I_minus_C_jacInterval, xi_minus_midPoint)
+		
+		kInterval1 = midPoint - C_IMidPoint + lastTerm[:,0]
+		kInterval2 = midPoint - C_IMidPoint + lastTerm[:,1]
+		kInterval = zeros((numVolts,2))
+		kInterval[:,0] = minimum(kInterval1, kInterval2)
+		kInterval[:,1] = maximum(kInterval1, kInterval2)
+
+		uniqueSoln = True
+		for i in range(numVolts):
+			if kInterval[i][0] < startBounds[i][0] or kInterval[i][0] > startBounds[i][1]:
+				uniqueSoln = False
+			if kInterval[i][1] < startBounds[i][0] or kInterval[i][1] > startBounds[i][1]:
+				uniqueSoln = False
+
+		if uniqueSoln:
+			print "Hyperrectangle with unique solution found"
+			print startBounds
+			return startBounds
+
+		intersect = zeros((numVolts,2))
+		for i in range(numVolts):
+			minVal = max(kInterval[i][0],startBounds[i][0])
+			maxVal = min(kInterval[i][1],startBounds[i][1])
+			if minVal <= maxVal:
+				intersect[i] = [minVal,maxVal]
+			else:
+				intersect = None
+
+
+		print "kInterval "
+		print kInterval
+
+		print "intersect"
+		print intersect
+
+		intervalLength =  intersect[:,1] - intersect[:,0]
+
+		if intersect is None:
+			print "hyperrectangle does not contain any solution"
+			return None
+		elif linalg.norm(intersect-startBounds) < 1e-8:
+			print "Found the smallest possible hyperrectangle containing solution"
+			return intersect
+		else:
+			startBounds = intersect
+		iteration += 1
+
+		if iteration == 2:
+			return
+
 
 def checkIfSolnUniqueInHyperrect(a,g_fwd,g_cc,hyperRectangle,sol,alpha=0.1,r=1.0):
 	lowerBound = array(hyperRectangle[0])
@@ -677,8 +786,7 @@ def testInvRegion(g_cc):
 	print "Checking existence of solutions within hyperrectangles"
 	for i in range(len(allHyperRectangles)):
 		print "Checking existience within hyperrectangle ", i
-		solExists = checkExistenceOfSolution(a,g_fwd,g_cc,allHyperRectangles[i])
-		print "solution Exists?: ", solExists
+		checkExistenceOfSolution(a,g_fwd,g_cc,allHyperRectangles[i])
 
 	'''print "refining hyperrectangles"
 	sols = []

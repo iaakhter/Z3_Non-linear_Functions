@@ -573,8 +573,8 @@ def checkExistenceOfSolution(a,g_fwd,g_cc,hyperRectangle):
 		I_minus_C_jacInterval = subtractIntervalMatFromRegularMat(I,C_jacInterval)
 		xi_minus_midPoint = zeros((numVolts,2))
 		for i in range(numVolts):
-			xi_minus_midPoint[i][0] = hyperRectangle[0][i] - midPoint[i]
-			xi_minus_midPoint[i][1] = hyperRectangle[1][i] - midPoint[i]
+			xi_minus_midPoint[i][0] = startBounds[i][0] - midPoint[i]
+			xi_minus_midPoint[i][1] = startBounds[i][1] - midPoint[i]
 
 		lastTerm = multiplyIntervalMatWithIntervalVec(I_minus_C_jacInterval, xi_minus_midPoint)
 		
@@ -617,11 +617,11 @@ def checkExistenceOfSolution(a,g_fwd,g_cc,hyperRectangle):
 		if intersect is None:
 			print "hyperrectangle does not contain any solution"
 			return None
-		elif linalg.norm(intersect-startBounds) < 1e-8:
-			print "Found the smallest possible hyperrectangle containing solution"
-			return intersect
 		else:
 			startBounds = intersect
+		'''elif linalg.norm(intersect-startBounds) < 1e-8:
+			print "Found the smallest possible hyperrectangle containing solution"
+			return intersect'''
 		iteration += 1
 
 		if iteration == 2:

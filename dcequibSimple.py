@@ -116,14 +116,37 @@ def trapezoidBounds(a,Vin,Vout, Vlow, Vhigh):
 
 #params in the form of [p1,p2]
 def fun1(s,x,bounds,a,params):
-	outVal = Real('outVal')
-	for i in range(len(bounds)):
-		triangleClaim = triangleBounds(a,x,outVal,bounds[i][0], bounds[i][1])
-		s.add(triangleClaim)
-		if i == 0 or i == len(bounds)-1:
-			trapezoidClaim = trapezoidBounds(a,x,outVal,bounds[i][0],bounds[i][1])
-			s.add(trapezoidClaim)
-	s.add(outVal == params[0]*x + params[1])
+	outVals = RealVector('outVals',len(x))
+	allBounds = []
+	for i in range(len(x)):
+		allBounds.append(bounds)
+
+	for i in range(len(x)):	
+		for j in range(len(bounds)):
+			bound = allBounds[i][j]
+			triangleClaim = triangleBounds(a,x[i],outVals[i],bound[0][i], bound[1][i])
+			s.add(triangleClaim)
+			if j == 0 or j == len(bounds)-1:
+				trapezoidClaim = trapezoidBounds(a,x[i],outVals[i],bound[0][i],bound[1][i])
+				s.add(trapezoidClaim)
+		s.add(outVals[i] == params[0]*x[i] + params[1])
+
+def fun2(s,x,bounds,a,params):
+	outVals = RealVector('outVals',len(x))
+	allBounds = []
+	for i in range(len(x)):
+		allBounds.append(bounds)
+
+	for i in range(len(x)):
+		for j in range(len(bounds)):
+			triangleClaim = triangleBounds(a,x[(i-1)%len(x)],outVals[i],allBounds[(i-1)%len(x)][j][0], allBounds[(i-1)%len(x)][j][1])
+			s.add(triangleClaim)
+			if j == 0 or j == len(bounds)-1:
+				trapezoidClaim = trapezoidBounds(a,x[(i-1)%len(x)],outVals[i],allBounds[(i-1)%len(x)][j][0],allBounds[(i-1)%len(x)][j][1])
+				s.add(trapezoidClaim)
+	s.add(x[1] == outVals[0] + params[0])
+	s.add(x[0] == outVals[1] - params[0])
+	s.add(x[1] == x[0])
 
 def plotFun1(a,params):
 	x = arange(-4.0,4.0,0.01)
@@ -134,26 +157,38 @@ def plotFun1(a,params):
 	#plt.plot(x,ytanh-yLinear)
 	plt.show()
 
+#params in the form of [b]
+def plotFun2(a,params):
+	u = arange(-4.0,4.0,0.01)
+	plt.figure()
+	plt.plot(u,tanhFun(a,u) + params[0],'r',tanhFun(a,u) - params[0],u,'b')
+	plt.legend(['I_y == 0','I_x == 0'])
+	plt.show()
 
-def findScale(x,bounds,a,params):
+
+def findScale(x,bounds,a,params,fun):
 	print "Finding Scale"
 	opt = Optimize()
-	fun1(opt,x,bounds,a,params)
-	opt.push()
-	optMin = opt.minimize(x)
-	opt.check()
-	minVal = float(Fraction(str(opt.lower(optMin))))
-	opt.pop()
-	opt.push()
-	optMax = opt.maximize(x)
-	opt.check()
-	maxVal = float(Fraction(str(opt.upper(optMax))))
-	opt.pop()
-	lowerBound = minVal
-	upperBound = maxVal
-	print "optimal lowerBound: ", lowerBound
-	print "optimal upperBound: ", upperBound
-	return [lowerBound,upperBound]
+	fun(opt,x,bounds,a,params)
+	optBounds = zeros((2,len(x)))
+	for i in range(len(x)):
+		print "i: ", i
+		opt.push()
+		optMin = opt.minimize(x[0])
+		opt.check()
+		minVal = float(Fraction(str(opt.lower(optMin))))
+		opt.pop()
+		opt.push()
+		optMax = opt.maximize(x[0])
+		opt.check()
+		maxVal = float(Fraction(str(opt.upper(optMax))))
+		opt.pop()
+		optBounds[0][i] = minVal
+		optBounds[1][i] = maxVal
+	print "lowerBounds ", optBounds[0]
+	print "upperbounds ", optBounds[1]
+	print ""
+	return optBounds
 	
 
 # s is solver. I and V are an array of Z3 symbolic  values.
@@ -161,7 +196,7 @@ def findScale(x,bounds,a,params):
 # This function finds hyper rectangles containing DC equilibrium points 
 # for our oscillator model. Each hyper rectangle has length and width
 # equalling distance
-def findHyper(x,bounds,a,params,distances):
+def findHyper(x,bounds,a,params,distances,fun,funNum):
 	allHyperRectangles = []
 	s = Solver()
 	print "Finding HyperRectangles"
@@ -171,38 +206,39 @@ def findHyper(x,bounds,a,params,distances):
 		print "count: ", count
 		count += 1
 		s.push()
-		fun1(s,x,bounds,a,params)
+		fun(s,x,bounds,a,params)
 		#print "solver "
 		#print s
 		ch = s.check()
 		if(ch == sat):
-			low = None
-			high = None
-			sol = None
+			low = zeros((len(x)))
+			high = zeros((len(x)))
+			sol = zeros((len(x)))
 			m = s.model()
-			#print "model"
-			#print m
+			print "m "
+			print m
 			for d in m.decls():
 				dName = str(d.name())
+				index = int(dName[len(dName) - 1])
 				val = float(Fraction(str(m[d])))
-				if(dName[0]=="x"):
-					sol = val
-					low = val-distances
-					high = val+distances
-					if(low < 0 and high > 0):
+				if(dName[0]=="x" and dName[1]=="_"):
+					sol[index] = val
+					low[index] = val-distances[index]
+					high[index] = val+distances[index]
+					if(low[index] < 0 and high[index]>0):
 						if(val >= 0):
-							low = 0.0
+							low[index] = 0.0
 						elif(val < 0):
-							high = 0.0
+							high[index] = 0.0
 
 			print "sol: ", sol
 			print "Check solution "
-			yNum = fun1Num(sol,a,params)
+			yNum = funNum(sol,a,params)
 			print "yNum should be close to 0"
 			print yNum
 			
 			#create hyperrectangle around the solution formed 
-			newHyperRectangle = [[low],[high]]
+			newHyperRectangle = [low,high]
 
 		else:
 			newHyperRectangle = None
@@ -222,7 +258,8 @@ def findHyper(x,bounds,a,params,distances):
 			print newHyperRectangle
 			allHyperRectangles.append(newHyperRectangle)
 			# Add the constraint so that Z3 can find solutions outside the hyper rectangle just constructed
-			s.add(Or(x < newHyperRectangle[0][0], x > newHyperRectangle[1][0]))
+			s.add(Or(*[Or(x[i] < newHyperRectangle[0][i] - distances[i], 
+							x[i] > newHyperRectangle[1][i] + distances[i]) for i in range(len(x))]))
 
 '''def findSolWithNewtons(a,g_fwd,g_cc,hyperRectangle):
 	print "lower bounds ", hyperRectangle[0]
@@ -353,6 +390,9 @@ def checkExistenceOfSolution(a,params,hyperRectangle):
 		kInterval[:,0] = minimum(kInterval1, kInterval2)
 		kInterval[:,1] = maximum(kInterval1, kInterval2)
 
+		print "kInterval "
+		print kInterval
+
 		uniqueSoln = True
 		for i in range(numVolts):
 			if kInterval[i][0] <= startBounds[i][0] or kInterval[i][0] >= startBounds[i][1]:
@@ -375,9 +415,6 @@ def checkExistenceOfSolution(a,params,hyperRectangle):
 				intersect = None
 
 
-		print "kInterval "
-		print kInterval
-
 		print "intersect"
 		print intersect
 
@@ -396,28 +433,28 @@ def checkExistenceOfSolution(a,params,hyperRectangle):
 		iteration += 1
 
 
-def testInvRegion(params):
-	a = 1
-	x = Real('x')
+def testInvRegion(a,params):
+	x = RealVector('x',1)
 	allHyperRectangles = []
-	bounds = [[-5.0,-3.0],
-				  [-3.0,-1.0],
-				  [-1.0,0.0],
-				  [0.0,1.0],
-				  [1.0,3.0],
-				  [3.0,4.0]]
+	bounds = [[[-4.0],[-3.0]],
+				  [[-3.0],[-1.0]],
+				  [[-1.0],[0.0]],
+				  [[0.0],[1.0]],
+				  [[1.0],[3.0]],
+				  [[3.0],[4.0]]]
 
-	overallHyperRectangle = findScale(x,bounds,a,params)
-	minOptSol = overallHyperRectangle[0]
+	overallHyperRectangle = findScale(x,bounds,a,params,fun1)
+	'''minOptSol = overallHyperRectangle[0]
 	maxOptSol = overallHyperRectangle[1]
-	VlowVhighs = [[minOptSol,minOptSol/2.0],
-				  [minOptSol/2.0,0.0],
-				  [0.0,maxOptSol/2.0],
-				  [maxOptSol/2.0,maxOptSol]]
+	bounds = [[[minOptSol[0]],[minOptSol[0]/2.0]],
+				  [[minOptSol[0]/2.0],[0.0]],
+				  [[0.0],[maxOptSol[0]/2.0]],
+				  [[maxOptSol[0]/2.0],[maxOptSol[0]]]]
 
 
 	distances = (maxOptSol - minOptSol)/8.0
-	allHyperRectangles = findHyper(x,bounds,a,params,distances)
+	print "distances ", distances
+	allHyperRectangles = findHyper(x,bounds,a,params,distances,fun1,fun1Num)
 	
 	print "total number of hyperrectangles: ", len(allHyperRectangles)
 	print ""
@@ -426,8 +463,11 @@ def testInvRegion(params):
 	for i in range(len(allHyperRectangles)):
 		print "Checking existience within hyperrectangle ", i
 		checkExistenceOfSolution(a,params,allHyperRectangles[i])
+		print ""'''
 
-	plotFun1(a,params)
+	#plotFun1(a,params)
+	plotFun2(a,params)
 
 
-testInvRegion([0.3,0.1])
+#testInvRegion(1,[0.3,0.1])
+testInvRegion(-5,[0.0,0.0])

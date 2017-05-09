@@ -51,10 +51,16 @@ def fun1Num(x,a,params):
 def fun2Num(x,a,params):
 	Iy = tanhFun(a,x[0]) + params[0] - x[1]
 	Ix = tanhFun(a,x[1]) - params[0] - x[0]
-	return array(Ix,Iy)
+	return array([Ix,Iy])
 
 def fun1Der(x,a,params):
 	return array([tanhFunder(a,x) - params[0]])
+
+def fun2Der(x,a,params):
+	der = -1*ones((len(x),len(x)))
+	der[0][1] = tanhFunder(a,x[1])
+	der[1][0] = tanhFunder(a,x[0])
+	return der
 
 '''
 params = [b1,b2]
@@ -65,6 +71,19 @@ def fun1DerInterval(a,params,bounds):
 	der1 = fun1Der(lowerBound[0],a,params)
 	der2 = fun1Der(upperBound[0],a,params)
 	der = zeros((1,1,2))
+	der[:,:,0] = minimum(der1,der2)
+	der[:,:,1] = maximum(der1,der2)
+	return der
+
+'''
+params = b
+'''
+def fun2DerInterval(a,params,bounds):
+	lowerBound = bounds[:,0]
+	upperBound = bounds[:,1]
+	der1 = fun2Der(lowerBound,a,params)
+	der2 = fun2Der(upperBound,a,params)
+	der = zeros((len(lowerBound),len(lowerBound),2))
 	der[:,:,0] = minimum(der1,der2)
 	der[:,:,1] = maximum(der1,der2)
 	return der
@@ -459,6 +478,9 @@ def checkExistenceOfSolution(a,params,hyperRectangle,funNum,funDer,funDerInterva
 		if intersect is None:
 			print "hyperrectangle does not contain any solution"
 			return None
+		elif linalg.norm(intervalLength) < 1e-8:
+			print "Found the smallest possible hyperrectangle containing solution"
+			return intersect
 		else:
 			startBounds = intersect
 		'''elif linalg.norm(intersect-startBounds) < 1e-8:
@@ -479,7 +501,11 @@ def testInvRegion():
 				  [[0.0],[1.0]],
 				  [[1.0],[3.0]],
 				  [[3.0],[4.0]]]
-	fun = fun1'''
+	fun = fun1
+	funNum = fun1Num
+	funDer = fun1Der
+	funDerInterval = fun1DerInterval
+	'''
 
 	x = RealVector('x',2)
 	a = -5
@@ -491,20 +517,22 @@ def testInvRegion():
 				  [[1.0,1.0],[3.0,3.0]],
 				  [[3.0,3.0],[4.0,4.0]]]
 	fun = fun2
+	funNum = fun2Num
+	funDer = fun2Der
+	funDerInterval = fun2DerInterval
 
 	overallHyperRectangle = findScale(x,bounds,a,params,fun)
-	'''minOptSol = overallHyperRectangle[0]
+	minOptSol = overallHyperRectangle[0]
 	maxOptSol = overallHyperRectangle[1]
-	bounds = [[[minOptSol[0]],[minOptSol[0]/2.0]],
-				  [[minOptSol[0]/2.0],[0.0]],
-				  [[0.0],[maxOptSol[0]/2.0]],
-				  [[maxOptSol[0]/2.0],[maxOptSol[0]]]]
+	bounds = [[minOptSol,minOptSol/2.0],
+				  [minOptSol/2.0,zeros((len(x)))],
+				  [zeros((len(x))),maxOptSol/2.0],
+				  [maxOptSol/2.0,maxOptSol]]
 
 
 	distances = (maxOptSol - minOptSol)/8.0
-	#print "distances ", distances
-	#distances = [0.1,0.1]
-	allHyperRectangles = findHyper(x,bounds,a,params,distances,fun,fun1Num)
+	
+	allHyperRectangles = findHyper(x,bounds,a,params,distances,fun,funNum)
 	
 	print "total number of hyperrectangles: ", len(allHyperRectangles)
 	print ""
@@ -512,10 +540,10 @@ def testInvRegion():
 	print "Checking existence of solutions within hyperrectangles"
 	for i in range(len(allHyperRectangles)):
 		print "Checking existience within hyperrectangle ", i
-		checkExistenceOfSolution(a,params,allHyperRectangles[i],fun1Num,fun1Der,fun1DerInterval)
-		print ""'''
+		checkExistenceOfSolution(a,params,allHyperRectangles[i],funNum,funDer,funDerInterval)
+		print ""
 
 	#plotFun1(a,params)
-	plotFun2(a,params)
+	#plotFun2(a,params)
 
 testInvRegion()

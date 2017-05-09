@@ -48,6 +48,11 @@ def tanhFunder(a,val):
 def fun1Num(x,a,params):
 	return tanhFun(a,x) - params[0]*x - params[1]
 
+def fun2Num(x,a,params):
+	Iy = tanhFun(a,x[0]) + params[0] - x[1]
+	Ix = tanhFun(a,x[1]) - params[0] - x[0]
+	return array(Ix,Iy)
+
 def fun1Der(x,a,params):
 	return array([tanhFunder(a,x) - params[0]])
 
@@ -77,17 +82,31 @@ def triangleBounds(a, Vin, Vout, Vlow, Vhigh):
 	cHigh = tanhFunVhigh - dHigh*Vhigh
 	cThird = tanhFunVlow - dThird*Vlow
 
-	if Vlow >= 0 and Vhigh >=0:
-		return Implies(And(Vin >= Vlow, Vin <= Vhigh),
-						And(Vout >= dThird*Vin + cThird,
-							Vout <= dLow*Vin + cLow,
-							Vout <= dHigh*Vin + cHigh))
+	if a > 0:
+		if Vlow >= 0 and Vhigh >=0:
+			return Implies(And(Vin >= Vlow, Vin <= Vhigh),
+							And(Vout >= dThird*Vin + cThird,
+								Vout <= dLow*Vin + cLow,
+								Vout <= dHigh*Vin + cHigh))
 
-	elif Vlow <=0 and Vhigh <=0:
-		return Implies(And(Vin >= Vlow, Vin <= Vhigh),
-						And(Vout <= dThird*Vin + cThird,
-							Vout >= dLow*Vin + cLow,
-							Vout >= dHigh*Vin + cHigh))
+		elif Vlow <=0 and Vhigh <=0:
+			return Implies(And(Vin >= Vlow, Vin <= Vhigh),
+							And(Vout <= dThird*Vin + cThird,
+								Vout >= dLow*Vin + cLow,
+								Vout >= dHigh*Vin + cHigh))
+
+	elif a < 0:
+		if Vlow <= 0 and Vhigh <=0:
+			return Implies(And(Vin >= Vlow, Vin <= Vhigh),
+							And(Vout >= dThird*Vin + cThird,
+								Vout <= dLow*Vin + cLow,
+								Vout <= dHigh*Vin + cHigh))
+
+		elif Vlow >=0 and Vhigh >=0:
+			return Implies(And(Vin >= Vlow, Vin <= Vhigh),
+							And(Vout <= dThird*Vin + cThird,
+								Vout >= dLow*Vin + cLow,
+								Vout >= dHigh*Vin + cHigh))
 
 def trapezoidBounds(a,Vin,Vout, Vlow, Vhigh):
 	tanhFunVlow = tanhFun(a,Vlow)
@@ -102,16 +121,29 @@ def trapezoidBounds(a,Vin,Vout, Vlow, Vhigh):
 	cHigh = tanhFunVhigh - dHigh*Vhigh
 	cThird = tanhFunVlow - dThird*Vlow
 
-	if Vlow <= 0 and Vhigh <= 0:
-		return Implies(Vin < Vlow, 
-						And(Vout < dLow*Vin + cLow,
-							Vout <= 1,
-							Vout > tanhFunVlow))
-	elif Vlow >= 0 and Vhigh >=0:
-		return Implies(Vin > Vhigh, 
-						And(Vout > dHigh*Vin + cHigh,
-							Vout >= - 1,
-							Vout <  tanhFunVhigh))
+	if a > 0:
+		if Vlow <= 0 and Vhigh <= 0:
+			return Implies(Vin < Vlow, 
+							And(Vout > dLow*Vin + cLow,
+								Vout >= -1,
+								Vout < tanhFunVlow))
+		elif Vlow >= 0 and Vhigh >=0:
+			return Implies(Vin > Vhigh, 
+							And(Vout < dHigh*Vin + cHigh,
+								Vout <=  1,
+								Vout >  tanhFunVhigh))
+
+	elif a < 0:
+		if Vlow <= 0 and Vhigh <= 0:
+			return Implies(Vin < Vlow, 
+							And(Vout < dLow*Vin + cLow,
+								Vout <= 1,
+								Vout > tanhFunVlow))
+		elif Vlow >= 0 and Vhigh >=0:
+			return Implies(Vin > Vhigh, 
+							And(Vout > dHigh*Vin + cHigh,
+								Vout >= - 1,
+								Vout <  tanhFunVhigh))
 
 
 #params in the form of [p1,p2]
@@ -139,15 +171,15 @@ def fun2(s,x,bounds,a,params):
 
 	for i in range(len(x)):
 		for j in range(len(bounds)):
-			bound = allBounds[(i-1)%len(x)][j]
-			triangleClaim = triangleBounds(a,x[(i-1)%len(x)],outVals[i],bound[0][(i-1)%len(x)], bound[1][(i-1)%len(x)])
+			bound = allBounds[i][j]
+			triangleClaim = triangleBounds(a,x[i],outVals[i],bound[0][i], bound[1][i])
 			s.add(triangleClaim)
 			if j == 0 or j == len(bounds)-1:
-				trapezoidClaim = trapezoidBounds(a,x[(i-1)%len(x)],outVals[i],bound[0][(i-1)%len(x)],bound[1][(i-1)%len(x)])
+				trapezoidClaim = trapezoidBounds(a,x[i],outVals[i],bound[0][i],bound[1][i])
 				s.add(trapezoidClaim)
-	s.add(x[1] == outVals[0] + params[0])
-	s.add(x[0] == outVals[1] - params[0])
-	s.add(x[1] == x[0])
+
+	s.add(outVals[0] + params[0] - x[1] == 0)
+	s.add(outVals[1] - params[0] - x[0] == 0)
 
 def plotFun1(a,params):
 	x = arange(-4.0,4.0,0.01)
@@ -177,6 +209,9 @@ def findScale(x,bounds,a,params,fun):
 		opt.push()
 		optMin = opt.minimize(x[0])
 		opt.check()
+		m = opt.model()
+		lowerString = str(opt.lower(optMin))
+		indexStar = lowerString
 		minVal = float(Fraction(str(opt.lower(optMin))))
 		opt.pop()
 		opt.push()
@@ -467,8 +502,9 @@ def testInvRegion():
 
 
 	distances = (maxOptSol - minOptSol)/8.0
-	print "distances ", distances
-	allHyperRectangles = findHyper(x,bounds,a,params,distances,fun1,fun1Num)
+	#print "distances ", distances
+	#distances = [0.1,0.1]
+	allHyperRectangles = findHyper(x,bounds,a,params,distances,fun,fun1Num)
 	
 	print "total number of hyperrectangles: ", len(allHyperRectangles)
 	print ""
@@ -477,9 +513,9 @@ def testInvRegion():
 	for i in range(len(allHyperRectangles)):
 		print "Checking existience within hyperrectangle ", i
 		checkExistenceOfSolution(a,params,allHyperRectangles[i],fun1Num,fun1Der,fun1DerInterval)
-		print ""
+		print ""'''
 
-	plotFun1(a,params)'''
+	#plotFun1(a,params)
 	plotFun2(a,params)
 
 testInvRegion()

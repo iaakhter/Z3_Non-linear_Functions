@@ -139,10 +139,11 @@ def fun2(s,x,bounds,a,params):
 
 	for i in range(len(x)):
 		for j in range(len(bounds)):
-			triangleClaim = triangleBounds(a,x[(i-1)%len(x)],outVals[i],allBounds[(i-1)%len(x)][j][0], allBounds[(i-1)%len(x)][j][1])
+			bound = allBounds[(i-1)%len(x)][j]
+			triangleClaim = triangleBounds(a,x[(i-1)%len(x)],outVals[i],bound[0][(i-1)%len(x)], bound[1][(i-1)%len(x)])
 			s.add(triangleClaim)
 			if j == 0 or j == len(bounds)-1:
-				trapezoidClaim = trapezoidBounds(a,x[(i-1)%len(x)],outVals[i],allBounds[(i-1)%len(x)][j][0],allBounds[(i-1)%len(x)][j][1])
+				trapezoidClaim = trapezoidBounds(a,x[(i-1)%len(x)],outVals[i],bound[0][(i-1)%len(x)],bound[1][(i-1)%len(x)])
 				s.add(trapezoidClaim)
 	s.add(x[1] == outVals[0] + params[0])
 	s.add(x[0] == outVals[1] - params[0])
@@ -352,7 +353,7 @@ def multiplyIntervalMatWithIntervalVec(mat,vec):
 	return result
 
 
-def checkExistenceOfSolution(a,params,hyperRectangle):
+def checkExistenceOfSolution(a,params,hyperRectangle,funNum,funDer,funDerInterval):
 	print "lower bounds ", hyperRectangle[0]
 	print "upper bounds ",hyperRectangle[1]
 	numVolts = len(hyperRectangle[0])
@@ -367,12 +368,12 @@ def checkExistenceOfSolution(a,params,hyperRectangle):
 		midPoint = (startBounds[:,0] + startBounds[:,1])/2.0
 		print "midPoint"
 		print midPoint
-		IMidPoint = fun1Num(midPoint,a,params)
-		jacMidPoint = fun1Der(midPoint,a,params)
+		IMidPoint = funNum(midPoint,a,params)
+		jacMidPoint = funDer(midPoint,a,params)
 		C = linalg.inv(jacMidPoint)
 		I = identity(numVolts)
 
-		jacInterval = fun1DerInterval(a,params,startBounds)
+		jacInterval = funDerInterval(a,params,startBounds)
 		C_IMidPoint = dot(C,IMidPoint)
 
 		C_jacInterval = multiplyRegularMatWithIntervalMat(C,jacInterval)
@@ -433,17 +434,30 @@ def checkExistenceOfSolution(a,params,hyperRectangle):
 		iteration += 1
 
 
-def testInvRegion(a,params):
-	x = RealVector('x',1)
-	allHyperRectangles = []
+def testInvRegion():
+	'''x = RealVector('x',1)
+	a = 1
+	params = [0.3,0.1]
 	bounds = [[[-4.0],[-3.0]],
 				  [[-3.0],[-1.0]],
 				  [[-1.0],[0.0]],
 				  [[0.0],[1.0]],
 				  [[1.0],[3.0]],
 				  [[3.0],[4.0]]]
+	fun = fun1'''
 
-	overallHyperRectangle = findScale(x,bounds,a,params,fun1)
+	x = RealVector('x',2)
+	a = -5
+	params = [0.0]
+	bounds = [[[-4.0,-4.0],[-3.0,-3.0]],
+				  [[-3.0,-3.0],[-1.0,-1.0]],
+				  [[-1.0,-1.0],[0.0,0.0]],
+				  [[0.0,0.0],[1.0,1.0]],
+				  [[1.0,1.0],[3.0,3.0]],
+				  [[3.0,3.0],[4.0,4.0]]]
+	fun = fun2
+
+	overallHyperRectangle = findScale(x,bounds,a,params,fun)
 	'''minOptSol = overallHyperRectangle[0]
 	maxOptSol = overallHyperRectangle[1]
 	bounds = [[[minOptSol[0]],[minOptSol[0]/2.0]],
@@ -462,12 +476,10 @@ def testInvRegion(a,params):
 	print "Checking existence of solutions within hyperrectangles"
 	for i in range(len(allHyperRectangles)):
 		print "Checking existience within hyperrectangle ", i
-		checkExistenceOfSolution(a,params,allHyperRectangles[i])
-		print ""'''
+		checkExistenceOfSolution(a,params,allHyperRectangles[i],fun1Num,fun1Der,fun1DerInterval)
+		print ""
 
-	#plotFun1(a,params)
+	plotFun1(a,params)'''
 	plotFun2(a,params)
 
-
-#testInvRegion(1,[0.3,0.1])
-testInvRegion(-5,[0.0,0.0])
+testInvRegion()

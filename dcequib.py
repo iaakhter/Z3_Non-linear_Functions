@@ -215,8 +215,8 @@ def oscl(s,I,V,a,VlowVhighs,g_cc,g_fwd = 1):
 			for k in range(len(allVlowVhighs[i])):
 				boundin = allVlowVhighs[(i-1)%lenV][j]
 				boundcc = allVlowVhighs[(i+lenV/2)%lenV][k]
-				claimFwd = triangleBounds(a,Vin[i],VoutFwd[i],boundin[0][i],boundin[1][i])
-				claimCc = triangleBounds(a,Vcc[i],VoutCc[i],boundcc[0][i],boundcc[1][i])
+				claimFwd = triangleBounds(a,Vin[i],VoutFwd[i],boundin[0][(i-1)%lenV],boundin[1][(i-1)%lenV])
+				claimCc = triangleBounds(a,Vcc[i],VoutCc[i],boundcc[0][(i+lenV/2)%lenV],boundcc[1][(i+lenV/2)%lenV])
 				s.add(claimFwd)
 				s.add(claimCc)
 

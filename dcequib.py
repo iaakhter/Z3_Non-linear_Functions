@@ -371,6 +371,7 @@ def findHyper(I,V,a,VlowVhighs,g_fwd,g_cc,distances):
 			print newHyperRectangle
 			allHyperRectangles.append(newHyperRectangle)
 			# Add the constraint so that Z3 can find solutions outside the hyper rectangle just constructed
+			# TODO: need to fix these constraint. is this correct?
 			s.add(Or(*[Or(V[i] < newHyperRectangle[0][i] - distances[i], 
 							V[i] > newHyperRectangle[1][i] + distances[i]) for i in range(len(V))]))
 
@@ -387,6 +388,7 @@ def refine(I,V,a,hyperrectangle,g_fwd,g_cc,hyperNumber,figure):
 	VoutFwdErrors = []
 	VoutCcErrors = []
 	finalSol = zeros((len(V)))
+	smallerHyperrectangles = []
 	while True:
 		print "Iteration # ", count
 		s.push()
@@ -432,11 +434,23 @@ def refine(I,V,a,hyperrectangle,g_fwd,g_cc,hyperNumber,figure):
 			InumNorms.append(log10(linalg.norm(Inum)))
 			VoutFwdErrors.append(log10(abs(array(VoutFwdnum)-VoutFwd)))
 			VoutCcErrors.append(log10(abs(array(VoutCcnum)-VoutCc)))
-			if linalg.norm(diffBetweenSoln) < 1e-5:
+			print "diffBetweenSoln: ", diffBetweenSoln
+			print "norm of diff: ", linalg.norm(diffBetweenSoln)
+			if linalg.norm(diffBetweenSoln) < 5e-3:
 				finalSol = solVoltArray
-				break
+				smallerDistances = (array(hyperrectangle[1]) - array(hyperrectangle[0]))/8.0
+				lowSol = finalSol - smallerDistances
+				highSol = finalSol + smallerDistances
+				#print "lowSol ", lowSol
+				#print "highSol ", highSol
+				s.add(Or(*[Or(V[i] < lowSol[i] - smallerDistances[i], 
+							V[i] > highSol[i] + smallerDistances[i]) for i in range(len(V))]))
+				smallerHyperrectangle = [lowSol,highSol]
+				smallerHyperrectangles.append(smallerHyperrectangle)
+				oldSol = array([(hyperrectangle[0][i]+hyperrectangle[1][i])/2.0 for i in range(len(V))])
 
-			oldSol = solVoltArray
+			else:
+				oldSol = solVoltArray
 			count+=1
 		
 		else:
@@ -448,12 +462,12 @@ def refine(I,V,a,hyperrectangle,g_fwd,g_cc,hyperNumber,figure):
 		legends = ["VoutFwd0", "VoutFwd1", "VoutFwd2", "VoutFwd3",
 		"VoutCc0","VoutCc1","VoutCc2","VoutCc3","InumNorm"]
 		plt.figure(hyperNumber)
-		#plt.plot(arange(len(InumNorms)),InumNorms)
-		plt.plot(arange(len(InumNorms)), VoutFwdErrors,arange(len(InumNorms)), VoutCcErrors)
+		plt.plot(arange(len(InumNorms)),InumNorms)
+		#plt.plot(arange(len(InumNorms)), VoutFwdErrors,arange(len(InumNorms)), VoutCcErrors)
 		plt.xlabel("Number of Iterations")
 		plt.ylabel("Log of error")
 		plt.legend(legends,prop={'size':8})
-	return solVoltArray
+	return smallerHyperrectangles
 
 def findSolWithNewtons(a,g_fwd,g_cc,hyperRectangle):
 	print "lower bounds ", hyperRectangle[0]
@@ -551,6 +565,7 @@ def checkExistenceOfSolution(a,g_fwd,g_cc,hyperRectangle):
 	print "upper bounds ",hyperRectangle[1]
 	numVolts = len(hyperRectangle[0])
 
+	#hyperRectangle = [[0.3,-0.31,0.3,-0.31],[0.31,-0.3,0.31,-0.3]]
 	startBounds = zeros((numVolts,2))
 	startBounds[:,0] = hyperRectangle[0]
 	startBounds[:,1] = hyperRectangle[1]
@@ -584,6 +599,9 @@ def checkExistenceOfSolution(a,g_fwd,g_cc,hyperRectangle):
 		kInterval[:,0] = minimum(kInterval1, kInterval2)
 		kInterval[:,1] = maximum(kInterval1, kInterval2)
 
+		print "kInterval "
+		print kInterval
+
 		uniqueSoln = True
 		for i in range(numVolts):
 			if kInterval[i][0] < startBounds[i][0] or kInterval[i][0] > startBounds[i][1]:
@@ -602,21 +620,19 @@ def checkExistenceOfSolution(a,g_fwd,g_cc,hyperRectangle):
 			maxVal = min(kInterval[i][1],startBounds[i][1])
 			if minVal <= maxVal:
 				intersect[i] = [minVal,maxVal]
+				intervalLength =  intersect[:,1] - intersect[:,0]
 			else:
 				intersect = None
-
-
-		print "kInterval "
-		print kInterval
 
 		print "intersect"
 		print intersect
 
-		intervalLength =  intersect[:,1] - intersect[:,0]
-
 		if intersect is None:
 			print "hyperrectangle does not contain any solution"
 			return None
+		elif linalg.norm(intervalLength) < 1e-8 or linalg.norm(intersect-startBounds) < 1e-8:
+			print "Found the smallest possible hyperrectangle containing solution"
+			return intersect
 		else:
 			startBounds = intersect
 		'''elif linalg.norm(intersect-startBounds) < 1e-8:
@@ -624,8 +640,8 @@ def checkExistenceOfSolution(a,g_fwd,g_cc,hyperRectangle):
 			return intersect'''
 		iteration += 1
 
-		if iteration == 2:
-			return
+		#if iteration == 2:
+		#	return
 
 
 def checkIfSolnUniqueInHyperrect(a,g_fwd,g_cc,hyperRectangle,sol,alpha=0.1,r=1.0):
@@ -782,13 +798,8 @@ def testInvRegion(g_cc):
 	
 	print "total number of hyperrectangles: ", len(allHyperRectangles)
 	print ""
-	
-	print "Checking existence of solutions within hyperrectangles"
-	for i in range(len(allHyperRectangles)):
-		print "Checking existience within hyperrectangle ", i
-		checkExistenceOfSolution(a,g_fwd,g_cc,allHyperRectangles[i])
 
-	'''print "refining hyperrectangles"
+	print "refining hyperrectangles"
 	sols = []
 	figure = True
 	for i in range(len(allHyperRectangles)):
@@ -799,13 +810,20 @@ def testInvRegion(g_cc):
 		else:
 			print "Refined solution: "
 			print sol
-			sols.append(sol)
+			for rect in sol:
+				sols.append(rect)
 		print ""
 	if figure:
 		plt.show()
-	print "total number of hyperrectangles: ", len(allHyperRectangles)
 	print "All refined solutions "
-	print sols'''
+	print sols
+	print ""
+
+	print "Checking existence of solutions within refined hyperrectangles"
+	for i in range(len(sols)):
+		print "Checking existience within hyperrectangle ", i
+		checkExistenceOfSolution(a,g_fwd,g_cc,sols[i])
+		print ""
 	
 	'''print "Number of refined solutions ", len(sols)
 	print "Checking if refined solutions are correct"
@@ -820,4 +838,4 @@ def testInvRegion(g_cc):
 		print ""'''
 
 
-testInvRegion(0.5)
+testInvRegion(10.0)

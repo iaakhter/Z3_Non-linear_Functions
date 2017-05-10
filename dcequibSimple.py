@@ -466,20 +466,18 @@ def checkExistenceOfSolution(a,params,hyperRectangle,funNum,funDer,funDerInterva
 			maxVal = min(kInterval[i][1],startBounds[i][1])
 			if minVal <= maxVal:
 				intersect[i] = [minVal,maxVal]
+				intervalLength =  intersect[:,1] - intersect[:,0]
 			else:
 				intersect = None
 
-
 		print "intersect"
 		print intersect
-
-		intervalLength =  intersect[:,1] - intersect[:,0]
 
 		if intersect is None:
 			print "hyperrectangle does not contain any solution"
 			return None
 		elif linalg.norm(intervalLength) < 1e-8:
-			print "Found the smallest possible hyperrectangle containing solution"
+			print "Found smallest hyperrectangle containing solution"
 			return intersect
 		else:
 			startBounds = intersect
@@ -504,8 +502,7 @@ def testInvRegion():
 	fun = fun1
 	funNum = fun1Num
 	funDer = fun1Der
-	funDerInterval = fun1DerInterval
-	'''
+	funDerInterval = fun1DerInterval'''
 
 	x = RealVector('x',2)
 	a = -5

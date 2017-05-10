@@ -604,15 +604,15 @@ def checkExistenceOfSolution(a,g_fwd,g_cc,hyperRectangle):
 
 		uniqueSoln = True
 		for i in range(numVolts):
-			if kInterval[i][0] < startBounds[i][0] or kInterval[i][0] > startBounds[i][1]:
+			if kInterval[i][0] <= startBounds[i][0] or kInterval[i][0] >= startBounds[i][1]:
 				uniqueSoln = False
-			if kInterval[i][1] < startBounds[i][0] or kInterval[i][1] > startBounds[i][1]:
+			if kInterval[i][1] <= startBounds[i][0] or kInterval[i][1] >= startBounds[i][1]:
 				uniqueSoln = False
 
 		if uniqueSoln:
 			print "Hyperrectangle with unique solution found"
-			print startBounds
-			return startBounds
+			print kInterval
+			return (True,kInterval)
 
 		intersect = zeros((numVolts,2))
 		for i in range(numVolts):
@@ -629,10 +629,10 @@ def checkExistenceOfSolution(a,g_fwd,g_cc,hyperRectangle):
 
 		if intersect is None:
 			print "hyperrectangle does not contain any solution"
-			return None
+			return (False,None)
 		elif linalg.norm(intervalLength) < 1e-8 or linalg.norm(intersect-startBounds) < 1e-8:
 			print "Found the smallest possible hyperrectangle containing solution"
-			return intersect
+			return (False,intersect)
 		else:
 			startBounds = intersect
 		'''elif linalg.norm(intersect-startBounds) < 1e-8:
@@ -798,32 +798,43 @@ def testInvRegion(g_cc):
 	
 	print "total number of hyperrectangles: ", len(allHyperRectangles)
 	print ""
+	finalHyperrectangles = []
 
-	print "refining hyperrectangles"
-	sols = []
-	figure = True
-	for i in range(len(allHyperRectangles)):
-		print "Refining hyper rectangle ", i
-		sol = refine(I,V,a,allHyperRectangles[i],g_fwd,g_cc,i,figure)
-		if len(sol) ==0:
-			print "No solution found"
-		else:
-			print "Refined solution: "
-			print sol
-			for rect in sol:
-				sols.append(rect)
+	while len(allHyperRectangles) != 0:
+		print "refining hyperrectangles"
+		sols = []
+		figure = False
+		for i in range(len(allHyperRectangles)):
+			print "Refining hyper rectangle ", i
+			sol = refine(I,V,a,allHyperRectangles[i],g_fwd,g_cc,i,figure)
+			if len(sol) ==0:
+				print "No solution found"
+			else:
+				print "Refined solution: "
+				print sol
+				for rect in sol:
+					sols.append(rect)
+			print ""
+		if figure:
+			plt.show()
+		print "All refined solutions "
+		print sols
 		print ""
-	if figure:
-		plt.show()
-	print "All refined solutions "
-	print sols
-	print ""
+		allHyperRectangles = []
 
-	print "Checking existence of solutions within refined hyperrectangles"
-	for i in range(len(sols)):
-		print "Checking existience within hyperrectangle ", i
-		checkExistenceOfSolution(a,g_fwd,g_cc,sols[i])
-		print ""
+		print "Checking existence of solutions within refined hyperrectangles"
+		for i in range(len(sols)):
+			print "Checking existience within hyperrectangle ", i
+			uniqueness,interval = checkExistenceOfSolution(a,g_fwd,g_cc,sols[i])
+			if uniqueness:
+				finalHyperrectangles.append(transpose(interval))
+			else:
+				if interval is not None:
+					allHyperRectangles.append(transpose(interval))
+			print ""
+
+	print "final solutions"
+	print finalHyperrectangles
 	
 	'''print "Number of refined solutions ", len(sols)
 	print "Checking if refined solutions are correct"
@@ -838,4 +849,4 @@ def testInvRegion(g_cc):
 		print ""'''
 
 
-testInvRegion(10.0)
+testInvRegion(0.5)

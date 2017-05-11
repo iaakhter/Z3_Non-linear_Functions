@@ -339,7 +339,7 @@ def findHyper(I,V,a,VlowVhighs,g_fwd,g_cc,distances):
 
 				elif(dName[0]=="V" and dName[4]=="C"):
 					VoutCc[index] = val
-			print "VoutFwd: "
+			'''print "VoutFwd: "
 			print VoutFwd
 			print "VoutCC: "
 			print VoutCc
@@ -348,7 +348,7 @@ def findHyper(I,V,a,VlowVhighs,g_fwd,g_cc,distances):
 			print "Check solution "
 			_,_,Inum = oscNum(solVoltArray,a,g_cc,g_fwd)
 			print "I should be close to 0"
-			print Inum
+			print Inum'''
 			
 			#create hyperrectangle around the solution formed 
 			newHyperRectangle = [lowVoltArray,highVoltArray]
@@ -372,8 +372,9 @@ def findHyper(I,V,a,VlowVhighs,g_fwd,g_cc,distances):
 			allHyperRectangles.append(newHyperRectangle)
 			# Add the constraint so that Z3 can find solutions outside the hyper rectangle just constructed
 			# TODO: need to fix these constraint. is this correct?
-			s.add(Or(*[Or(V[i] < newHyperRectangle[0][i] - distances[i], 
-							V[i] > newHyperRectangle[1][i] + distances[i]) for i in range(len(V))]))
+			s.add(Or(*[Or(V[i] < newHyperRectangle[0][i], 
+							V[i] > newHyperRectangle[1][i]) for i in range(len(V))]))
+
 
 def refine(I,V,a,hyperrectangle,g_fwd,g_cc,hyperNumber,figure):
 	print "Finding solutions within hyperrectangle"
@@ -430,21 +431,20 @@ def refine(I,V,a,hyperrectangle,g_fwd,g_cc,hyperNumber,figure):
 			rightHyperrectangle = [solVoltArray,hyperLast[1]]
 			hyperrectangles = [leftHyperrectangle,rightHyperrectangle]
 
-			diffBetweenSoln = solVoltArray - oldSol
+			diffBetweenSoln = absolute(solVoltArray - oldSol)
 			InumNorms.append(log10(linalg.norm(Inum)))
 			VoutFwdErrors.append(log10(abs(array(VoutFwdnum)-VoutFwd)))
 			VoutCcErrors.append(log10(abs(array(VoutCcnum)-VoutCc)))
 			print "diffBetweenSoln: ", diffBetweenSoln
 			print "norm of diff: ", linalg.norm(diffBetweenSoln)
-			if linalg.norm(diffBetweenSoln) < 5e-3:
+			if all(diffBetweenSoln < 1e-5) or all(absolute(Inum) < 1e-4):
 				finalSol = solVoltArray
 				smallerDistances = (array(hyperrectangle[1]) - array(hyperrectangle[0]))/8.0
 				lowSol = finalSol - smallerDistances
 				highSol = finalSol + smallerDistances
 				#print "lowSol ", lowSol
 				#print "highSol ", highSol
-				s.add(Or(*[Or(V[i] < lowSol[i] - smallerDistances[i], 
-							V[i] > highSol[i] + smallerDistances[i]) for i in range(len(V))]))
+				s.add(Or(*[Or(V[i] < lowSol[i], V[i] > highSol[i]) for i in range(len(V))]))
 				smallerHyperrectangle = [lowSol,highSol]
 				smallerHyperrectangles.append(smallerHyperrectangle)
 				oldSol = array([(hyperrectangle[0][i]+hyperrectangle[1][i])/2.0 for i in range(len(V))])
@@ -618,11 +618,16 @@ def checkExistenceOfSolution(a,g_fwd,g_cc,hyperRectangle):
 		for i in range(numVolts):
 			minVal = max(kInterval[i][0],startBounds[i][0])
 			maxVal = min(kInterval[i][1],startBounds[i][1])
-			if minVal <= maxVal:
+			if minVal <= maxVal and \
+				minVal >= kInterval[i][0] and minVal >= startBounds[i][0] and \
+				minVal <= kInterval[i][1] and minVal <= startBounds[i][1] and \
+				maxVal >= kInterval[i][0] and maxVal >= startBounds[i][0] and \
+				maxVal <= kInterval[i][1] and maxVal <= startBounds[i][1]:
 				intersect[i] = [minVal,maxVal]
 				intervalLength =  intersect[:,1] - intersect[:,0]
 			else:
 				intersect = None
+				break
 
 		print "intersect"
 		print intersect
@@ -764,6 +769,47 @@ def plotSolutionsWithinHyperRectangles(I,V,a,g_fwd,g_cc,allHyperRectangles,volta
 			solv.pop()
 	plt.show()
 
+def filterHyperrectangles(allHyperRectangles):
+	filteredHypers = []
+	intersected = []
+	for hyper in allHyperRectangles:
+		intersected.append(False)
+
+	for i in range(len(allHyperRectangles)):
+		if intersected[i] == False:
+			hyper1 = array(allHyperRectangles[i])
+			for j in range(i+1,len(allHyperRectangles)):
+				enclosure = zeros((2,len(hyper1[0])))
+				if intersected[j] == False:
+					hyper2 = allHyperRectangles[j]
+					for k in range(len(hyper1[0])):
+						minValCheck = max(hyper1[0][k],hyper2[0][k])
+						maxValCheck = min(hyper1[1][k],hyper2[1][k])
+						minVal = min(hyper1[0][k],hyper2[0][k])
+						maxVal = max(hyper1[1][k],hyper2[1][k])
+						if minValCheck <= maxValCheck and \
+							minValCheck <= hyper1[1][k] and minValCheck <= hyper2[1][k] and \
+							minValCheck >= hyper1[0][k] and minValCheck >= hyper2[0][k] and \
+							maxValCheck >= hyper1[0][k] and maxValCheck >= hyper2[0][k] and \
+							maxValCheck <= hyper1[1][k] and maxValCheck <= hyper2[1][k]:
+							enclosure[0][k] = minVal
+							enclosure[1][k] = maxVal
+						else:
+							enclosure = None
+							break
+					if enclosure is not None:
+						print "combined "
+						print "hyper1 ", hyper1
+						print "hyper2 ", hyper2
+						hyper1 = enclosure
+						print "enclosure ", enclosure
+						print "hyper1 ", hyper1
+						intersected[j] = True
+			filteredHypers.append(hyper1)
+			intersected[i] = True
+
+	return filteredHypers
+
 
 def testInvRegion(g_cc):
 	a = 5
@@ -794,9 +840,9 @@ def testInvRegion(g_cc):
 
 	distances = [(maxOptSol[i] - minOptSol[i])/8.0 for i in range(len(V))]
 	allHyperRectangles = findHyper(I,V,a,VlowVhighs,g_fwd,g_cc,distances)
-	#plotSolutionsWithinHyperRectangles(I,V,a,g_fwd,g_cc,allHyperRectangles,0)
 	
-	print "total number of hyperrectangles: ", len(allHyperRectangles)
+	print "filteredHypers"
+	print allHyperRectangles
 	print ""
 	finalHyperrectangles = []
 
@@ -835,18 +881,8 @@ def testInvRegion(g_cc):
 
 	print "final solutions"
 	print finalHyperrectangles
-	
-	'''print "Number of refined solutions ", len(sols)
-	print "Checking if refined solutions are correct"
-	# Checking the refined hyperrectangle with numerical computation
-	for i in range(len(sols)):
-		Vtest = sols[i]
-		Inum = oscNum(Vtest,a,g_cc,g_fwd)
-		print "Example voltage in hyperrectangle"
-		print Vtest
-		print "Inum should be zero"
-		print Inum
-		print ""'''
-
+	filteredHypers= filterHyperrectangles(finalHyperrectangles)
+	print "final filtered solutions"
+	print filteredHypers
 
 testInvRegion(0.5)

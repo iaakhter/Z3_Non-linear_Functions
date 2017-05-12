@@ -821,12 +821,12 @@ def filterHyperrectangles(allHyperRectangles):
 							enclosure = None
 							break
 					if enclosure is not None:
-						print "combined "
-						print "hyper1 ", hyper1
-						print "hyper2 ", hyper2
+						#print "combined "
+						#print "hyper1 ", hyper1
+						#print "hyper2 ", hyper2
 						hyper1 = enclosure
-						print "enclosure ", enclosure
-						print "hyper1 ", hyper1
+						#print "enclosure ", enclosure
+						#print "hyper1 ", hyper1
 						intersected[j] = True
 			filteredHypers.append(hyper1)
 			intersected[i] = True
@@ -856,22 +856,22 @@ def separateHyperrectangles(allHyperRectangles):
 					minValCheck >= hyper1[0][k] and minValCheck >= hyper2[0][k] and \
 					maxValCheck >= hyper1[0][k] and maxValCheck >= hyper2[0][k] and \
 					maxValCheck <= hyper1[1][k] and maxValCheck <= hyper2[1][k]:
-					if hyper1[0][k] <= hyper2[0][k]:
+					if hyper1[0][k] < hyper2[0][k]:
 						hyper2[0][k] = hyper1[1][k]
-					elif hyper1[0][k] >= hyper2[0][k]:
+					elif hyper1[0][k] > hyper2[0][k]:
 						hyper2[1][k] = hyper1[0][k]
 				else:
 					changed = False
 					break
 			if changed:
 				allHyperRectangles[j] = hyper2
-				print "hyper1 after "
+				'''print "hyper1 after "
 				print allHyperRectangles[i][0]
 				print allHyperRectangles[i][1]
 				print "hyper2 after " 
 				print allHyperRectangles[j][0]
 				print allHyperRectangles[j][1]
-				print ""
+				print ""'''
 		separatedHypers.append(hyper1)
 
 
@@ -916,7 +916,7 @@ def testInvRegion(g_cc):
 	while len(allHyperRectangles) != 0:
 		print "refining hyperrectangles"
 		sols = []
-		figure = False
+		figure = True
 		for i in range(len(allHyperRectangles)):
 			print "Refining hyper rectangle ", i
 			sol = refine(I,V,a,allHyperRectangles[i],g_fwd,g_cc,i,figure)
@@ -943,10 +943,14 @@ def testInvRegion(g_cc):
 				finalHyperrectangles.append(transpose(interval))
 			else:
 				if interval is not None:
-					filteredHypers.append(transpose(interval))
+					allHyperRectangles.append(transpose(interval))
 			print ""
 
 	print "final solutions"
 	print finalHyperrectangles
+
+	filteredHyperrectangles = filterHyperrectangles(finalHyperrectangles)
+	print "final filtered solutions"
+	print filteredHyperrectangles
 
 testInvRegion(0.5)

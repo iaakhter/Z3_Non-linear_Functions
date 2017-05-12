@@ -256,8 +256,12 @@ def osclRefine(s,I,V,a,hyperRectangles,g_cc,g_fwd = 1):
 			hyperRectangle = hyperRectangles[j]
 			boundin = [hyperRectangle[0][(i-1) % lenV],hyperRectangle[1][(i-1) % lenV]]
 			boundcc = [hyperRectangle[0][(i+lenV/2)%lenV],hyperRectangle[1][(i+lenV/2)%lenV]]
+			#print "boundin ", boundin
+			#print "boundcc ", boundcc
 			claimFwd = triangleBounds(a,Vin[i],VoutFwd[i],boundin[0],boundin[1])
 			claimCc = triangleBounds(a,Vcc[i],VoutCc[i],boundcc[0],boundcc[1])
+			#print "claimFwd"
+			#print claimFwd
 			s.add(claimFwd)
 			s.add(claimCc)
 
@@ -392,7 +396,7 @@ def refine(I,V,a,hyperrectangle,g_fwd,g_cc,hyperNumber,figure):
 	smallerHyperrectangles = []
 	while True:
 		print "Iteration # ", count
-		s.push()
+		#s.push()
 		osclRefine(s,I,V,a,hyperrectangles,g_cc,g_fwd)
 		is_equilibrium = And(*[I[i]==0 for i in range(len(V))])
 		s.add(is_equilibrium)
@@ -423,13 +427,30 @@ def refine(I,V,a,hyperrectangle,g_fwd,g_cc,hyperNumber,figure):
 			VoutFwdnum,VoutCcnum,Inum = oscNum(solVoltArray,a,g_cc,g_fwd)
 			print "I should be close to 0"
 			print Inum
-			s.pop()
+			#s.pop()
 
 			hyperFirst = array(hyperrectangles[0])
 			hyperLast = array(hyperrectangles[len(hyperrectangles)-1])
 			leftHyperrectangle = [hyperFirst[0],solVoltArray]
 			rightHyperrectangle = [solVoltArray,hyperLast[1]]
-			hyperrectangles = [leftHyperrectangle,rightHyperrectangle]
+
+			'''if linalg.norm(solVoltArray - hyperFirst[0]) < linalg.norm(hyperLast[1] - solVoltArray):
+				hyperrectangles = [leftHyperrectangle]
+			else:
+				hyperrectangles = [rightHyperrectangle]'''
+			newHyper = zeros((2,len(V)))
+			distLeft = (solVoltArray - hyperrectangle[0])/4.0
+			distRight = (hyperrectangle[1] - solVoltArray)/4.0
+			newHyper[0] = solVoltArray - distLeft
+			newHyper[1] = solVoltArray + distRight
+			'''newHyperLeft = zeros((2,len(V)))
+			newHyperLeft[0] = hyperrectangle[0]
+			newHyperLeft[1] = solVoltArray
+			newHyperRight = zeros((2,len(V)))
+			newHyperRight[0] = solVoltArray
+			newHyperRight[1] = hyperrectangle[1]
+			hyperrectangles = [newHyperLeft,newHyper,newHyperRight]'''
+			hyperrectangles = [newHyper]
 
 			diffBetweenSoln = absolute(solVoltArray - oldSol)
 			InumNorms.append(log10(linalg.norm(Inum)))
@@ -437,6 +458,8 @@ def refine(I,V,a,hyperrectangle,g_fwd,g_cc,hyperNumber,figure):
 			VoutCcErrors.append(log10(abs(array(VoutCcnum)-VoutCc)))
 			print "diffBetweenSoln: ", diffBetweenSoln
 			print "norm of diff: ", linalg.norm(diffBetweenSoln)
+			print "all(diffBetweenSoln < 1e-5) ", all(diffBetweenSoln < 1e-5)
+			print "all(absolute(Inum) < 1e-4) ", all(absolute(Inum) < 1e-4)
 			if all(diffBetweenSoln < 1e-5) or all(absolute(Inum) < 1e-4):
 				finalSol = solVoltArray
 				smallerDistances = (array(hyperrectangle[1]) - array(hyperrectangle[0]))/8.0
@@ -454,7 +477,7 @@ def refine(I,V,a,hyperrectangle,g_fwd,g_cc,hyperNumber,figure):
 			count+=1
 		
 		else:
-			s.pop()
+			#s.pop()
 			finalSol =  []
 			break
 	
@@ -810,6 +833,48 @@ def filterHyperrectangles(allHyperRectangles):
 
 	return filteredHypers
 
+def separateHyperrectangles(allHyperRectangles):
+	separatedHypers = []
+
+	for i in range(len(allHyperRectangles)):
+		hyper1 = array(allHyperRectangles[i])
+		for j in range(i+1,len(allHyperRectangles)):
+			changed = True
+			hyper2 = allHyperRectangles[j]
+			print "hyper1 before " 
+			print allHyperRectangles[i][0]
+			print allHyperRectangles[i][1]
+			print "hyper2 before "
+			print allHyperRectangles[j][0]
+			print allHyperRectangles[j][1]
+			print ""
+			for k in range(len(hyper1[0])):
+				minValCheck = max(hyper1[0][k],hyper2[0][k])
+				maxValCheck = min(hyper1[1][k],hyper2[1][k])
+				if minValCheck <= maxValCheck and \
+					minValCheck <= hyper1[1][k] and minValCheck <= hyper2[1][k] and \
+					minValCheck >= hyper1[0][k] and minValCheck >= hyper2[0][k] and \
+					maxValCheck >= hyper1[0][k] and maxValCheck >= hyper2[0][k] and \
+					maxValCheck <= hyper1[1][k] and maxValCheck <= hyper2[1][k]:
+					if hyper1[0][k] <= hyper2[0][k]:
+						hyper2[0][k] = hyper1[1][k]
+					elif hyper1[0][k] >= hyper2[0][k]:
+						hyper2[1][k] = hyper1[0][k]
+				else:
+					changed = False
+					break
+			if changed:
+				allHyperRectangles[j] = hyper2
+				print "hyper1 after "
+				print allHyperRectangles[i][0]
+				print allHyperRectangles[i][1]
+				print "hyper2 after " 
+				print allHyperRectangles[j][0]
+				print allHyperRectangles[j][1]
+				print ""
+		separatedHypers.append(hyper1)
+
+
 
 def testInvRegion(g_cc):
 	a = 5
@@ -839,11 +904,13 @@ def testInvRegion(g_cc):
 
 
 	distances = [(maxOptSol[i] - minOptSol[i])/8.0 for i in range(len(V))]
-	allHyperRectangles = findHyper(I,V,a,VlowVhighs,g_fwd,g_cc,distances)
-	
-	print "filteredHypers"
+	print "hyperrectangles before"
 	print allHyperRectangles
-	print ""
+	allHyperRectangles = findHyper(I,V,a,VlowVhighs,g_fwd,g_cc,distances)
+	separateHyperrectangles(allHyperRectangles)
+	print "hyperrectangles after"
+	print allHyperRectangles
+	
 	finalHyperrectangles = []
 
 	while len(allHyperRectangles) != 0:
@@ -876,13 +943,10 @@ def testInvRegion(g_cc):
 				finalHyperrectangles.append(transpose(interval))
 			else:
 				if interval is not None:
-					allHyperRectangles.append(transpose(interval))
+					filteredHypers.append(transpose(interval))
 			print ""
 
 	print "final solutions"
 	print finalHyperrectangles
-	filteredHypers= filterHyperrectangles(finalHyperrectangles)
-	print "final filtered solutions"
-	print filteredHypers
 
 testInvRegion(0.5)

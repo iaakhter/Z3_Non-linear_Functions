@@ -176,9 +176,6 @@ def tangentLineBounds(a,Vin,Vout,point,Vpoint):
 		else:
 			lowVal = point
 			highVal = invTanhFun(a,Vpoint)
-			distance = highVal - lowVal
-			lowVal = lowVal - distance
-			highVal = highVal + distance
 			if lowVal < 0.0 and highVal > 0.0:
 				highVal = 0.0
 			diff = highVal - lowVal
@@ -191,9 +188,6 @@ def tangentLineBounds(a,Vin,Vout,point,Vpoint):
 		if Vpoint >= tanhFun(a,point):
 			lowVal = invTanhFun(a,Vpoint)
 			highVal = point
-			distance = highVal - lowVal
-			lowVal = lowVal - distance
-			highVal = highVal + distance
 			if lowVal < 0.0 and highVal > 0.0:
 				lowVal = 0.0
 			diff = highVal - lowVal

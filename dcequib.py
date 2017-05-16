@@ -36,6 +36,9 @@ def tanhFun(a,val):
 	return -tanh(a*val)
 	#return -(exp(a*val) - exp(-a*val))/(exp(a*val) + exp(-a*val))
 
+def invTanhFun(a,val):
+	return -arctanh(val)/a
+
 '''
 takes in non-symbolic python values
 calculates the derivative of tanhFun of val
@@ -163,6 +166,35 @@ def triangleBounds(a, Vin, Vout, Vlow, Vhigh):
 							Vout >= dLow*Vin + cLow,
 							Vout >= dHigh*Vin + cHigh))
 
+def tangentTriangleBounds(a,Vin,Vout,point,Vpoint):
+	tanhFunPoint = tanhFun(a,point)
+	dPoint = tanhFunder(a,point)
+	cPoint = tanhFunPoint - dPoint*point
+	if point <= 0:
+		if Vpoint >= tanhFun(a,point):
+			return Vout <= dPoint*Vin + cPoint
+		else:
+			lowVal = point
+			highVal = invTanhFun(a,Vpoint)
+			distance = highVal - lowVal
+			lowVal = lowVal - distance
+			highVal = highVal + distance
+			if lowVal < 0.0 and highVal > 0.0:
+				highVal = 0.0
+			return triangleBounds(a,Vin,Vout,lowVal,highVal)
+	else:
+		if Vpoint >= tanhFun(a,point):
+			lowVal = invTanhFun(a,Vpoint)
+			highVal = point
+			distance = highVal - lowVal
+			lowVal = lowVal - distance
+			highVal = highVal + distance
+			if lowVal < 0.0 and highVal > 0.0:
+				lowVal = 0.0
+			return triangleBounds(a,Vin,Vout,lowVal,highVal)
+		else:
+			return Vout >= dPoint*Vin + cPoint
+
 def trapezoidBounds(a,Vin,Vout, Vlow, Vhigh):
 	tanhFunVlow = tanhFun(a,Vlow)
 	tanhFunVhigh = tanhFun(a,Vhigh)
@@ -265,6 +297,19 @@ def osclRefine(s,I,V,a,hyperRectangles,g_cc,g_fwd = 1):
 			s.add(claimFwd)
 			s.add(claimCc)
 
+		s.add(I[i] == (VoutFwd[i] - V[i])*g_fwd + (VoutCc[i] - V[i])*g_cc)
+
+def osclRefineWithSol(s,I,V,a,solution,VoutSolFwd,VoutSolCc,g_cc,g_fwd):
+	lenV = len(V)
+	VoutFwd = RealVector('VoutFwd',lenV)
+	VoutCc = RealVector('VoutCc',lenV)
+	Vin = [V[i % lenV] for i in range(-1,lenV-1)]
+	Vcc = [V[(i + lenV/2) % lenV] for i in range(lenV)]
+	for i in range(lenV):
+		pointToBeConsideredFwd = solution[(i-1) % lenV]
+		pointToBeConsideredCc = solution[(i+lenV/2)%lenV]
+		claimFwd = tangentTriangleBounds(a,Vin[i],VoutFwd[i],pointToBeConsideredFwd,VoutSolFwd[i])
+		claimCc = tangentTriangleBounds(a,Vcc[i],VoutCc[i],pointToBeConsideredCc,VoutSolCc[i])
 		s.add(I[i] == (VoutFwd[i] - V[i])*g_fwd + (VoutCc[i] - V[i])*g_cc)
 
 def findScale(I,V,a,VlowVhighs,g_fwd,g_cc):
@@ -387,6 +432,8 @@ def refine(I,V,a,hyperrectangle,g_fwd,g_cc,hyperNumber,figure):
 	s = Solver()
 	s.add(And(*[And(V[i]>=hyperrectangle[0][i], V[i]<=hyperrectangle[1][i]) for i in range(len(V))]))
 	oldSol = array([(hyperrectangle[0][i]+hyperrectangle[1][i])/2.0 for i in range(len(V))])
+	VoutSolFwd =  zeros((len(V)))
+	VoutSolCc = zeros((len(V)))
 	hyperrectangles = [hyperrectangle]
 	count = 0
 	InumNorms = []
@@ -394,10 +441,14 @@ def refine(I,V,a,hyperrectangle,g_fwd,g_cc,hyperNumber,figure):
 	VoutCcErrors = []
 	finalSol = zeros((len(V)))
 	smallerHyperrectangles = []
+	diffBetweenSolnNorms = []
 	while True:
 		print "Iteration # ", count
 		#s.push()
-		osclRefine(s,I,V,a,hyperrectangles,g_cc,g_fwd)
+		if count == 0:
+			osclRefine(s,I,V,a,hyperrectangles,g_cc,g_fwd)
+		else:
+			osclRefineWithSol(s,I,V,a,oldSol,VoutSolFwd,VoutSolCc,g_cc,g_fwd)
 		is_equilibrium = And(*[I[i]==0 for i in range(len(V))])
 		s.add(is_equilibrium)
 		ch = s.check()
@@ -441,8 +492,10 @@ def refine(I,V,a,hyperrectangle,g_fwd,g_cc,hyperNumber,figure):
 			newHyper = zeros((2,len(V)))
 			distLeft = (solVoltArray - hyperrectangle[0])/4.0
 			distRight = (hyperrectangle[1] - solVoltArray)/4.0
-			newHyper[0] = solVoltArray - distLeft
-			newHyper[1] = solVoltArray + distRight
+			minDistance = minimum(distLeft, distRight)
+			print "mindistance ", minDistance
+			newHyper[0] = solVoltArray - minDistance
+			newHyper[1] = solVoltArray + minDistance
 			'''newHyperLeft = zeros((2,len(V)))
 			newHyperLeft[0] = hyperrectangle[0]
 			newHyperLeft[1] = solVoltArray
@@ -453,14 +506,17 @@ def refine(I,V,a,hyperrectangle,g_fwd,g_cc,hyperNumber,figure):
 			hyperrectangles = [newHyper]
 
 			diffBetweenSoln = absolute(solVoltArray - oldSol)
-			InumNorms.append(log10(linalg.norm(Inum)))
+			diffBetweenSolnNorm = linalg.norm(diffBetweenSoln)
+			if len(smallerHyperrectangles) == 0:
+				diffBetweenSolnNorms.append(diffBetweenSolnNorm)
+				InumNorms.append(log10(linalg.norm(Inum)))
 			VoutFwdErrors.append(log10(abs(array(VoutFwdnum)-VoutFwd)))
 			VoutCcErrors.append(log10(abs(array(VoutCcnum)-VoutCc)))
 			print "diffBetweenSoln: ", diffBetweenSoln
-			print "norm of diff: ", linalg.norm(diffBetweenSoln)
+			print "norm of diff: ", diffBetweenSolnNorm
 			print "all(diffBetweenSoln < 1e-5) ", all(diffBetweenSoln < 1e-5)
-			print "all(absolute(Inum) < 1e-4) ", all(absolute(Inum) < 1e-4)
-			if all(diffBetweenSoln < 1e-5) or all(absolute(Inum) < 1e-4):
+			#print "all(absolute(Inum) < 1e-4) ", all(absolute(Inum) < 1e-4)
+			if all(diffBetweenSoln < 1e-5):
 				finalSol = solVoltArray
 				smallerDistances = (array(hyperrectangle[1]) - array(hyperrectangle[0]))/8.0
 				lowSol = finalSol - smallerDistances
@@ -471,9 +527,12 @@ def refine(I,V,a,hyperrectangle,g_fwd,g_cc,hyperNumber,figure):
 				smallerHyperrectangle = [lowSol,highSol]
 				smallerHyperrectangles.append(smallerHyperrectangle)
 				oldSol = array([(hyperrectangle[0][i]+hyperrectangle[1][i])/2.0 for i in range(len(V))])
+				count = -1
 
 			else:
 				oldSol = solVoltArray
+				VoutSolFwd = VoutFwd
+				VoutSolCc = VoutCc
 			count+=1
 		
 		else:
@@ -482,14 +541,16 @@ def refine(I,V,a,hyperrectangle,g_fwd,g_cc,hyperNumber,figure):
 			break
 	
 	if figure:
-		legends = ["VoutFwd0", "VoutFwd1", "VoutFwd2", "VoutFwd3",
-		"VoutCc0","VoutCc1","VoutCc2","VoutCc3","InumNorm"]
-		plt.figure(hyperNumber)
-		plt.plot(arange(len(InumNorms)),InumNorms)
-		#plt.plot(arange(len(InumNorms)), VoutFwdErrors,arange(len(InumNorms)), VoutCcErrors)
-		plt.xlabel("Number of Iterations")
-		plt.ylabel("Log of error")
-		plt.legend(legends,prop={'size':8})
+		if len(smallerHyperrectangles) > 0:
+			legends = ["VoutFwd0", "VoutFwd1", "VoutFwd2", "VoutFwd3",
+			"VoutCc0","VoutCc1","VoutCc2","VoutCc3","InumNorm"]
+			plt.figure(hyperNumber)
+			#plt.plot(arange(len(InumNorms)),InumNorms)
+			plt.plot(arange(len(InumNorms)),diffBetweenSolnNorms)
+			#plt.plot(arange(len(InumNorms)), VoutFwdErrors,arange(len(InumNorms)), VoutCcErrors)
+			plt.xlabel("Number of Iterations")
+			plt.ylabel("Log of norm of error")
+			#plt.legend(legends,prop={'size':8})
 	return smallerHyperrectangles
 
 def findSolWithNewtons(a,g_fwd,g_cc,hyperRectangle):
@@ -953,4 +1014,4 @@ def testInvRegion(g_cc):
 	print "final filtered solutions"
 	print filteredHyperrectangles
 
-testInvRegion(0.5)
+testInvRegion(10.0)

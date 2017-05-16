@@ -442,8 +442,8 @@ def refine(I,V,a,hyperrectangle,g_fwd,g_cc,hyperNumber,figure):
 	s = Solver()
 	s.add(And(*[And(V[i]>=hyperrectangle[0][i], V[i]<=hyperrectangle[1][i]) for i in range(len(V))]))
 	oldSol = array([(hyperrectangle[0][i]+hyperrectangle[1][i])/2.0 for i in range(len(V))])
-	VoutSolFwd =  zeros((len(V)))
-	VoutSolCc = zeros((len(V)))
+	VoutSolFwd =  None
+	VoutSolCc = None
 	hyperrectangles = [hyperrectangle]
 	count = 0
 	InumNorms = []
@@ -452,6 +452,7 @@ def refine(I,V,a,hyperrectangle,g_fwd,g_cc,hyperNumber,figure):
 	finalSol = zeros((len(V)))
 	smallerHyperrectangles = []
 	diffBetweenSolnNorms = []
+	osclRefine(s,I,V,a,hyperrectangles,g_cc,g_fwd)
 	while True:
 		print "Iteration # ", count
 		#s.push()
@@ -489,15 +490,6 @@ def refine(I,V,a,hyperrectangle,g_fwd,g_cc,hyperNumber,figure):
 			print "I should be close to 0"
 			print Inum
 			#s.pop()
-
-			newHyper = zeros((2,len(V)))
-			distLeft = (solVoltArray - hyperrectangle[0])/4.0
-			distRight = (hyperrectangle[1] - solVoltArray)/4.0
-			minDistance = minimum(distLeft, distRight)
-			print "mindistance ", minDistance
-			newHyper[0] = solVoltArray - minDistance
-			newHyper[1] = solVoltArray + minDistance
-			hyperrectangles = [newHyper]
 
 			diffBetweenSoln = absolute(solVoltArray - oldSol)
 			diffBetweenSolnNorm = linalg.norm(diffBetweenSoln)
@@ -1008,4 +1000,4 @@ def testInvRegion(g_cc):
 	print "final filtered solutions"
 	print filteredHyperrectangles
 
-testInvRegion(0.5)
+testInvRegion(2.0)

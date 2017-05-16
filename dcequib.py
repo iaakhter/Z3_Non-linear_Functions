@@ -171,9 +171,8 @@ def tangentLineBounds(a,Vin,Vout,point,Vpoint):
 	dPoint = tanhFunder(a,point)
 	cPoint = tanhFunPoint - dPoint*point
 	if point <= 0:
-		if Vpoint >= tanhFun(a,point):
-			return Vout <= dPoint*Vin + cPoint
-		else:
+		claim1 =  Vout <= dPoint*Vin + cPoint
+		if Vpoint <= tanhFun(a,point):
 			lowVal = point
 			highVal = invTanhFun(a,Vpoint)
 			if lowVal < 0.0 and highVal > 0.0:
@@ -181,11 +180,17 @@ def tangentLineBounds(a,Vin,Vout,point,Vpoint):
 			diff = highVal - lowVal
 			if diff == 0.0:
 				diff = 1e-5
-			dPoint = (tanhFun(a,highVal) - tanhFun(a,lowVal))/diff
-			cPoint = tanhFun(a,lowVal) - dPoint*lowVal
-			return Vout >= dPoint*Vin + cPoint
+			#print "lowVal ", lowVal, " highVal ", highVal
+			dSec = (tanhFun(a,highVal) - tanhFun(a,lowVal))/diff
+			cSec = tanhFun(a,lowVal) - dSec*lowVal
+			return (triangleBounds(a, Vin, Vout, lowVal, highVal))
+		else:
+			return claim1
 	else:
-		if Vpoint >= tanhFun(a,point):
+		claim1 = Vout >= dPoint*Vin + cPoint
+		if Vpoint <= tanhFun(a,point):
+			return claim1
+		else:
 			lowVal = invTanhFun(a,Vpoint)
 			highVal = point
 			if lowVal < 0.0 and highVal > 0.0:
@@ -193,11 +198,10 @@ def tangentLineBounds(a,Vin,Vout,point,Vpoint):
 			diff = highVal - lowVal
 			if diff == 0.0:
 				diff = 1e-5
-			dPoint = (tanhFun(a,highVal) - tanhFun(a,lowVal))/diff
-			cPoint = tanhFun(a,lowVal) - dPoint*lowVal
-			return Vout <= dPoint*Vin + cPoint
-		else:
-			return Vout >= dPoint*Vin + cPoint
+			#print "lowVal ", lowVal, " highVal ", highVal
+			dSec = (tanhFun(a,highVal) - tanhFun(a,lowVal))/diff
+			cSec = tanhFun(a,lowVal) - dSec*lowVal
+			return triangleBounds(a, Vin, Vout, lowVal, highVal)
 
 def trapezoidBounds(a,Vin,Vout, Vlow, Vhigh):
 	tanhFunVlow = tanhFun(a,Vlow)
@@ -314,6 +318,8 @@ def osclRefineWithSol(s,I,V,a,solution,VoutSolFwd,VoutSolCc,g_cc,g_fwd):
 		pointToBeConsideredCc = solution[(i+lenV/2)%lenV]
 		claimFwd = tangentLineBounds(a,Vin[i],VoutFwd[i],pointToBeConsideredFwd,VoutSolFwd[i])
 		claimCc = tangentLineBounds(a,Vcc[i],VoutCc[i],pointToBeConsideredCc,VoutSolCc[i])
+		s.add(claimFwd)
+		s.add(claimCc)
 		s.add(I[i] == (VoutFwd[i] - V[i])*g_fwd + (VoutCc[i] - V[i])*g_cc)
 
 def findScale(I,V,a,VlowVhighs,g_fwd,g_cc):
@@ -450,9 +456,7 @@ def refine(I,V,a,hyperrectangle,g_fwd,g_cc,hyperNumber,figure):
 	while True:
 		print "Iteration # ", count
 		#s.push()
-		if count == 0:
-			osclRefine(s,I,V,a,hyperrectangles,g_cc,g_fwd)
-		else:
+		if VoutSolFwd is not None:
 			osclRefineWithSol(s,I,V,a,oldSol,VoutSolFwd,VoutSolCc,g_cc,g_fwd)
 		is_equilibrium = And(*[I[i]==0 for i in range(len(V))])
 		s.add(is_equilibrium)
@@ -508,6 +512,8 @@ def refine(I,V,a,hyperrectangle,g_fwd,g_cc,hyperNumber,figure):
 				smallerHyperrectangles.append(smallerHyperrectangle)
 				oldSol = array([(hyperrectangle[0][i]+hyperrectangle[1][i])/2.0 for i in range(len(V))])
 				count = -1
+				VoutSolFwd = None
+				VoutSolCc = None
 
 			else:
 				oldSol = solVoltArray
@@ -994,4 +1000,4 @@ def testInvRegion(g_cc):
 	print "final filtered solutions"
 	print filteredHyperrectangles
 
-testInvRegion(2.0)
+testInvRegion(0.4)

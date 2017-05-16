@@ -490,15 +490,6 @@ def refine(I,V,a,hyperrectangle,g_fwd,g_cc,hyperNumber,figure):
 			print Inum
 			#s.pop()
 
-			hyperFirst = array(hyperrectangles[0])
-			hyperLast = array(hyperrectangles[len(hyperrectangles)-1])
-			leftHyperrectangle = [hyperFirst[0],solVoltArray]
-			rightHyperrectangle = [solVoltArray,hyperLast[1]]
-
-			'''if linalg.norm(solVoltArray - hyperFirst[0]) < linalg.norm(hyperLast[1] - solVoltArray):
-				hyperrectangles = [leftHyperrectangle]
-			else:
-				hyperrectangles = [rightHyperrectangle]'''
 			newHyper = zeros((2,len(V)))
 			distLeft = (solVoltArray - hyperrectangle[0])/4.0
 			distRight = (hyperrectangle[1] - solVoltArray)/4.0
@@ -506,13 +497,6 @@ def refine(I,V,a,hyperrectangle,g_fwd,g_cc,hyperNumber,figure):
 			print "mindistance ", minDistance
 			newHyper[0] = solVoltArray - minDistance
 			newHyper[1] = solVoltArray + minDistance
-			'''newHyperLeft = zeros((2,len(V)))
-			newHyperLeft[0] = hyperrectangle[0]
-			newHyperLeft[1] = solVoltArray
-			newHyperRight = zeros((2,len(V)))
-			newHyperRight[0] = solVoltArray
-			newHyperRight[1] = hyperrectangle[1]
-			hyperrectangles = [newHyperLeft,newHyper,newHyperRight]'''
 			hyperrectangles = [newHyper]
 
 			diffBetweenSoln = absolute(solVoltArray - oldSol)
@@ -528,7 +512,7 @@ def refine(I,V,a,hyperrectangle,g_fwd,g_cc,hyperNumber,figure):
 			#print "all(absolute(Inum) < 1e-4) ", all(absolute(Inum) < 1e-4)
 			if all(diffBetweenSoln < 1e-5):
 				finalSol = solVoltArray
-				smallerDistances = (array(hyperrectangle[1]) - array(hyperrectangle[0]))/8.0
+				smallerDistances = (array(hyperrectangle[1]) - array(hyperrectangle[0]))/4.0
 				lowSol = finalSol - smallerDistances
 				highSol = finalSol + smallerDistances
 				#print "lowSol ", lowSol

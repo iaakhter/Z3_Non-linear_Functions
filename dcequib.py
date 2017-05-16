@@ -166,7 +166,7 @@ def triangleBounds(a, Vin, Vout, Vlow, Vhigh):
 							Vout >= dLow*Vin + cLow,
 							Vout >= dHigh*Vin + cHigh))
 
-def tangentTriangleBounds(a,Vin,Vout,point,Vpoint):
+def tangentLineBounds(a,Vin,Vout,point,Vpoint):
 	tanhFunPoint = tanhFun(a,point)
 	dPoint = tanhFunder(a,point)
 	cPoint = tanhFunPoint - dPoint*point
@@ -181,7 +181,12 @@ def tangentTriangleBounds(a,Vin,Vout,point,Vpoint):
 			highVal = highVal + distance
 			if lowVal < 0.0 and highVal > 0.0:
 				highVal = 0.0
-			return triangleBounds(a,Vin,Vout,lowVal,highVal)
+			diff = highVal - lowVal
+			if diff == 0.0:
+				diff = 1e-5
+			dPoint = (tanhFun(a,highVal) - tanhFun(a,lowVal))/diff
+			cPoint = tanhFun(a,lowVal) - dPoint*lowVal
+			return Vout >= dPoint*Vin + cPoint
 	else:
 		if Vpoint >= tanhFun(a,point):
 			lowVal = invTanhFun(a,Vpoint)
@@ -191,7 +196,12 @@ def tangentTriangleBounds(a,Vin,Vout,point,Vpoint):
 			highVal = highVal + distance
 			if lowVal < 0.0 and highVal > 0.0:
 				lowVal = 0.0
-			return triangleBounds(a,Vin,Vout,lowVal,highVal)
+			diff = highVal - lowVal
+			if diff == 0.0:
+				diff = 1e-5
+			dPoint = (tanhFun(a,highVal) - tanhFun(a,lowVal))/diff
+			cPoint = tanhFun(a,lowVal) - dPoint*lowVal
+			return Vout <= dPoint*Vin + cPoint
 		else:
 			return Vout >= dPoint*Vin + cPoint
 
@@ -308,8 +318,8 @@ def osclRefineWithSol(s,I,V,a,solution,VoutSolFwd,VoutSolCc,g_cc,g_fwd):
 	for i in range(lenV):
 		pointToBeConsideredFwd = solution[(i-1) % lenV]
 		pointToBeConsideredCc = solution[(i+lenV/2)%lenV]
-		claimFwd = tangentTriangleBounds(a,Vin[i],VoutFwd[i],pointToBeConsideredFwd,VoutSolFwd[i])
-		claimCc = tangentTriangleBounds(a,Vcc[i],VoutCc[i],pointToBeConsideredCc,VoutSolCc[i])
+		claimFwd = tangentLineBounds(a,Vin[i],VoutFwd[i],pointToBeConsideredFwd,VoutSolFwd[i])
+		claimCc = tangentLineBounds(a,Vcc[i],VoutCc[i],pointToBeConsideredCc,VoutSolCc[i])
 		s.add(I[i] == (VoutFwd[i] - V[i])*g_fwd + (VoutCc[i] - V[i])*g_cc)
 
 def findScale(I,V,a,VlowVhighs,g_fwd,g_cc):
@@ -1014,4 +1024,4 @@ def testInvRegion(g_cc):
 	print "final filtered solutions"
 	print filteredHyperrectangles
 
-testInvRegion(10.0)
+testInvRegion(0.5)

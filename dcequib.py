@@ -166,6 +166,11 @@ def triangleBounds(a, Vin, Vout, Vlow, Vhigh):
 							Vout >= dLow*Vin + cLow,
 							Vout >= dHigh*Vin + cHigh))
 
+	elif Vlow <= 0 and Vhigh >= 0:
+		return Implies(And(Vin >= Vlow, Vin <= Vhigh),
+						And(Vout <= dLow*Vin + cLow,
+							Vout >= dHigh*Vin + cHigh))
+
 def tangentTriangleBounds(a,Vin,Vout,point,Vpoint,low,high):
 	tanhFunPoint = tanhFun(a,point)
 	dPoint = tanhFunder(a,point)
@@ -222,16 +227,17 @@ def trapezoidBounds(a,Vin,Vout, Vlow, Vhigh):
 	cHigh = tanhFunVhigh - dHigh*Vhigh
 	cThird = tanhFunVlow - dThird*Vlow
 
-	if Vlow <= 0 and Vhigh <= 0:
+	if Vlow <= 0:
 		return Implies(Vin < Vlow, 
 						And(Vout < dLow*Vin + cLow,
 							Vout <= 1,
 							Vout > tanhFunVlow))
-	elif Vlow >= 0 and Vhigh >=0:
+	elif Vhigh >=0:
 		return Implies(Vin > Vhigh, 
 						And(Vout > dHigh*Vin + cHigh,
 							Vout >= - 1,
 							Vout <  tanhFunVhigh))
+
 
 
 # Use triangle and trapezoid bounds for the constraints
@@ -1024,4 +1030,4 @@ def testInvRegion(g_cc):
 	print "final filtered solutions"
 	print filteredHyperrectangles
 
-testInvRegion(0.5)
+testInvRegion(10.0)

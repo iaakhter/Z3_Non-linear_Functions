@@ -63,40 +63,56 @@ def convertToStdLP(stringConstraint):
 	variablesSign = {} # if negative need to change variables in original LP
 	variableConstraints = finalSplitConst[len(finalSplitConst)-1]
 	countVariables = 1
-	for j in range(len(variableConstraints)):
-		if j%3 == 0:
+	for j in range(len(variableConstraints)-1):
+		if variableConstraints[j+1] == "urs":
+			variablesSign[variableConstraints[j]] = "urs"
+			variables[variableConstraints[j]] = [countVariables, countVariables+1]
+			countVariables += 2
+		elif variableConstraints[j+1] == ">=":
+			variablesSign[variableConstraints[j]] = True #variable must be positive
 			variables[variableConstraints[j]] = countVariables
-			if variableConstraints[j+1] == ">=":
-				variablesSign[variableConstraints[j]] = True #variable must be positive
-			elif variableConstraints[j+1] == "<=":
-				variablesSign[variableConstraints[j]] = False #variable must be negative
+			countVariables += 1
+		elif variableConstraints[j+1] == "<=":
+			variablesSign[variableConstraints[j]] = False #variable must be negative
 			countVariables += 1
 
+	print "variablesSign"
+	print variablesSign
+	print "variables"
+	print variables
 	countInequalities = 1 # because of the objective function
 	for i in range(1,len(finalSplitConst)-1):
 		const = finalSplitConst[i]
 		if const[len(const)-2] != "==":
 			countInequalities+=1
 
-	mat = np.zeros((len(finalSplitConst)-1,len(variables) + countInequalities + 1))
+	mat = np.zeros((len(finalSplitConst)-1,countVariables + countInequalities))
 	mat[0,0] = 1.0
-	slackVarNum = len(variables) + 1
+	slackVarNum = countVariables
 	print "finalSplitConst"
 	print finalSplitConst
+	
+	# fill in the matrix
 	for i in range(mat.shape[0]):
 		const = finalSplitConst[i]
 		if i== 0:
 			maximize = True
 			if const[0] == "min":
 				maximize = False
-			for j in range(1,mat.shape[1]-1):
+			for j in range(1,len(const)-1):
 				if is_number(const[j]):
 					if maximize:
-						if variablesSign[const[j+1]]:
+						if variablesSign[const[j+1]] == "urs":
+							mat[i][variables[const[j+1]][0]] = -float(const[j])
+							mat[i][variables[const[j+1]][1]] = float(const[j])
+						elif variablesSign[const[j+1]]:
 							mat[i][variables[const[j+1]]] = -float(const[j])
 						else:
 							mat[i][variables[const[j+1]]] = float(const[j])
 					else:
+						if variablesSign[const[j+1]] == "urs":
+							mat[i][variables[const[j+1]][0]] = float(const[j])
+							mat[i][variables[const[j+1]][1]] = -float(const[j])
 						if variablesSign[const[j+1]]:
 							mat[i][variables[const[j+1]]] = float(const[j])
 						else:
@@ -111,9 +127,12 @@ def convertToStdLP(stringConstraint):
 			elif const[len(const)-2] == "==":
 				lessThan = False
 				greaterThan = False
-			for j in range(mat.shape[1]-1):
+			for j in range(len(const)-1):
 				if is_number(const[j]):
-					if variablesSign[const[j+1]]:
+					if variablesSign[const[j+1]] == "urs":
+						mat[i][variables[const[j+1]][0]] = float(const[j])
+						mat[i][variables[const[j+1]][1]] = -float(const[j])
+					elif variablesSign[const[j+1]]:
 						mat[i][variables[const[j+1]]] = float(const[j])
 					else:
 						mat[i][variables[const[j+1]]] = -float(const[j])
@@ -128,7 +147,7 @@ def convertToStdLP(stringConstraint):
 
 
 if __name__=="__main__":
-	stringConstraint = "max 1 x1 + 1 x2\n2 x1 + 1 x2 <= 4\n1 x1 + 2 x2 <= 3\nx1 >= 0 x2 >= 0"
+	stringConstraint = "max 1 x1 + 1 x2\n2 x1 + 1 x2 <= 4\n1 x1 + 2 x2 <= 3\nx1 urs x2 >= 0"
 	print "stringConstraint"
 	print stringConstraint
 	mat = convertToStdLP(stringConstraint)

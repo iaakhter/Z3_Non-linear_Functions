@@ -490,7 +490,7 @@ def checkExistenceOfSolution(a,params,hyperRectangle,funNum,funDer,funDerInterva
 
 
 def testInvRegion():
-	'''x = RealVector('x',1)
+	x = RealVector('x',1)
 	a = 1
 	params = [0.3,0.1]
 	bounds = [[[-4.0],[-3.0]],
@@ -502,9 +502,9 @@ def testInvRegion():
 	fun = fun1
 	funNum = fun1Num
 	funDer = fun1Der
-	funDerInterval = fun1DerInterval'''
+	funDerInterval = fun1DerInterval
 
-	x = RealVector('x',2)
+	'''x = RealVector('x',2)
 	a = -5
 	params = [0.0]
 	bounds = [[[-4.0,-4.0],[-3.0,-3.0]],
@@ -538,9 +538,9 @@ def testInvRegion():
 	for i in range(len(allHyperRectangles)):
 		print "Checking existience within hyperrectangle ", i
 		checkExistenceOfSolution(a,params,allHyperRectangles[i],funNum,funDer,funDerInterval)
-		print ""
+		print ""'''
 
-	#plotFun1(a,params)
+	plotFun1(a,params)
 	#plotFun2(a,params)
 
 testInvRegion()

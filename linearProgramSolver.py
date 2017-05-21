@@ -11,9 +11,26 @@ def is_number(s):
 # Applies the simplex on a standard form LP matrix
 # the first row is the objective function
 # the first element in the first row must be positive
-def simplex(standardMat):
+def simplex(standardMat, artificialIndices):
 	numRows = standardMat.shape[0]
 	numCols = standardMat.shape[1]
+	count = 0
+	while True:
+		print "standardMat before simplex"
+		print standardMat
+		nonZeroVals = 0
+		artInd = None
+		for ind in artificialIndices:
+			r = ind[0]
+			c = ind[1]
+			nonZeroVals += np.sum(standardMat[:,c] != 0)
+			artInd = ind
+		if nonZeroVals == len(artificialIndices):
+			break
+
+		standardMat = gauss_jordan(standardMat,artInd[0],artInd[1])
+		count += 1
+
 	count = 0
 	while len(np.where(standardMat[0] < 0)[0]) > 0:
 		print "mat "
@@ -22,7 +39,10 @@ def simplex(standardMat):
 		enteringVariable = np.where(standardMat[0,:] < 0)[0][0]
 		ratios = np.divide(standardMat[:,numCols - 1],standardMat[:,enteringVariable])
 		ratioSortedIndices = np.argsort(ratios)
-		pivot = ratioSortedIndices[1]
+		for ind in ratioSortedIndices:
+			if ind != 0 and ratios[ind] > 0:
+				pivot = ind
+				break
 		print "entering variable ", enteringVariable
 		print "ratios ", ratios
 		print "ratioIndices", ratioSortedIndices
@@ -32,6 +52,8 @@ def simplex(standardMat):
 		print standardMat
 		print ""
 		count+=1
+		'''if count == 2:
+			return'''
 	sols = np.zeros((numCols - 1))
 	for i in range(len(sols)):
 		if np.sum(standardMat[:,i]==0) == numRows - 1:
@@ -49,6 +71,7 @@ def gauss_jordan(mat, pivot, enteringVariable):
 	return mat
 
 def convertToStdLP(stringConstraint):
+	artificialIndices = []
 	#split the strings appropriately to make it easy for parsing
 	splittedConstraint = stringConstraint.split("\n")
 	finalSplitConst = []
@@ -83,10 +106,13 @@ def convertToStdLP(stringConstraint):
 	countInequalities = 1 # because of the objective function
 	for i in range(1,len(finalSplitConst)-1):
 		const = finalSplitConst[i]
-		if const[len(const)-2] != "==":
+		if const[len(const)-2] == ">=":
+			countInequalities+=2
+		else:
 			countInequalities+=1
 
 	mat = np.zeros((len(finalSplitConst)-1,countVariables + countInequalities))
+	#print "mat.shape ", mat.shape
 	mat[0,0] = 1.0
 	slackVarNum = countVariables
 	print "finalSplitConst"
@@ -95,6 +121,7 @@ def convertToStdLP(stringConstraint):
 	# fill in the matrix
 	for i in range(mat.shape[0]):
 		const = finalSplitConst[i]
+		# deal with min max issue in the objectibe function
 		if i== 0:
 			maximize = True
 			if const[0] == "min":
@@ -102,6 +129,7 @@ def convertToStdLP(stringConstraint):
 			for j in range(1,len(const)-1):
 				if is_number(const[j]):
 					if maximize:
+						#if variable is unrestricted, replace it with two variables
 						if variablesSign[const[j+1]] == "urs":
 							mat[i][variables[const[j+1]][0]] = -float(const[j])
 							mat[i][variables[const[j+1]][1]] = float(const[j])
@@ -118,7 +146,10 @@ def convertToStdLP(stringConstraint):
 						else:
 							mat[i][variables[const[j+1]]] = -float(const[j])
 		else:
-			mat[i][mat.shape[1]-1] = float(const[len(const)-1])
+			negConstant = False # if negative constant on the right hand side
+								# multiply everything by -1 and flip the equality signs
+			if (float(const[len(const)-1]) < 0):
+				negConstant = True
 			lessThan = True
 			greaterThan = False
 			if const[len(const)-2] == ">=":
@@ -127,30 +158,70 @@ def convertToStdLP(stringConstraint):
 			elif const[len(const)-2] == "==":
 				lessThan = False
 				greaterThan = False
+			if (lessThan or greaterThan) and negConstant:
+				mat[i][mat.shape[1]-1] = -float(const[len(const)-1])
+				if lessThan:
+					lessThan = False
+					greaterThan = True
+				else:
+					lessThan = True
+					greaterThan = False
+			else:
+				mat[i][mat.shape[1]-1] = float(const[len(const)-1])
 			for j in range(len(const)-1):
 				if is_number(const[j]):
 					if variablesSign[const[j+1]] == "urs":
-						mat[i][variables[const[j+1]][0]] = float(const[j])
-						mat[i][variables[const[j+1]][1]] = -float(const[j])
+						if negConstant == False:
+							mat[i][variables[const[j+1]][0]] = float(const[j])
+							mat[i][variables[const[j+1]][1]] = -float(const[j])
+						else:
+							mat[i][variables[const[j+1]][0]] = -float(const[j])
+							mat[i][variables[const[j+1]][1]] = float(const[j])
 					elif variablesSign[const[j+1]]:
-						mat[i][variables[const[j+1]]] = float(const[j])
+						if negConstant == False:
+							mat[i][variables[const[j+1]]] = float(const[j])
+						else:
+							mat[i][variables[const[j+1]]] = -float(const[j])
 					else:
-						mat[i][variables[const[j+1]]] = -float(const[j])
-			if lessThan:
+						if negConstant == False:
+							mat[i][variables[const[j+1]]] = -float(const[j])
+						else:
+							mat[i][variables[const[j+1]]] = float(const[j])
+
+			if lessThan == False and greaterThan == False:
+				mat[i][slackVarNum] = 1.0
+				mat[0][slackVarNum] = 1e+15
+				artificialIndices.append([i,slackVarNum])
+				slackVarNum += 1
+			elif lessThan:
 				mat[i][slackVarNum] = 1.0
 				slackVarNum += 1
 			elif greaterThan:
 				mat[i][slackVarNum] = -1.0
 				slackVarNum += 1
+				mat[i][slackVarNum] = 1.0
+				mat[0][slackVarNum] = 1e+15
+				artificialIndices.append([i,slackVarNum])
+				slackVarNum += 1
 
-	return mat
+
+	return (mat, artificialIndices)
+
+def linearConstraintFun1():
+	constraintString = "1 y + 0.133 x <= 0.9205\n\
+						1 y + 5.0 x <= 0.0\n\
+						1 y + 1.974 x >= 0.0\n\
+						1 y <= 1.0\n\
+						1 y >= 0.987\n\
+						1 y - 0.3 x == 0.1"
+
 
 
 if __name__=="__main__":
-	stringConstraint = "max 1 x1 + 1 x2\n2 x1 + 1 x2 <= 4\n1 x1 + 2 x2 <= 3\nx1 urs x2 >= 0"
+	stringConstraint = "max 2 x1 + 1 x2\n1 x1 + 1 x2 <= 10\n-1 x1 + 1 x2 >= 2\nx1 >= 0 x2 >= 0"
 	print "stringConstraint"
 	print stringConstraint
-	mat = convertToStdLP(stringConstraint)
+	mat,artificialIndices = convertToStdLP(stringConstraint)
 	print "mat "
 	print mat
 	'''mat = np.array([[1.0, -1.0, -1.0, 0.0, 0.0, 0.0],
@@ -162,7 +233,7 @@ if __name__=="__main__":
 	'''mat = np.array([[1.0,-1.0,-1.0,0.0,0.0,0.0],
 				[0.0,2.0,1.0,1.0,0.0,4.0],
 				[0.0,1.0,2.0,0.0,1.0,3.0]])'''
-	'''solutions = simplex(mat)
+	solutions = simplex(mat,artificialIndices)
 	print "final solutions"
-	print solutions'''
+	print solutions
 

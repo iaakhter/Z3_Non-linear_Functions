@@ -15,6 +15,23 @@ def simplex(standardMat, artificialIndices):
 	numRows = standardMat.shape[0]
 	numCols = standardMat.shape[1]
 	count = 0
+	while True:
+		print "standardMat before simplex"
+		print standardMat
+		nonZeroVals = 0
+		artInd = None
+		for ind in artificialIndices:
+			r = ind[0]
+			c = ind[1]
+			nonZeroVals += np.sum(standardMat[:,c] != 0)
+			artInd = ind
+		if nonZeroVals == len(artificialIndices):
+			break
+
+		standardMat = gauss_jordan(standardMat,artInd[0],artInd[1])
+		count += 1
+
+	count = 0
 	while len(np.where(standardMat[0] < 0)[0]) > 0:
 		print "mat "
 		print standardMat
@@ -52,105 +69,6 @@ def gauss_jordan(mat, pivot, enteringVariable):
 		if i!= pivot:
 			mat[i] = mat[i] - mat[i][enteringVariable]*mat[pivot]
 	return mat
-
-# Assumptions: All decision variables are >= 0
-def normalize(stringConstriant):
-	#split the strings appropriately to make it easy for parsing
-	splittedConstraint = stringConstraint.split("\n")
-	finalSplitConst = []
-	for s in splittedConstraint:
-		splitted = s.split(" ")
-		finalSplitConst.append(splitted)
-
-	# get all the variables from the last constraint added
-	# assumes that the last constraint always constraints the individual
-	# decision variables. e.g. x1 >= 0, x2 >= 0 and so on
-	variables = {}
-	variableConstraints = finalSplitConst[len(finalSplitConst)-1]
-	countVariables = 1
-	
-	for j in range(len(variableConstraints)-1):
-		if variableConstraints[j+1] == ">=":
-			variables[variableConstraints[j]] = countVariables
-			countVariables += 1
-
-	print "variables"
-	print variables
-	countExtraVariables = 1 # because of the objective function
-	countExtraConstraints = 0
-	for i in range(1,len(finalSplitConst)-1):
-		const = finalSplitConst[i]
-		if const[len(const)-2] == ">=" or const[len(const)-2] == "<=":
-			countExtraVariables+=1
-		elif const[len(const)-2] == "==":
-			countExtraVariables+=2
-			countExtraConstraints +=1
-
-	mat = np.zeros((len(finalSplitConst)-1 + countExtraConstraints,countVariables + countExtraVariables))
-	#print "mat.shape ", mat.shape
-	mat[0,0] = 1.0
-	slackVarNum = countVariables
-	print "finalSplitConst"
-	print finalSplitConst
-
-	# fill in the matrix
-	matIndex = 0
-	for i in range(len(finalSplitConst)-1):
-		const = finalSplitConst[i]
-		# deal with min max issue in the objectibe function
-		if i== 0:
-			maximize = True
-			if const[0] == "min":
-				maximize = False
-			for j in range(1,len(const)-1):
-				if is_number(const[j]):
-					if maximize:
-						mat[matIndex][variables[const[j+1]]] = -float(const[j])
-					else:
-						mat[matIndex][variables[const[j+1]]] = float(const[j])
-		else:
-			lessThan = True
-			greaterThan = False
-			if const[len(const)-2] == ">=":
-				lessThan = False
-				greaterThan = True
-			elif const[len(const)-2] == "==":
-				lessThan = False
-				greaterThan = False
-			#print "const, ", const
-			#print "len(const) ", len(const)
-			for j in range(len(const)):
-				# if equality constraint, convert it to two less than equality
-				# constraint
-				if is_number(const[j]):
-					if lessThan == False and greaterThan == False and j < len(const)-1:
-						mat[matIndex][variables[const[j+1]]] = float(const[j])
-						mat[matIndex+1][variables[const[j+1]]] = -float(const[j])
-						#print "mat ", mat[matIndex+1][variables[const[j+1]]]
-					elif lessThan == False and greaterThan == False and j == len(const)-1:
-						mat[matIndex][mat.shape[1]-1] = float(const[j])
-						mat[matIndex+1][mat.shape[1]-1] = -float(const[j])
-					elif lessThan == False and j < len(const)-1:
-						mat[matIndex][variables[const[j+1]]] = -float(const[j])
-					elif lessThan == False and j == len(const)-1:
-						mat[matIndex][mat.shape[1]-1] = -float(const[j])
-					elif lessThan == True and j < len(const)-1:
-						mat[matIndex][variables[const[j+1]]] = float(const[j])
-					elif lessThan == True and j == len(const)-1:
-						mat[matIndex][mat.shape[1]-1] = float(const[j])
-
-			if lessThan == False and greaterThan == False:
-				mat[matIndex][slackVarNum] = 1.0
-				slackVarNum += 1
-				mat[matIndex+1][slackVarNum] = 1.0
-				slackVarNum += 1
-				matIndex += 1
-			else:
-				mat[i][slackVarNum] = 1.0
-				slackVarNum += 1
-		matIndex += 1
-	return mat
-
 
 def convertToStdLP(stringConstraint):
 	artificialIndices = []
@@ -300,10 +218,10 @@ def linearConstraintFun1():
 
 
 if __name__=="__main__":
-	stringConstraint = "min 1 y0\n1 y0 + 0.133 x0 <= 0.9205\n1 y0 + 5 x0 <= 0\n1 y0 + 1.974 x0 >= 0\n1 y0 <= 1\n1 y0 >= 0.987\n1 y0 + -0.3 x0 == 0.1\ny0 >= 0 x0 >= 0"
+	stringConstraint = "max 2 x1 + 1 x2\n1 x1 + 1 x2 <= 10\n-1 x1 + 1 x2 >= 2\nx1 >= 0 x2 >= 0"
 	print "stringConstraint"
 	print stringConstraint
-	mat = normalize(stringConstraint)
+	mat,artificialIndices = convertToStdLP(stringConstraint)
 	print "mat "
 	print mat
 	'''mat = np.array([[1.0, -1.0, -1.0, 0.0, 0.0, 0.0],
@@ -315,10 +233,7 @@ if __name__=="__main__":
 	'''mat = np.array([[1.0,-1.0,-1.0,0.0,0.0,0.0],
 				[0.0,2.0,1.0,1.0,0.0,4.0],
 				[0.0,1.0,2.0,0.0,1.0,3.0]])'''
-	'''solutions = simplex(mat,artificialIndices)
+	solutions = simplex(mat,artificialIndices)
 	print "final solutions"
-	print solutions'''
-
-# normalize LP - for min, should be greater than equal to. for max should be less than equal to
-#first do simple simplex and then do dual simplex
+	print solutions
 

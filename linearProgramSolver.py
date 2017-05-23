@@ -350,11 +350,75 @@ def linearConstraintFun1():
 						1 y >= 0.987\n\
 						1 y - 0.3 x == 0.1"
 
+def tanhFun(a,val):
+	return tanh(a*val)
+	#return -(exp(a*val) - exp(-a*val))/(exp(a*val) + exp(-a*val))
+
+'''
+takes in non-symbolic python values
+calculates the derivative of tanhFun of val
+'''
+def tanhFunder(a,val):
+	den = cosh(a*val)*cosh(a*val)
+	#print "den ", den
+	return a/(cosh(a*val)*cosh(a*val))
+	#return (-4.0*a)/((exp(a*val) + exp(-a*val)) * (exp(a*val) + exp(-a*val)))
+
+def convertTriangleBoundsToConstraints(a, Vin, Vout, Vlow, Vhigh):
+	#return a string
+	constraint = ""
+	tanhFunVlow = tanhFun(a,Vlow)
+	tanhFunVhigh = tanhFun(a,Vhigh)
+	dLow = tanhFunder(a,Vlow)
+	dHigh = tanhFunder(a,Vhigh)
+	diff = Vhigh - Vlow
+	if(diff == 0):
+		diff = 1e-10
+	dThird = (tanhFunVhigh - tanhFunVlow)/diff
+	cLow = tanhFunVlow - dLow*Vlow
+	cHigh = tanhFunVhigh - dHigh*Vhigh
+	cThird = tanhFunVlow - dThird*Vlow
+
+	if a > 0:
+		if Vlow >= 0 and Vhigh >=0:
+			constraint = "min 1 "+Vout+"\n"
+			constraint += "1 " + Vout+" >= "+str(dThird) + " " + Vin +" + "+str(cThird)+"\n"
+			constraint += "1 " + Vout+" <= "+str(dLow) + " " + Vin +" + "+str(cLow)+"\n"
+			constraint += "1 " + Vout+" <= "+str(dHigh) + " " + Vin +" + "+str(cHigh)+"\n"
+
+		elif Vlow <=0 and Vhigh <=0:
+			constraint = "max -1 "+Vout+"\n"
+			constraint += "-1 " + Vout + " <= "+" -"+str(dThird)+" "+Vin+" + "+str(cThird)+"\n"
+			constraint += "-1 " + Vout + " >= "+" -"+str(dLow)+" "+Vin+" + "+str(cLow)+"\n"
+			constraint += "-1 " + Vout + " >= "+" -"+str(dHigh)+" "Vin+" + "+str(cHihg)+"\n"
+
+	elif a < 0:
+		if Vlow <= 0 and Vhigh <=0:
+			constraint = "min 1 "+Vout+"\n"
+			constraint += "1 " + Vout+" >= "+str(dThird) + " " + Vin +" + "+str(cThird)+"\n"
+			constraint += "1 " + Vout+" <= "+str(dLow) + " " + Vin +" + "+str(cLow)+"\n"
+			constraint += "1 " + Vout+" <= "+str(dHigh) + " " + Vin +" + "+str(cHigh)+"\n"
+
+		elif Vlow >=0 and Vhigh >=0:
+			constraint = "max -1 "+Vout+"\n"
+			constraint += "-1 " + Vout + " <= "+" -"+str(dThird)+" "+Vin+" + "+str(cThird)+"\n"
+			constraint += "-1 " + Vout + " >= "+" -"+str(dLow)+" "+Vin+" + "+str(cLow)+"\n"
+			constraint += "-1 " + Vout + " >= "+" -"+str(dHigh)+" "Vin+" + "+str(cHihg)+"\n"
+	return constraint
+
+def convertTrapezoidBoundsToConstraints():
+	#hello
+
+def fun1Constraints():
+	#hello
+
 
 
 if __name__=="__main__":
-	stringConstraint1 = "min 1 y0\n1 y0 + -0.7864 x0 <= 0.0689\n1 y0 + -1 x0 <= 0\n1 y0 + -0.9242 x0 >= 0\n1 y0 + -0.3 x0 == 0.1\ny0 >= 0 x0 >= 0"
-	stringConstraint2 = "min 1 y0\n1 y0 + -0.7864 x0 <= 0.0689\n1 y0 <= 1\n1 y0 >= 0.4621\ny0 >= 0 x0 >= 0"
+	stringConstraint1 = "min 1 y0\n1 y0 + -0.7864 x0 <= 0.0689\n1 y0 + -1 x0 <= 0\n1 y0 + -0.9242 x0 >= 0\n1 y0 + -0.3 x0 == 0.1\n1 x0 <= 0.5\ny0 >= 0 x0 >= 0"
+	stringConstraint2 = "min 1 y0\n1 y0 + -0.7864 x0 <= 0.0689\n1 y0 <= 1\n1 y0 + -0.3 x0 == 0.1\n1 x0 >= 0.5\n1 y0 >= 0.4621\ny0 >= 0 x0 >= 0"
+	stringConstraint3 = "max -1 y0\n-1 y0 + 0.7864 x0 >= -0.0689\n-1 y0 + 1 x0 >= 0\n-1 y0 + 0.9242 x0 <= 0\n-1 y0 + 0.3 x0 == 0.1\n-1 x0 >= -0.5\ny0 >= 0 x0 >= 0"
+	stringConstraint4 = "max -1 y0\n-1 y0 + 0.7864 x0 >= -0.0689\n-1 y0 >= -1\n-1 y0 + 0.3 x0 == 0.1\n-1 x0 <= -0.5\n-1 y0 <= -0.4621\ny0 >= 0 x0 >= 0"
 	#stringConstraint = "max -5 x1 + -35 x2 + -20 x3\n1 x1 + -1 x2 + -1 x3 <= -2\n-1 x1 + -3 x2 <= -3\nx1 >= 0 x2 >= 0 x3 >= 0"
 	print "stringConstraint1"
 	print stringConstraint1
@@ -363,12 +427,26 @@ if __name__=="__main__":
 	print "final solutions1"
 	print solutions
 
-	print "stringConstraint2"
+	'''print "stringConstraint2"
 	print stringConstraint2
 	mat = normalize(stringConstraint2)
 	solutions = dualSimplex(mat)
 	print "final solutions2"
 	print solutions
+
+	print "stringConstraint3"
+	print stringConstraint3
+	mat = normalize(stringConstraint3)
+	solutions = dualSimplex(mat)
+	print "final solutions3"
+	print solutions
+
+	print "stringConstraint4"
+	print stringConstraint4
+	mat = normalize(stringConstraint4)
+	solutions = dualSimplex(mat)
+	print "final solutions4"
+	print solutions'''
 
 # normalize LP - for min, should be greater than equal to. for max should be less than equal to
 #first do simple simplex and then do dual simplex

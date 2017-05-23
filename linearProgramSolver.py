@@ -45,6 +45,59 @@ def simplex(standardMat, artificialIndices):
 				sols[i] = standardMat[nonzeroIndex][numCols-1]
 	return sols
 
+def dualSimplex(normalizedMat):
+	numRows = normalizedMat.shape[0]
+	numCols = normalizedMat.shape[1]
+	numNegsIn1stRow = np.sum(normalizedMat[0,:numCols-1] < 0)
+	numPosInLastColumn = np.sum(normalizedMat[1:,numCols-1] > 0)
+
+	if numNegsIn1stRow != 0:
+		print "can't apply dual simplex to this matrix"
+		return None
+	count = 0
+	while np.sum(normalizedMat[1:,numCols-1] < 0) > 0:
+		print "mat "
+		print normalizedMat
+		print ""
+		enteringVariable, pivot = None, None
+		minInCol = np.argsort(normalizedMat[:,numCols-1])
+		for i in range(len(minInCol)):
+			minInd = minInCol[i]
+			foundEnteringVariable = False
+			if minInd != 0 and normalizedMat[minInd,numCols-1] < 0:
+				pivot = minInd
+				print "pivot ", pivot
+				ratios = np.divide(-normalizedMat[0,:numCols - 1],normalizedMat[pivot,:numCols-1])
+				ratioSortedIndices = np.argsort(ratios)
+				print "ratios ", ratios
+				print "ratioIndices", ratioSortedIndices
+				for ind in ratioSortedIndices:
+					if ind != 0 and normalizedMat[pivot,ind] < 0:
+						enteringVariable = ind
+						foundEnteringVariable = True
+						break
+				if foundEnteringVariable:
+					break
+		if foundEnteringVariable == False:
+			print "No feasible solution"
+			return None
+
+		print "entering variable ", enteringVariable
+		normalizedMat = gauss_jordan(normalizedMat,pivot,enteringVariable)
+		print "mat after "
+		print normalizedMat
+		print ""
+		count+=1
+		'''if count == 2:
+			return'''
+	sols = np.zeros((numCols - 1))
+	for i in range(len(sols)):
+		if np.sum(normalizedMat[:,i]==0) == numRows - 1:
+			nonzeroIndex = np.where(normalizedMat[:,i] != 0)[0][0]
+			if normalizedMat[nonzeroIndex][i] == 1:
+				sols[i] = normalizedMat[nonzeroIndex][numCols-1]
+	return sols
+
 
 def gauss_jordan(mat, pivot, enteringVariable):
 	mat[pivot] = mat[pivot]/mat[pivot][enteringVariable]
@@ -54,7 +107,7 @@ def gauss_jordan(mat, pivot, enteringVariable):
 	return mat
 
 # Assumptions: All decision variables are >= 0
-def normalize(stringConstriant):
+def normalize(stringConstraint):
 	#split the strings appropriately to make it easy for parsing
 	splittedConstraint = stringConstraint.split("\n")
 	finalSplitConst = []
@@ -300,24 +353,22 @@ def linearConstraintFun1():
 
 
 if __name__=="__main__":
-	stringConstraint = "min 1 y0\n1 y0 + 0.133 x0 <= 0.9205\n1 y0 + 5 x0 <= 0\n1 y0 + 1.974 x0 >= 0\n1 y0 <= 1\n1 y0 >= 0.987\n1 y0 + -0.3 x0 == 0.1\ny0 >= 0 x0 >= 0"
-	print "stringConstraint"
-	print stringConstraint
-	mat = normalize(stringConstraint)
-	print "mat "
-	print mat
-	'''mat = np.array([[1.0, -1.0, -1.0, 0.0, 0.0, 0.0],
-					[0.0, 1.0, 2.0, 1.0, 0.0, 8.0],
-					[0.0, 3.0, 2.0, 0.0, 1.0, 12.0]])'''
-	'''mat = np.array([[1.0,-5.0,-7.0,0.0,0.0,0.0],
-				[0.0,3.0,4.0,1.0,0.0,650.0],
-				[0.0,2.0,3.0,0.0,1.0,500.0]])'''
-	'''mat = np.array([[1.0,-1.0,-1.0,0.0,0.0,0.0],
-				[0.0,2.0,1.0,1.0,0.0,4.0],
-				[0.0,1.0,2.0,0.0,1.0,3.0]])'''
-	'''solutions = simplex(mat,artificialIndices)
-	print "final solutions"
-	print solutions'''
+	stringConstraint1 = "min 1 y0\n1 y0 + -0.7864 x0 <= 0.0689\n1 y0 + -1 x0 <= 0\n1 y0 + -0.9242 x0 >= 0\n1 y0 + -0.3 x0 == 0.1\ny0 >= 0 x0 >= 0"
+	stringConstraint2 = "min 1 y0\n1 y0 + -0.7864 x0 <= 0.0689\n1 y0 <= 1\n1 y0 >= 0.4621\ny0 >= 0 x0 >= 0"
+	#stringConstraint = "max -5 x1 + -35 x2 + -20 x3\n1 x1 + -1 x2 + -1 x3 <= -2\n-1 x1 + -3 x2 <= -3\nx1 >= 0 x2 >= 0 x3 >= 0"
+	print "stringConstraint1"
+	print stringConstraint1
+	mat = normalize(stringConstraint1)
+	solutions = dualSimplex(mat)
+	print "final solutions1"
+	print solutions
+
+	print "stringConstraint2"
+	print stringConstraint2
+	mat = normalize(stringConstraint2)
+	solutions = dualSimplex(mat)
+	print "final solutions2"
+	print solutions
 
 # normalize LP - for min, should be greater than equal to. for max should be less than equal to
 #first do simple simplex and then do dual simplex

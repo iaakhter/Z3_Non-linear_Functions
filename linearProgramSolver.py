@@ -56,9 +56,9 @@ def dualSimplex(normalizedMat):
 		return None
 	count = 0
 	while np.sum(normalizedMat[1:,numCols-1] < 0) > 0:
-		print "mat "
+		'''print "mat "
 		print normalizedMat
-		print ""
+		print ""'''
 		enteringVariable, pivot = None, None
 		minInCol = np.argsort(normalizedMat[:,numCols-1])
 		for i in range(len(minInCol)):
@@ -66,11 +66,11 @@ def dualSimplex(normalizedMat):
 			foundEnteringVariable = False
 			if minInd != 0 and normalizedMat[minInd,numCols-1] < 0:
 				pivot = minInd
-				print "pivot ", pivot
+				#print "pivot ", pivot
 				ratios = np.divide(-normalizedMat[0,:numCols - 1],normalizedMat[pivot,:numCols-1])
 				ratioSortedIndices = np.argsort(ratios)
-				print "ratios ", ratios
-				print "ratioIndices", ratioSortedIndices
+				'''print "ratios ", ratios
+				print "ratioIndices", ratioSortedIndices'''
 				for ind in ratioSortedIndices:
 					if ind != 0 and normalizedMat[pivot,ind] < 0:
 						enteringVariable = ind
@@ -80,13 +80,13 @@ def dualSimplex(normalizedMat):
 					break
 		if foundEnteringVariable == False:
 			print "No feasible solution"
-			return None
+			return None, None
 
-		print "entering variable ", enteringVariable
+		#print "entering variable ", enteringVariable
 		normalizedMat = gauss_jordan(normalizedMat,pivot,enteringVariable)
-		print "mat after "
+		'''print "mat after "
 		print normalizedMat
-		print ""
+		print ""'''
 		count+=1
 		'''if count == 2:
 			return'''
@@ -96,7 +96,7 @@ def dualSimplex(normalizedMat):
 			nonzeroIndex = np.where(normalizedMat[:,i] != 0)[0][0]
 			if normalizedMat[nonzeroIndex][i] == 1:
 				sols[i] = normalizedMat[nonzeroIndex][numCols-1]
-	return sols
+	return normalizedMat, sols
 
 
 def gauss_jordan(mat, pivot, enteringVariable):
@@ -351,7 +351,7 @@ def linearConstraintFun1():
 						1 y - 0.3 x == 0.1"
 
 def tanhFun(a,val):
-	return tanh(a*val)
+	return np.tanh(a*val)
 	#return -(exp(a*val) - exp(-a*val))/(exp(a*val) + exp(-a*val))
 
 '''
@@ -359,9 +359,9 @@ takes in non-symbolic python values
 calculates the derivative of tanhFun of val
 '''
 def tanhFunder(a,val):
-	den = cosh(a*val)*cosh(a*val)
+	den = np.cosh(a*val)*np.cosh(a*val)
 	#print "den ", den
-	return a/(cosh(a*val)*cosh(a*val))
+	return a/(np.cosh(a*val)*np.cosh(a*val))
 	#return (-4.0*a)/((exp(a*val) + exp(-a*val)) * (exp(a*val) + exp(-a*val)))
 
 def convertTriangleBoundsToConstraints(a, Vin, Vout, Vlow, Vhigh):
@@ -382,71 +382,275 @@ def convertTriangleBoundsToConstraints(a, Vin, Vout, Vlow, Vhigh):
 	if a > 0:
 		if Vlow >= 0 and Vhigh >=0:
 			constraint = "min 1 "+Vout+"\n"
-			constraint += "1 " + Vout+" >= "+str(dThird) + " " + Vin +" + "+str(cThird)+"\n"
-			constraint += "1 " + Vout+" <= "+str(dLow) + " " + Vin +" + "+str(cLow)+"\n"
-			constraint += "1 " + Vout+" <= "+str(dHigh) + " " + Vin +" + "+str(cHigh)+"\n"
+			constraint += "1 " + Vout+" + "+str(-dThird) + " " + Vin +" >= "+str(cThird)+"\n"
+			constraint += "1 " + Vout+" + "+str(-dLow) + " " + Vin +" <= "+str(cLow)+"\n"
+			constraint += "1 " + Vout+" + "+str(-dHigh) + " " + Vin +" <= "+str(cHigh)+"\n"
+			if Vlow != 0:
+				constraint += "1 " + Vin + " >= "+str(Vlow)+"\n"
+			constraint += "1 " + Vin + " <= "+str(Vhigh)+"\n"
 
 		elif Vlow <=0 and Vhigh <=0:
 			constraint = "max -1 "+Vout+"\n"
-			constraint += "-1 " + Vout + " <= "+" -"+str(dThird)+" "+Vin+" + "+str(cThird)+"\n"
-			constraint += "-1 " + Vout + " >= "+" -"+str(dLow)+" "+Vin+" + "+str(cLow)+"\n"
-			constraint += "-1 " + Vout + " >= "+" -"+str(dHigh)+" "Vin+" + "+str(cHihg)+"\n"
-
+			constraint += "-1 " + Vout + " + " +str(dThird)+" "+Vin+" <= "+str(cThird)+"\n"
+			constraint += "-1 " + Vout + " + " +str(dLow)+" "+Vin+" >= "+str(cLow)+"\n"
+			constraint += "-1 " + Vout + " + " +str(dHigh)+" "+Vin+" >= "+str(cHigh)+"\n"
+			constraint += "-1 " + Vin + " >= "+str(Vlow)+"\n"
+			if Vhigh != 0:
+				constraint += "-1 " + Vin + " <= "+str(Vhigh)+"\n"
+	
 	elif a < 0:
 		if Vlow <= 0 and Vhigh <=0:
 			constraint = "min 1 "+Vout+"\n"
-			constraint += "1 " + Vout+" >= "+str(dThird) + " " + Vin +" + "+str(cThird)+"\n"
-			constraint += "1 " + Vout+" <= "+str(dLow) + " " + Vin +" + "+str(cLow)+"\n"
-			constraint += "1 " + Vout+" <= "+str(dHigh) + " " + Vin +" + "+str(cHigh)+"\n"
-
+			constraint += "1 " + Vout+" + "+str(dThird) + " " + Vin +" >= "+str(cThird)+"\n"
+			constraint += "1 " + Vout+" + "+str(dLow) + " " + Vin +" <= "+str(cLow)+"\n"
+			constraint += "1 " + Vout+" + "+str(dHigh) + " " + Vin +" <= "+str(cHigh)+"\n"
+			constraint += "-1 " + Vin + " >= "+str(Vlow)+"\n"
+			if Vhigh != 0:
+				constraint += "-1 " + Vin + " <= "+str(Vhigh)+"\n"
+		
 		elif Vlow >=0 and Vhigh >=0:
 			constraint = "max -1 "+Vout+"\n"
-			constraint += "-1 " + Vout + " <= "+" -"+str(dThird)+" "+Vin+" + "+str(cThird)+"\n"
-			constraint += "-1 " + Vout + " >= "+" -"+str(dLow)+" "+Vin+" + "+str(cLow)+"\n"
-			constraint += "-1 " + Vout + " >= "+" -"+str(dHigh)+" "Vin+" + "+str(cHihg)+"\n"
+			constraint += "-1 " + Vout + " + "+str(-dThird)+" "+Vin+" <= "+str(cThird)+"\n"
+			constraint += "-1 " + Vout + " + "+str(-dLow)+" "+Vin+" >= "+str(cLow)+"\n"
+			constraint += "-1 " + Vout + " + "+str(-dHigh)+" "+Vin+" >= "+str(cHigh)+"\n"
+			constraint += "1 " + Vin + " >= "+str(Vlow)+"\n"
+			if Vhigh != 0:
+				constraint += "1 " + Vin + " <= "+str(Vhigh)+"\n"
 	return constraint
 
-def convertTrapezoidBoundsToConstraints():
-	#hello
+def convertTrapezoidBoundsToConstraints(a, Vin, Vout, Vlow, Vhigh):
+	constraint = ""
+	tanhFunVlow = tanhFun(a,Vlow)
+	tanhFunVhigh = tanhFun(a,Vhigh)
+	dLow = tanhFunder(a,Vlow)
+	dHigh = tanhFunder(a,Vhigh)
+	diff = Vhigh - Vlow
+	if(diff == 0):
+		diff = 1e-10
+	dThird = (tanhFunVhigh - tanhFunVlow)/diff
+	cLow = tanhFunVlow - dLow*Vlow
+	cHigh = tanhFunVhigh - dHigh*Vhigh
+	cThird = tanhFunVlow - dThird*Vlow
 
-def fun1Constraints():
-	#hello
+	if a > 0:
+		if Vlow <= 0 and Vhigh <= 0:
+			constraint = "max -1 "+Vout+"\n"
+			constraint += "-1 "+Vout+" + "+str(dLow)+" "+Vin+" >= "+str(cLow)+"\n"
+			constraint += "-1 "+Vout+" >= "+"-1\n"
+			constraint += "-1 "+Vout+" <= "+str(tanhFunVlow)+"\n"
+			constraint += "-1 "+Vin+" <= "+str(Vlow)+"\n"
+		elif Vlow >= 0 and Vhigh >=0:
+			constraint = "min 1 "+Vout+"\n"
+			constraint += "1 "+Vout+" + "+str(-dHigh)+" "+Vin+" <= "+str(cHigh)+"\n"
+			constraint += "1 "+Vout+" <= "+"1\n"
+			constraint += "1 "+Vout+" >= "+str(tanhFunVhigh)+"\n"
+			constraint += "1 "+Vin+" >= "+str(Vhigh)+"\n"
+
+	elif a < 0:
+		if Vlow <= 0 and Vhigh <= 0:
+			constraint = "min 1 "+Vout+"\n"
+			constraint += "1 "+Vout+" + "+str(dLow)+" "+Vin+" <= "+str(cLow)+"\n"
+			constraint += "1 "+Vout+" <= "+"1\n"
+			constraint += "1 "+Vout+" >= "+str(tanhFunVlow)+"\n"
+			constraint += "-1 "+Vin+" <= "+str(Vlow)+"\n"
+		elif Vlow >= 0 and Vhigh >=0:
+			constraint = "max -1 "+Vout+"\n"
+			constraint += "-1 "+Vout+" + "+str(-dHigh)+" "+Vin+" >= "+str(cHigh)+"\n"
+			constraint += "-1 "+Vout+" >= "+"-1\n"
+			constraint += "-1 "+Vout+" <= "+str(tanhFunVhigh)+"\n"
+			constraint += "1 "+Vin+" >= "+str(Vhigh)+"\n"
+
+	return constraint
+	
+
+def fun1Constraints(Vin, Vout):
+	a = 1
+	params = [0.3,0.1]
+	solutions = []
+	mats = []
+
+	Vlow = 0.0
+	Vhigh = 0.5
+	overallConstraint = ""
+	if Vlow >= 0 and Vhigh >= 0:
+		overallConstraint += "1 "+Vout+" + "+str(-params[0])+" "+Vin+" == "+str(params[1])+"\n"
+	elif Vlow <= 0 and Vhigh <= 0:
+		overallConstraint += "-1 "+Vout+" + "+str(params[0])+" "+Vin+" == "+str(params[1])+"\n"
+	overallConstraint += Vout + " >= 0 " + Vin + " >= 0"
+	
+	triConstraint = convertTriangleBoundsToConstraints(a, Vin, Vout, Vlow, Vhigh)
+	triConstraint += overallConstraint
+	print "triConstraint1"
+	print triConstraint
+	mat = normalize(triConstraint)
+	mat,soln = dualSimplex(mat)
+	print "solutions ", soln
+	print ""
+	if soln is not None:
+		if Vlow >= 0 and Vhigh >= 0:
+			solutions.append(soln[2])
+		elif Vlow <= 0 and Vhigh <= 0:
+			solutions.append(-soln[2])
+		mats.append(mat)
+	
+	trapConstraint = convertTrapezoidBoundsToConstraints(a, Vin, Vout, Vlow, Vhigh)
+	trapConstraint += overallConstraint
+	print "trapConstraint1"
+	print trapConstraint
+	mat = normalize(trapConstraint)
+	mat,soln = dualSimplex(mat)
+	print "solutions ", soln
+	print ""
+	if soln is not None:
+		if Vlow >= 0 and Vhigh >= 0:
+			solutions.append(soln[2])
+		elif Vlow <= 0 and Vhigh <= 0:
+			solutions.append(-soln[2])
+		mats.append(mat)
+
+	Vlow = -0.5
+	Vhigh = 0.0
+	overallConstraint = ""
+	if Vlow >= 0 and Vhigh >= 0:
+		overallConstraint += "1 "+Vout+" + "+str(-params[0])+" "+Vin+" == "+str(params[1])+"\n"
+	elif Vlow <= 0 and Vhigh <= 0:
+		overallConstraint += "-1 "+Vout+" + "+str(params[0])+" "+Vin+" == "+str(params[1])+"\n"
+	overallConstraint += Vout + " >= 0 " + Vin + " >= 0"
+	
+	triConstraint = convertTriangleBoundsToConstraints(a, Vin, Vout, Vlow, Vhigh)
+	triConstraint += overallConstraint
+	print "triConstraint2"
+	print triConstraint
+	mat = normalize(triConstraint)
+	mat,soln = dualSimplex(mat)
+	print "solutions ", soln
+	print ""
+	if soln is not None:
+		if Vlow >= 0 and Vhigh >= 0:
+			solutions.append(soln[2])
+		elif Vlow <= 0 and Vhigh <= 0:
+			solutions.append(-soln[2])
+		mats.append(mat)
+	
+	trapConstraint = convertTrapezoidBoundsToConstraints(a, Vin, Vout, Vlow, Vhigh)
+	trapConstraint += overallConstraint
+	print "trapConstraint2"
+	print trapConstraint
+	mat = normalize(trapConstraint)
+	mat,soln = dualSimplex(mat)
+	print "solutions ", soln
+	print ""
+	if soln is not None:
+		if Vlow >= 0 and Vhigh >= 0:
+			solutions.append(soln[2])
+		elif Vlow <= 0 and Vhigh <= 0:
+			solutions.append(-soln[2])
+		mats.append(mat)
+	
+	return mats,solutions
+
+def findHyper(distances):
+	Vin = "x0"
+	Vout = "y0"
+	mats,solutions = fun1Constraints(Vin, Vout)
+	newConstraint = ""
+	finalSolutions = copy.deepcopy(solutions)
+	while len(solutions) > 0:
+		newSolutions = []
+		newMats = []
+		for i in range(len(solutions)):
+			print "solution number ", i
+			for j in range(len(mats)):
+				print "mat number ", j
+				mat = mats[j]
+
+				newMat = np.zeros((mat.shape[0]+1,mat.shape[1]+1))
+				newMat[0:mat.shape[0],0:mat.shape[1]-1] = mat[:,0:mat.shape[1]-1]
+				newMat[0:mat.shape[0],newMat.shape[1]-1] = mat[:,mat.shape[1]-1]
+				soln = solutions[i]
+				if soln >= 0:
+					newMat[mat.shape[0]][2] = 1.0
+					newMat[mat.shape[0]][mat.shape[1]] = 1.0
+					newMat[mat.shape[0]][newMat.shape[1]-1] = soln-distances
+				elif soln <= 0:
+					newMat[mat.shape[0]][2] = -1.0
+					newMat[mat.shape[0]][mat.shape[1]] = 1.0
+					newMat[mat.shape[0]][newMat.shape[1]-1] = soln-distances
+
+				nonZeroRow = np.where(mat[:,2] == 1)[0][0]
+				newMat = gauss_jordan(newMat, nonZeroRow, 2)
+				mat,sols = dualSimplex(newMat)
+				if sols is not None:
+					if i >= len(solutions)/2:
+						finalSolutions.append(-sols[2])
+						newSolutions.append(-sols[2])
+						print "found new solution ", -sols[2]
+					else:
+						finalSolutions.append(sols[2])
+						newSolutions.append(sols[2])
+						print "found new solution ", sols[2]
+					newMats.append(mat)
+				else:
+					print "no new solution found"
+
+				if sols is not None:
+					newMat = np.zeros((mat.shape[0]+1,mat.shape[1]+1))
+					newMat[0:mat.shape[0],0:mat.shape[1]-1] = mat[:,0:mat.shape[1]-1]
+					newMat[0:mat.shape[0],newMat.shape[1]-1] = mat[:,mat.shape[1]-1]
+
+					if soln >= 0:
+						newMat[mat.shape[0]][2] = -1.0
+						newMat[mat.shape[0]][mat.shape[1]] = 1.0
+						newMat[mat.shape[0]][newMat.shape[1]-1] = -(soln+distances)
+					elif soln <= 0:
+						newMat[mat.shape[0]][2] = -1.0
+						newMat[mat.shape[0]][mat.shape[1]] = 1.0
+						newMat[mat.shape[0]][newMat.shape[1]-1] = -(soln+distances)
+					nonZeroRow = np.where(mat[:,2] == 1)[0][0]
+					newMat = gauss_jordan(newMat, nonZeroRow, 2)
+					mat,sols = dualSimplex(newMat)
+				if sols is not None:
+					if i >= len(solutions)/2:
+						finalSolutions.append(-sols[2])
+						newSolutions.append(-sols[2])
+						print "found new solution ", -sols[2]
+					else:
+						finalSolutions.append(sols[2])
+						newSolutions.append(sols[2])
+						print "found new solution ", sols[2]
+					newMats.append(mat)
+				else:
+					print "no new solution found"
+			if i==2:
+				break
+
+		solutions = newSolutions
+		mats = newMats
+
+	print "found all solutions"
+	print finalSolutions
+
+	hypers = []
+	print "hyperrectangles around solutions"
+	for i in range(len(finalSolutions)):
+		hypers.append([finalSolutions[i]-distances, finalSolutions[i]+distances])
+
+	print "hyperrectangles"
+	print hypers
+	print ""
+
+	return hypers
+
+
+
 
 
 
 if __name__=="__main__":
-	stringConstraint1 = "min 1 y0\n1 y0 + -0.7864 x0 <= 0.0689\n1 y0 + -1 x0 <= 0\n1 y0 + -0.9242 x0 >= 0\n1 y0 + -0.3 x0 == 0.1\n1 x0 <= 0.5\ny0 >= 0 x0 >= 0"
-	stringConstraint2 = "min 1 y0\n1 y0 + -0.7864 x0 <= 0.0689\n1 y0 <= 1\n1 y0 + -0.3 x0 == 0.1\n1 x0 >= 0.5\n1 y0 >= 0.4621\ny0 >= 0 x0 >= 0"
-	stringConstraint3 = "max -1 y0\n-1 y0 + 0.7864 x0 >= -0.0689\n-1 y0 + 1 x0 >= 0\n-1 y0 + 0.9242 x0 <= 0\n-1 y0 + 0.3 x0 == 0.1\n-1 x0 >= -0.5\ny0 >= 0 x0 >= 0"
-	stringConstraint4 = "max -1 y0\n-1 y0 + 0.7864 x0 >= -0.0689\n-1 y0 >= -1\n-1 y0 + 0.3 x0 == 0.1\n-1 x0 <= -0.5\n-1 y0 <= -0.4621\ny0 >= 0 x0 >= 0"
-	#stringConstraint = "max -5 x1 + -35 x2 + -20 x3\n1 x1 + -1 x2 + -1 x3 <= -2\n-1 x1 + -3 x2 <= -3\nx1 >= 0 x2 >= 0 x3 >= 0"
-	print "stringConstraint1"
-	print stringConstraint1
-	mat = normalize(stringConstraint1)
-	solutions = dualSimplex(mat)
-	print "final solutions1"
-	print solutions
-
-	'''print "stringConstraint2"
-	print stringConstraint2
-	mat = normalize(stringConstraint2)
-	solutions = dualSimplex(mat)
-	print "final solutions2"
-	print solutions
-
-	print "stringConstraint3"
-	print stringConstraint3
-	mat = normalize(stringConstraint3)
-	solutions = dualSimplex(mat)
-	print "final solutions3"
-	print solutions
-
-	print "stringConstraint4"
-	print stringConstraint4
-	mat = normalize(stringConstraint4)
-	solutions = dualSimplex(mat)
-	print "final solutions4"
+	'''solutions = fun1Constraints()
+	print "final solutions"
 	print solutions'''
+	allHypers = findHyper(0.1)
 
 # normalize LP - for min, should be greater than equal to. for max should be less than equal to
 #first do simple simplex and then do dual simplex

@@ -330,110 +330,70 @@ def convertTrapezoidBoundsToConstraints(a, Vin, Vout, Vlow, Vhigh):
 	return constraint
 	
 
-def fun1Constraints(Vin, Vout):
+def fun1Constraints(bounds):
+	Vin = "x0"
+	Vout = "y0"
 	a = 1
 	params = [0.3,0.1]
 	solutions = []
 	mats = []
 
-	Vlow = 0.0
-	Vhigh = 0.5
-	overallConstraint = ""
-	if Vlow >= 0 and Vhigh >= 0:
-		overallConstraint += "1 "+Vout+" + "+str(-params[0])+" "+Vin+" == "+str(params[1])+"\n"
-	elif Vlow <= 0 and Vhigh <= 0:
-		overallConstraint += "-1 "+Vout+" + "+str(params[0])+" "+Vin+" == "+str(params[1])+"\n"
-	overallConstraint += Vout + " >= 0 " + Vin + " >= 0"
-	testSol = -3.66
-	testSol = None
-	
-	triConstraint = convertTriangleBoundsToConstraints(a, Vin, Vout, Vlow, Vhigh)
-	triConstraint += overallConstraint
-	print "triConstraint1"
-	print triConstraint
-	mat = normalize(triConstraint)
-	print "mat from constraints"
-	print mat
-	mat,soln = dualSimplex(mat)
-	print "solutions ", soln
-	print ""
-	if soln is not None:
-		if Vlow >= 0 and Vhigh >= 0:
-			solutions.append(soln[2])
-			if testSol is not None:
-				sillySyntax(mat, testSol)
-		elif Vlow <= 0 and Vhigh <= 0:
-			solutions.append(-soln[2])
-			if testSol is not None:
-				sillySyntax(mat, testSol)
-		mats.append(mat)
-	
-	trapConstraint = convertTrapezoidBoundsToConstraints(a, Vin, Vout, Vlow, Vhigh)
-	trapConstraint += overallConstraint
-	print "trapConstraint1"
-	print trapConstraint
-	mat = normalize(trapConstraint)
-	mat,soln = dualSimplex(mat)
-	print "solutions ", soln
-	print ""
-	if soln is not None:
-		if Vlow >= 0 and Vhigh >= 0:
-			solutions.append(soln[2])
-			if testSol is not None:
-				sillySyntax(mat, testSol)
-		elif Vlow <= 0 and Vhigh <= 0:
-			solutions.append(-soln[2])
-			if testSol is not None:
-				sillySyntax(mat, testSol)
-		mats.append(mat)
+	for i in range(len(bounds)):
+		bound = bounds[i]
+		Vlow = bound[0]
+		Vhigh = bound[1]
 
-	Vlow = -0.5
-	Vhigh = 0.0
-	overallConstraint = ""
-	if Vlow >= 0 and Vhigh >= 0:
-		overallConstraint += "1 "+Vout+" + "+str(-params[0])+" "+Vin+" == "+str(params[1])+"\n"
-	elif Vlow <= 0 and Vhigh <= 0:
-		overallConstraint += "-1 "+Vout+" + "+str(params[0])+" "+Vin+" == "+str(params[1])+"\n"
-	overallConstraint += Vout + " >= 0 " + Vin + " >= 0"
-	
-	triConstraint = convertTriangleBoundsToConstraints(a, Vin, Vout, Vlow, Vhigh)
-	triConstraint += overallConstraint
-	print "triConstraint2"
-	print triConstraint
-	mat = normalize(triConstraint)
-	mat,soln = dualSimplex(mat)
-	print "solutions ", soln
-	print ""
-	if soln is not None:
+		overallConstraint = ""
 		if Vlow >= 0 and Vhigh >= 0:
-			solutions.append(soln[2])
-			if testSol is not None:
-				sillySyntax(mat, testSol)
+			overallConstraint += "1 "+Vout+" + "+str(-params[0])+" "+Vin+" == "+str(params[1])+"\n"
 		elif Vlow <= 0 and Vhigh <= 0:
-			solutions.append(-soln[2])
-			if testSol is not None:
-				sillySyntax(mat, testSol)
-		mats.append(mat)
-	
-	trapConstraint = convertTrapezoidBoundsToConstraints(a, Vin, Vout, Vlow, Vhigh)
-	trapConstraint += overallConstraint
-	print "trapConstraint2"
-	print trapConstraint
-	mat = normalize(trapConstraint)
-	mat,soln = dualSimplex(mat)
-	print "solutions ", soln
-	print ""
-	if soln is not None:
-		if Vlow >= 0 and Vhigh >= 0:
-			solutions.append(soln[2])
-			if testSol is not None:
-				sillySyntax(mat, testSol)
-		elif Vlow <= 0 and Vhigh <= 0:
-			solutions.append(-soln[2])
-			if testSol is not None:
-				sillySyntax(mat, testSol)
-		mats.append(mat)
-	
+			overallConstraint += "-1 "+Vout+" + "+str(params[0])+" "+Vin+" == "+str(params[1])+"\n"
+		overallConstraint += Vout + " >= 0 " + Vin + " >= 0"
+		testSol = -3.66
+		testSol = None
+		
+		triConstraint = convertTriangleBoundsToConstraints(a, Vin, Vout, Vlow, Vhigh)
+		triConstraint += overallConstraint
+		print "triConstraint1"
+		print triConstraint
+		mat = normalize(triConstraint)
+		print "mat from constraints"
+		print mat
+		mat,soln = dualSimplex(mat)
+		print "solutions ", soln
+		print ""
+		if soln is not None:
+			if Vlow >= 0 and Vhigh >= 0:
+				solutions.append(soln[2])
+				if testSol is not None:
+					sillySyntax(mat, testSol)
+			elif Vlow <= 0 and Vhigh <= 0:
+				solutions.append(-soln[2])
+				if testSol is not None:
+					sillySyntax(mat, testSol)
+			mats.append(mat)
+
+		if i == 0 or i == len(bounds)-1:
+			trapConstraint = convertTrapezoidBoundsToConstraints(a, Vin, Vout, Vlow, Vhigh)
+			trapConstraint += overallConstraint
+			print "trapConstraint1"
+			print trapConstraint
+			mat = normalize(trapConstraint)
+			mat,soln = dualSimplex(mat)
+			print "solutions ", soln
+			print ""
+			if soln is not None:
+				if Vlow >= 0 and Vhigh >= 0:
+					solutions.append(soln[2])
+					if testSol is not None:
+						sillySyntax(mat, testSol)
+				elif Vlow <= 0 and Vhigh <= 0:
+					solutions.append(-soln[2])
+					if testSol is not None:
+						sillySyntax(mat, testSol)
+				mats.append(mat)
+
+		
 	return mats,solutions
 
 # check if solution is feasible in mat
@@ -479,9 +439,8 @@ def sillySyntax(mat, sol):
 	return
 
 def findHyper(distances):
-	Vin = "x0"
-	Vout = "y0"
-	mats,solutions = fun1Constraints(Vin, Vout)
+	bounds = [[-0.5,-0.25],[-0.25,0.0],[0.0,0.25],[0.25,0.5]]
+	mats,solutions = fun1Constraints(bounds)
 	newConstraint = ""
 	finalSolutions = {}
 	for sol in solutions:
@@ -575,7 +534,8 @@ def findHyper(distances):
 	print finalSolutions
 
 	print "hyperrectangles"
-	print hypers
+	for hyper in hypers:
+		print hyper
 	print ""
 
 	return hypers

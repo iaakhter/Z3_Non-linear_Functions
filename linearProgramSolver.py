@@ -45,7 +45,8 @@ def simplex(standardMat, artificialIndices):
 				sols[i] = standardMat[nonzeroIndex][numCols-1]
 	return sols
 
-def dualSimplex(normalizedMat):
+def dualSimplex(theMat):
+	normalizedMat = copy.deepcopy(theMat)
 	numRows = normalizedMat.shape[0]
 	numCols = normalizedMat.shape[1]
 	numNegsIn1stRow = np.sum(normalizedMat[0,:numCols-1] < 0)
@@ -56,9 +57,9 @@ def dualSimplex(normalizedMat):
 		return None
 	count = 0
 	while np.sum(normalizedMat[1:,numCols-1] < 0) > 0:
-		'''print "mat "
-		print normalizedMat
-		print ""'''
+		#print "mat "
+		#print normalizedMat
+		#print ""
 		enteringVariable, pivot = None, None
 		minInCol = np.argsort(normalizedMat[:,numCols-1])
 		for i in range(len(minInCol)):
@@ -82,11 +83,13 @@ def dualSimplex(normalizedMat):
 			print "No feasible solution"
 			return None, None
 
+		#print "pivot ", pivot
+		#print "enteringVariable ", enteringVariable
 		#print "entering variable ", enteringVariable
 		normalizedMat = gauss_jordan(normalizedMat,pivot,enteringVariable)
-		'''print "mat after "
-		print normalizedMat
-		print ""'''
+		#print "mat after "
+		#print normalizedMat
+		#print ""
 		count+=1
 		'''if count == 2:
 			return'''
@@ -143,8 +146,8 @@ def normalize(stringConstraint):
 	#print "mat.shape ", mat.shape
 	mat[0,0] = 1.0
 	slackVarNum = countVariables
-	print "finalSplitConst"
-	print finalSplitConst
+	#print "finalSplitConst"
+	#print finalSplitConst
 
 	# fill in the matrix
 	matIndex = 0
@@ -204,151 +207,6 @@ def normalize(stringConstraint):
 		matIndex += 1
 	return mat
 
-
-def convertToStdLP(stringConstraint):
-	artificialIndices = []
-	#split the strings appropriately to make it easy for parsing
-	splittedConstraint = stringConstraint.split("\n")
-	finalSplitConst = []
-	for s in splittedConstraint:
-		splitted = s.split(" ")
-		finalSplitConst.append(splitted)
-	
-	# get all the variables from the last constraint added
-	# assumes that the last constraint always constraints the individual
-	# decision variables. e.g. x1 >= 0, x2 >= 0 and so on
-	variables = {}
-	variablesSign = {} # if negative need to change variables in original LP
-	variableConstraints = finalSplitConst[len(finalSplitConst)-1]
-	countVariables = 1
-	for j in range(len(variableConstraints)-1):
-		if variableConstraints[j+1] == "urs":
-			variablesSign[variableConstraints[j]] = "urs"
-			variables[variableConstraints[j]] = [countVariables, countVariables+1]
-			countVariables += 2
-		elif variableConstraints[j+1] == ">=":
-			variablesSign[variableConstraints[j]] = True #variable must be positive
-			variables[variableConstraints[j]] = countVariables
-			countVariables += 1
-		elif variableConstraints[j+1] == "<=":
-			variablesSign[variableConstraints[j]] = False #variable must be negative
-			countVariables += 1
-
-	print "variablesSign"
-	print variablesSign
-	print "variables"
-	print variables
-	countInequalities = 1 # because of the objective function
-	for i in range(1,len(finalSplitConst)-1):
-		const = finalSplitConst[i]
-		if const[len(const)-2] == ">=":
-			countInequalities+=2
-		else:
-			countInequalities+=1
-
-	mat = np.zeros((len(finalSplitConst)-1,countVariables + countInequalities))
-	#print "mat.shape ", mat.shape
-	mat[0,0] = 1.0
-	slackVarNum = countVariables
-	print "finalSplitConst"
-	print finalSplitConst
-	
-	# fill in the matrix
-	for i in range(mat.shape[0]):
-		const = finalSplitConst[i]
-		# deal with min max issue in the objectibe function
-		if i== 0:
-			maximize = True
-			if const[0] == "min":
-				maximize = False
-			for j in range(1,len(const)-1):
-				if is_number(const[j]):
-					if maximize:
-						#if variable is unrestricted, replace it with two variables
-						if variablesSign[const[j+1]] == "urs":
-							mat[i][variables[const[j+1]][0]] = -float(const[j])
-							mat[i][variables[const[j+1]][1]] = float(const[j])
-						elif variablesSign[const[j+1]]:
-							mat[i][variables[const[j+1]]] = -float(const[j])
-						else:
-							mat[i][variables[const[j+1]]] = float(const[j])
-					else:
-						if variablesSign[const[j+1]] == "urs":
-							mat[i][variables[const[j+1]][0]] = float(const[j])
-							mat[i][variables[const[j+1]][1]] = -float(const[j])
-						if variablesSign[const[j+1]]:
-							mat[i][variables[const[j+1]]] = float(const[j])
-						else:
-							mat[i][variables[const[j+1]]] = -float(const[j])
-		else:
-			negConstant = False # if negative constant on the right hand side
-								# multiply everything by -1 and flip the equality signs
-			if (float(const[len(const)-1]) < 0):
-				negConstant = True
-			lessThan = True
-			greaterThan = False
-			if const[len(const)-2] == ">=":
-				lessThan = False
-				greaterThan = True
-			elif const[len(const)-2] == "==":
-				lessThan = False
-				greaterThan = False
-			if (lessThan or greaterThan) and negConstant:
-				mat[i][mat.shape[1]-1] = -float(const[len(const)-1])
-				if lessThan:
-					lessThan = False
-					greaterThan = True
-				else:
-					lessThan = True
-					greaterThan = False
-			else:
-				mat[i][mat.shape[1]-1] = float(const[len(const)-1])
-			for j in range(len(const)-1):
-				if is_number(const[j]):
-					if variablesSign[const[j+1]] == "urs":
-						if negConstant == False:
-							mat[i][variables[const[j+1]][0]] = float(const[j])
-							mat[i][variables[const[j+1]][1]] = -float(const[j])
-						else:
-							mat[i][variables[const[j+1]][0]] = -float(const[j])
-							mat[i][variables[const[j+1]][1]] = float(const[j])
-					elif variablesSign[const[j+1]]:
-						if negConstant == False:
-							mat[i][variables[const[j+1]]] = float(const[j])
-						else:
-							mat[i][variables[const[j+1]]] = -float(const[j])
-					else:
-						if negConstant == False:
-							mat[i][variables[const[j+1]]] = -float(const[j])
-						else:
-							mat[i][variables[const[j+1]]] = float(const[j])
-
-			if lessThan == False and greaterThan == False:
-				mat[i][slackVarNum] = 1.0
-				mat[0][slackVarNum] = 1e+15
-				artificialIndices.append([i,slackVarNum])
-				slackVarNum += 1
-			elif lessThan:
-				mat[i][slackVarNum] = 1.0
-				slackVarNum += 1
-			elif greaterThan:
-				mat[i][slackVarNum] = -1.0
-				slackVarNum += 1
-				mat[i][slackVarNum] = 1.0
-				mat[0][slackVarNum] = 1e+15
-				artificialIndices.append([i,slackVarNum])
-				slackVarNum += 1
-
-
-	return (mat, artificialIndices)
-
-def linearConstraintFun1():
-	constraintString = "1 y + 0.133 x <= 0.9205\n\
-						1 y + 5.0 x <= 0.0\n\
-						1 y + 1.974 x >= 0.0\n\
-						1 y <= 1.0\n\
-						1 y >= 0.987\n\
-						1 y - 0.3 x == 0.1"
 
 def tanhFun(a,val):
 	return np.tanh(a*val)
@@ -477,6 +335,8 @@ def fun1Constraints(Vin, Vout):
 	elif Vlow <= 0 and Vhigh <= 0:
 		overallConstraint += "-1 "+Vout+" + "+str(params[0])+" "+Vin+" == "+str(params[1])+"\n"
 	overallConstraint += Vout + " >= 0 " + Vin + " >= 0"
+	testSol = -3.66
+	#testSol = None
 	
 	triConstraint = convertTriangleBoundsToConstraints(a, Vin, Vout, Vlow, Vhigh)
 	triConstraint += overallConstraint
@@ -489,8 +349,12 @@ def fun1Constraints(Vin, Vout):
 	if soln is not None:
 		if Vlow >= 0 and Vhigh >= 0:
 			solutions.append(soln[2])
+			if testSol is not None:
+				sillySyntax(mat, testSol)
 		elif Vlow <= 0 and Vhigh <= 0:
 			solutions.append(-soln[2])
+			if testSol is not None:
+				sillySyntax(mat, testSol)
 		mats.append(mat)
 	
 	trapConstraint = convertTrapezoidBoundsToConstraints(a, Vin, Vout, Vlow, Vhigh)
@@ -504,8 +368,12 @@ def fun1Constraints(Vin, Vout):
 	if soln is not None:
 		if Vlow >= 0 and Vhigh >= 0:
 			solutions.append(soln[2])
+			if testSol is not None:
+				sillySyntax(mat, testSol)
 		elif Vlow <= 0 and Vhigh <= 0:
 			solutions.append(-soln[2])
+			if testSol is not None:
+				sillySyntax(mat, testSol)
 		mats.append(mat)
 
 	Vlow = -0.5
@@ -528,8 +396,12 @@ def fun1Constraints(Vin, Vout):
 	if soln is not None:
 		if Vlow >= 0 and Vhigh >= 0:
 			solutions.append(soln[2])
+			if testSol is not None:
+				sillySyntax(mat, testSol)
 		elif Vlow <= 0 and Vhigh <= 0:
 			solutions.append(-soln[2])
+			if testSol is not None:
+				sillySyntax(mat, testSol)
 		mats.append(mat)
 	
 	trapConstraint = convertTrapezoidBoundsToConstraints(a, Vin, Vout, Vlow, Vhigh)
@@ -543,86 +415,133 @@ def fun1Constraints(Vin, Vout):
 	if soln is not None:
 		if Vlow >= 0 and Vhigh >= 0:
 			solutions.append(soln[2])
+			if testSol is not None:
+				sillySyntax(mat, testSol)
 		elif Vlow <= 0 and Vhigh <= 0:
 			solutions.append(-soln[2])
+			if testSol is not None:
+				sillySyntax(mat, testSol)
 		mats.append(mat)
 	
 	return mats,solutions
+
+def sillySyntax(mat, sol):
+	print "Checking feasibility of solution ", sol
+	newMat = np.zeros((mat.shape[0]+2,mat.shape[1]+2))
+	newMat[0:mat.shape[0],0:mat.shape[1]-1] = mat[:,0:mat.shape[1]-1]
+	newMat[0:mat.shape[0],newMat.shape[1]-1] = mat[:,mat.shape[1]-1]
+	if sol >= 0:
+		newMat[mat.shape[0]][2] = 1.0
+		newMat[mat.shape[0]][mat.shape[1]-1] = 1.0
+		newMat[mat.shape[0]][newMat.shape[1]-1] = sol
+
+		newMat[mat.shape[0]+1][2] = -1.0
+		newMat[mat.shape[0]+1][mat.shape[1]] = 1.0
+		newMat[mat.shape[0]+1][newMat.shape[1]-1] = -sol
+	else:
+		newMat[mat.shape[0]][2] = -1.0
+		newMat[mat.shape[0]][mat.shape[1]-1] = 1.0
+		newMat[mat.shape[0]][newMat.shape[1]-1] = sol
+
+		newMat[mat.shape[0]+1][2] = 1.0
+		newMat[mat.shape[0]+1][mat.shape[1]] = 1.0
+		newMat[mat.shape[0]+1][newMat.shape[1]-1] = -sol
+
+	'''print "mat "
+	print mat
+	print "newMat before"
+	print newMat'''
+
+	nonzeroIndex = np.where(mat[:,2]!=0)[0][0]
+	newMat[mat.shape[0]] = newMat[mat.shape[0]] - (newMat[mat.shape[0]][2]/mat[nonzeroIndex][2])*newMat[nonzeroIndex]
+	newMat[mat.shape[0]+1] = newMat[mat.shape[0]+1] - (newMat[mat.shape[0]+1][2]/mat[nonzeroIndex][2])*newMat[nonzeroIndex]
+
+	#print "newMat after"
+	#print newMat
+
+	mat,soln = dualSimplex(newMat)
+	if soln is None:
+		print sol, " solution is not feasible\n"
+	else:
+		print sol, " solution is feasible\n"
+	return
 
 def findHyper(distances):
 	Vin = "x0"
 	Vout = "y0"
 	mats,solutions = fun1Constraints(Vin, Vout)
 	newConstraint = ""
-	finalSolutions = copy.deepcopy(solutions)
+	finalSolutions = {}
+	'''for sol in solutions:
+		finalSolutions[sol] = True
 	while len(solutions) > 0:
 		newSolutions = []
 		newMats = []
 		for i in range(len(solutions)):
 			print "solution number ", i
+			soln = solutions[i]
+			lowVal = soln - distances
+			highVal = soln + distances
 			for j in range(len(mats)):
 				print "mat number ", j
 				mat = mats[j]
-
 				newMat = np.zeros((mat.shape[0]+1,mat.shape[1]+1))
 				newMat[0:mat.shape[0],0:mat.shape[1]-1] = mat[:,0:mat.shape[1]-1]
 				newMat[0:mat.shape[0],newMat.shape[1]-1] = mat[:,mat.shape[1]-1]
-				soln = solutions[i]
-				if soln >= 0:
+				if lowVal >= 0:
 					newMat[mat.shape[0]][2] = 1.0
-					newMat[mat.shape[0]][mat.shape[1]] = 1.0
-					newMat[mat.shape[0]][newMat.shape[1]-1] = soln-distances
-				elif soln <= 0:
+				elif lowVal <= 0:
 					newMat[mat.shape[0]][2] = -1.0
-					newMat[mat.shape[0]][mat.shape[1]] = 1.0
-					newMat[mat.shape[0]][newMat.shape[1]-1] = soln-distances
+				newMat[mat.shape[0]][mat.shape[1]-1] = 1.0
+				newMat[mat.shape[0]][newMat.shape[1]-1] = lowVal
+				print "mat"
+				print mat
+				print "newMat"
+				print newMat
 
-				nonZeroRow = np.where(mat[:,2] == 1)[0][0]
-				newMat = gauss_jordan(newMat, nonZeroRow, 2)
-				mat,sols = dualSimplex(newMat)
+				finalMat,sols = dualSimplex(newMat)
 				if sols is not None:
-					if i >= len(solutions)/2:
-						finalSolutions.append(-sols[2])
+					if -sols[2] not in finalSolutions:
+						finalSolutions[-sols[2]] = True
 						newSolutions.append(-sols[2])
+						newMats.append(newMat)
 						print "found new solution ", -sols[2]
-					else:
-						finalSolutions.append(sols[2])
+
+					if sols[2] not in finalSolutions:
+						finalSolutions[sols[2]] = True
 						newSolutions.append(sols[2])
+						newMats.append(newMat)
 						print "found new solution ", sols[2]
-					newMats.append(mat)
 				else:
 					print "no new solution found"
 
+				newMat[0:mat.shape[0],0:mat.shape[1]-1] = mat[:,0:mat.shape[1]-1]
+				newMat[0:mat.shape[0],newMat.shape[1]-1] = mat[:,mat.shape[1]-1]
+				# need to figure out this better constraint
+				if highVal >= 0:
+					newMat[mat.shape[0]][2] = -1.0
+				elif highVal <= 0:
+					newMat[mat.shape[0]][2] = 1.0
+				newMat[mat.shape[0]][mat.shape[1]-1] = 1.0
+				newMat[mat.shape[0]][newMat.shape[1]-1] = -highVal
+			
+				finalMat,sols = dualSimplex(newMat)
 				if sols is not None:
-					newMat = np.zeros((mat.shape[0]+1,mat.shape[1]+1))
-					newMat[0:mat.shape[0],0:mat.shape[1]-1] = mat[:,0:mat.shape[1]-1]
-					newMat[0:mat.shape[0],newMat.shape[1]-1] = mat[:,mat.shape[1]-1]
-
-					if soln >= 0:
-						newMat[mat.shape[0]][2] = -1.0
-						newMat[mat.shape[0]][mat.shape[1]] = 1.0
-						newMat[mat.shape[0]][newMat.shape[1]-1] = -(soln+distances)
-					elif soln <= 0:
-						newMat[mat.shape[0]][2] = -1.0
-						newMat[mat.shape[0]][mat.shape[1]] = 1.0
-						newMat[mat.shape[0]][newMat.shape[1]-1] = -(soln+distances)
-					nonZeroRow = np.where(mat[:,2] == 1)[0][0]
-					newMat = gauss_jordan(newMat, nonZeroRow, 2)
-					mat,sols = dualSimplex(newMat)
-				if sols is not None:
-					if i >= len(solutions)/2:
-						finalSolutions.append(-sols[2])
+					if -sols[2] not in finalSolutions:
+						finalSolutions[-sols[2]] = True
 						newSolutions.append(-sols[2])
+						newMats.append(newMat)
 						print "found new solution ", -sols[2]
-					else:
-						finalSolutions.append(sols[2])
+					if sols[2] not in finalSolutions:
+						finalSolutions[sols[2]] = True
 						newSolutions.append(sols[2])
+						newMats.append(newMat)
 						print "found new solution ", sols[2]
-					newMats.append(mat)
 				else:
 					print "no new solution found"
-			if i==2:
-				break
+				print ""
+			#if i==0:
+			#	break
 
 		solutions = newSolutions
 		mats = newMats
@@ -632,14 +551,14 @@ def findHyper(distances):
 
 	hypers = []
 	print "hyperrectangles around solutions"
-	for i in range(len(finalSolutions)):
-		hypers.append([finalSolutions[i]-distances, finalSolutions[i]+distances])
+	for sol in finalSolutions:
+		hypers.append([sol-distances, sol+distances])
 
 	print "hyperrectangles"
 	print hypers
 	print ""
 
-	return hypers
+	return hypers'''
 
 
 

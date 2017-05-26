@@ -345,15 +345,13 @@ def fun1Constraints(Vin, Vout):
 		overallConstraint += "-1 "+Vout+" + "+str(params[0])+" "+Vin+" == "+str(params[1])+"\n"
 	overallConstraint += Vout + " >= 0 " + Vin + " >= 0"
 	testSol = -3.66
-	testSol = None
+	#testSol = None
 	
 	triConstraint = convertTriangleBoundsToConstraints(a, Vin, Vout, Vlow, Vhigh)
 	triConstraint += overallConstraint
 	print "triConstraint1"
 	print triConstraint
 	mat = normalize(triConstraint)
-	print "mat from constraints"
-	print mat
 	mat,soln = dualSimplex(mat)
 	print "solutions ", soln
 	print ""
@@ -585,7 +583,7 @@ if __name__=="__main__":
 	'''solutions = fun1Constraints()
 	print "final solutions"
 	print solutions'''
-	allHypers = findHyper(0.5)
+	allHypers = findHyper(0.1)
 
 # normalize LP - for min, should be greater than equal to. for max should be less than equal to
 #first do simple simplex and then do dual simplex

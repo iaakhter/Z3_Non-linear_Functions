@@ -345,15 +345,22 @@ def fun1Constraints(Vin, Vout):
 		overallConstraint += "-1 "+Vout+" + "+str(params[0])+" "+Vin+" == "+str(params[1])+"\n"
 	overallConstraint += Vout + " >= 0 " + Vin + " >= 0"
 	testSol = -3.66
+<<<<<<< HEAD
 	testSol = None
+=======
+	#testSol = None
+>>>>>>> 2886fbb013f2951e65e6c8403f901d693996b9d4
 	
 	triConstraint = convertTriangleBoundsToConstraints(a, Vin, Vout, Vlow, Vhigh)
 	triConstraint += overallConstraint
 	print "triConstraint1"
 	print triConstraint
 	mat = normalize(triConstraint)
+<<<<<<< HEAD
 	print "mat from constraints"
 	print mat
+=======
+>>>>>>> 2886fbb013f2951e65e6c8403f901d693996b9d4
 	mat,soln = dualSimplex(mat)
 	print "solutions ", soln
 	print ""
@@ -436,7 +443,10 @@ def fun1Constraints(Vin, Vout):
 	
 	return mats,solutions
 
+<<<<<<< HEAD
 # check if solution is feasible in mat
+=======
+>>>>>>> 2886fbb013f2951e65e6c8403f901d693996b9d4
 def sillySyntax(mat, sol):
 	print "Checking feasibility of solution ", sol
 	newMat = np.zeros((mat.shape[0]+2,mat.shape[1]+2))
@@ -484,14 +494,20 @@ def findHyper(distances):
 	mats,solutions = fun1Constraints(Vin, Vout)
 	newConstraint = ""
 	finalSolutions = {}
+<<<<<<< HEAD
 	for sol in solutions:
 		finalSolutions[sol] = True
 	count = 0
 	hypers = []
+=======
+	'''for sol in solutions:
+		finalSolutions[sol] = True
+>>>>>>> 2886fbb013f2951e65e6c8403f901d693996b9d4
 	while len(solutions) > 0:
 		newSolutions = []
 		newMats = []
 		for i in range(len(solutions)):
+<<<<<<< HEAD
 			soln = solutions[i]
 			print "solution Number ", i, ": ", soln
 			lowVal = soln - distances
@@ -499,6 +515,13 @@ def findHyper(distances):
 			start = 0
 			hypers.append([lowVal,highVal])
 			for j in range(0,len(mats)):
+=======
+			print "solution number ", i
+			soln = solutions[i]
+			lowVal = soln - distances
+			highVal = soln + distances
+			for j in range(len(mats)):
+>>>>>>> 2886fbb013f2951e65e6c8403f901d693996b9d4
 				print "mat number ", j
 				mat = mats[j]
 				newMat = np.zeros((mat.shape[0]+1,mat.shape[1]+1))
@@ -510,6 +533,7 @@ def findHyper(distances):
 					newMat[mat.shape[0]][2] = -1.0
 				newMat[mat.shape[0]][mat.shape[1]-1] = 1.0
 				newMat[mat.shape[0]][newMat.shape[1]-1] = lowVal
+<<<<<<< HEAD
 				#print "mat"
 				#print mat
 				print "lowVal ", lowVal
@@ -534,6 +558,29 @@ def findHyper(distances):
 					print "no new solution found"
 
 				newMat = np.zeros((mat.shape[0]+1,mat.shape[1]+1))
+=======
+				print "mat"
+				print mat
+				print "newMat"
+				print newMat
+
+				finalMat,sols = dualSimplex(newMat)
+				if sols is not None:
+					if -sols[2] not in finalSolutions:
+						finalSolutions[-sols[2]] = True
+						newSolutions.append(-sols[2])
+						newMats.append(newMat)
+						print "found new solution ", -sols[2]
+
+					if sols[2] not in finalSolutions:
+						finalSolutions[sols[2]] = True
+						newSolutions.append(sols[2])
+						newMats.append(newMat)
+						print "found new solution ", sols[2]
+				else:
+					print "no new solution found"
+
+>>>>>>> 2886fbb013f2951e65e6c8403f901d693996b9d4
 				newMat[0:mat.shape[0],0:mat.shape[1]-1] = mat[:,0:mat.shape[1]-1]
 				newMat[0:mat.shape[0],newMat.shape[1]-1] = mat[:,mat.shape[1]-1]
 				# need to figure out this better constraint
@@ -543,6 +590,7 @@ def findHyper(distances):
 					newMat[mat.shape[0]][2] = 1.0
 				newMat[mat.shape[0]][mat.shape[1]-1] = 1.0
 				newMat[mat.shape[0]][newMat.shape[1]-1] = -highVal
+<<<<<<< HEAD
 
 				#print "mat"
 				#print mat
@@ -562,11 +610,27 @@ def findHyper(distances):
 						newSolutions.append(sols[2])
 						print "found new solution ", sols[2]
 					newMats.append(newMat)
+=======
+			
+				finalMat,sols = dualSimplex(newMat)
+				if sols is not None:
+					if -sols[2] not in finalSolutions:
+						finalSolutions[-sols[2]] = True
+						newSolutions.append(-sols[2])
+						newMats.append(newMat)
+						print "found new solution ", -sols[2]
+					if sols[2] not in finalSolutions:
+						finalSolutions[sols[2]] = True
+						newSolutions.append(sols[2])
+						newMats.append(newMat)
+						print "found new solution ", sols[2]
+>>>>>>> 2886fbb013f2951e65e6c8403f901d693996b9d4
 				else:
 					print "no new solution found"
 				print ""
 			#if i==0:
 			#	break
+<<<<<<< HEAD
 
 		solutions = newSolutions
 		mats = newMats
@@ -577,6 +641,28 @@ def findHyper(distances):
 	print "hyperrectangles"
 	print hypers
 	print ""
+=======
+
+		solutions = newSolutions
+		mats = newMats
+
+	print "found all solutions"
+	print finalSolutions
+
+	hypers = []
+	print "hyperrectangles around solutions"
+	for sol in finalSolutions:
+		hypers.append([sol-distances, sol+distances])
+
+	print "hyperrectangles"
+	print hypers
+	print ""
+
+	return hypers'''
+
+
+
+>>>>>>> 2886fbb013f2951e65e6c8403f901d693996b9d4
 
 	return hypers
 
@@ -585,7 +671,11 @@ if __name__=="__main__":
 	'''solutions = fun1Constraints()
 	print "final solutions"
 	print solutions'''
+<<<<<<< HEAD
 	allHypers = findHyper(0.5)
+=======
+	allHypers = findHyper(0.1)
+>>>>>>> 2886fbb013f2951e65e6c8403f901d693996b9d4
 
 # normalize LP - for min, should be greater than equal to. for max should be less than equal to
 #first do simple simplex and then do dual simplex

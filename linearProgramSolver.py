@@ -226,6 +226,46 @@ def tanhFun(a,val):
 	return np.tanh(a*val)
 	#return -(exp(a*val) - exp(-a*val))/(exp(a*val) + exp(-a*val))
 
+def fun1Num(x,a,params):
+	return tanhFun(a,x) - params[0]*x - params[1]
+
+def fun1Der(x,a,params):
+	return np.array([tanhFunder(a,x) - params[0]])
+
+'''
+params = [b1,b2]
+'''
+def fun1DerInterval(a,params,bounds):
+	lowerBound = bounds[:,0]
+	upperBound = bounds[:,1]
+	der1 = fun1Der(lowerBound[0],a,params)
+	der2 = fun1Der(upperBound[0],a,params)
+	der = np.zeros((1,1,2))
+	der[:,:,0] = np.minimum(der1,der2)
+	der[:,:,1] = np.maximum(der1,der2)
+	return der
+
+def fun2Num(x,a,params):
+	Iy = tanhFun(a,x[0]) + params[0] - x[1]
+	Ix = tanhFun(a,x[1]) - params[0] - x[0]
+	return np.array([Ix,Iy])
+
+def fun2Der(x,a,params):
+	der = -1*np.ones((len(x),len(x)))
+	der[0][1] = tanhFunder(a,x[1])
+	der[1][0] = tanhFunder(a,x[0])
+	return der
+
+def fun2DerInterval(a,params,bounds):
+	lowerBound = bounds[:,0]
+	upperBound = bounds[:,1]
+	der1 = fun2Der(lowerBound,a,params)
+	der2 = fun2Der(upperBound,a,params)
+	der = np.zeros((len(lowerBound),len(lowerBound),2))
+	der[:,:,0] = np.minimum(der1,der2)
+	der[:,:,1] = np.maximum(der1,der2)
+	return der
+
 '''
 takes in non-symbolic python values
 calculates the derivative of tanhFun of val
@@ -285,9 +325,9 @@ def convertTriangleBoundsToConstraints(a, Vin, Vout, Vlow, Vhigh):
 			constraint = "-1 " + Vout + " + "+str(-dThird)+" "+Vin+" <= "+str(cThird)+"\n"
 			constraint += "-1 " + Vout + " + "+str(-dLow)+" "+Vin+" >= "+str(cLow)+"\n"
 			constraint += "-1 " + Vout + " + "+str(-dHigh)+" "+Vin+" >= "+str(cHigh)+"\n"
-			constraint += "1 " + Vin + " >= "+str(Vlow)+"\n"
-			if Vhigh != 0:
-				constraint += "1 " + Vin + " <= "+str(Vhigh)+"\n"
+			if Vlow != 0:
+				constraint += "1 " + Vin + " >= "+str(Vlow)+"\n"
+			constraint += "1 " + Vin + " <= "+str(Vhigh)+"\n"
 	return constraint
 
 def convertTrapezoidBoundsToConstraints(a, Vin, Vout, Vlow, Vhigh):
@@ -333,117 +373,40 @@ def convertTrapezoidBoundsToConstraints(a, Vin, Vout, Vlow, Vhigh):
 			constraint += "1 "+Vin+" >= "+str(Vhigh)+"\n"
 
 	return constraint
-	
 
-'''def fun1Constraints(bounds):
+def fun1Constraints(bounds,a,params,triangle):
 	Vin = "x0"
 	Vout = "y0"
-	a = 1
-	params = [0.3,0.1]
-	solutions = []
-	mats = []
-
-	for i in range(len(bounds)):
-		bound = bounds[i]
-		Vlow = bound[0]
-		Vhigh = bound[1]
-
-		objConstraint = ""
-		overallConstraint = ""
-		if Vlow >= 0 and Vhigh >= 0:
-			overallConstraint += "1 "+Vout+" + "+str(-params[0])+" "+Vin+" == "+str(params[1])+"\n"
-			if a >= 0:
-				objConstraint += "min 1 "+Vout+"\n"
-			elif a <= 0:
-				objConstraint += "max -1 "+Vout+"\n"
-		elif Vlow <= 0 and Vhigh <= 0:
-			overallConstraint += "-1 "+Vout+" + "+str(params[0])+" "+Vin+" == "+str(params[1])+"\n"
-			if a >= 0:
-				objConstraint += "max -1 "+Vout+"\n"
-			elif a <= 0:
-				objConstraint += "min 1 "+Vout+"\n"
-		
-		overallConstraint += Vout + " >= 0 " + Vin + " >= 0"
-		testSol = -3.66
-		testSol = None
-		
-		triConstraint = objConstraint
-		triConstraint += convertTriangleBoundsToConstraints(a, Vin, Vout, Vlow, Vhigh)
-		triConstraint += overallConstraint
-		print "triConstraint: ", "Vlow ", Vlow, " Vhigh ", Vhigh 
-		print triConstraint
-		mat = normalize(triConstraint)
-		print "mat from constraints"
-		print mat
-		mat,soln = dualSimplex(mat)
-		print "solutions ", soln
-		print ""
-		print "mat after simplex"
-		print mat
-		if soln is not None:
-			if Vlow >= 0 and Vhigh >= 0:
-				solutions.append(soln[2])
-				if testSol is not None:
-					sillySyntax(mat, testSol)
-			elif Vlow <= 0 and Vhigh <= 0:
-				solutions.append(-soln[2])
-				if testSol is not None:
-					sillySyntax(mat, testSol)
-			mats.append(mat)
-
-		if i == 0 or i == len(bounds)-1:
-			trapConstraint = objConstraint
-			trapConstraint += convertTrapezoidBoundsToConstraints(a, Vin, Vout, Vlow, Vhigh)
-			trapConstraint += overallConstraint
-			print "trapConstraint: ", "Vlow ", Vlow, " Vhigh ", Vhigh 
-			print trapConstraint
-			mat = normalize(trapConstraint)
-			mat,soln = dualSimplex(mat)
-			print "mat from constraints"
-			print mat
-			print "solutions ", soln
-			print ""
-			print "mat after simplex"
-			print mat
-			if soln is not None:
-				if Vlow >= 0 and Vhigh >= 0:
-					solutions.append(soln[2])
-					if testSol is not None:
-						sillySyntax(mat, testSol)
-				elif Vlow <= 0 and Vhigh <= 0:
-					solutions.append(-soln[2])
-					if testSol is not None:
-						sillySyntax(mat, testSol)
-				mats.append(mat)
-
-		
-	return mats,solutions'''
-
-def fun1ConstraintsScale(bounds):
-	Vin = "x0"
-	Vout = "y0"
-	a = 1
-	params = [0.3,0.1]
 	solutions = []
 	mats = []
 	hypers = []
 
 	for i in range(len(bounds)):
 		bound = bounds[i]
-		Vlow = bound[0]
-		Vhigh = bound[1]
+		Vlow = bound[0][0]
+		Vhigh = bound[1][0]
 
 		objMinConstraint = ""
 		objMaxConstraint = ""
 		overallConstraint = ""
-		if Vlow >= 0 and Vhigh >= 0:
-			overallConstraint += "1 "+Vout+" + "+str(-params[0])+" "+Vin+" == "+str(params[1])+"\n"
-			objMinConstraint += "min 1 "+Vin+"\n"
-			objMaxConstraint += "max 1 "+Vin+"\n"
-		elif Vlow <= 0 and Vhigh <= 0:
-			overallConstraint += "-1 "+Vout+" + "+str(params[0])+" "+Vin+" == "+str(params[1])+"\n"
-			objMinConstraint += "min -1 "+Vin+"\n"
-			objMaxConstraint += "max -1 "+Vin+"\n"
+		if a >= 0:
+			if Vlow >= 0 and Vhigh >= 0:
+				overallConstraint += "1 "+Vout+" + "+str(-params[0])+" "+Vin+" == "+str(params[1])+"\n"
+				objMinConstraint += "min 1 "+Vin+"\n"
+				objMaxConstraint += "max 1 "+Vin+"\n"
+			elif Vlow <= 0 and Vhigh <= 0:
+				overallConstraint += "-1 "+Vout+" + "+str(params[0])+" "+Vin+" == "+str(params[1])+"\n"
+				objMinConstraint += "min -1 "+Vin+"\n"
+				objMaxConstraint += "max -1 "+Vin+"\n"
+		else:
+			if Vlow <= 0 and Vhigh <= 0:
+				overallConstraint += "1 "+Vout+" + "+str(-params[0])+" "+Vin+" == "+str(params[1])+"\n"
+				objMinConstraint += "min 1 "+Vin+"\n"
+				objMaxConstraint += "max 1 "+Vin+"\n"
+			elif Vlow >= 0 and Vhigh >= 0:
+				overallConstraint += "-1 "+Vout+" + "+str(params[0])+" "+Vin+" == "+str(params[1])+"\n"
+				objMinConstraint += "min -1 "+Vin+"\n"
+				objMaxConstraint += "max -1 "+Vin+"\n"
 		
 		overallConstraint += Vout + " >= 0 " + Vin + " >= 0"
 	
@@ -471,15 +434,15 @@ def fun1ConstraintsScale(bounds):
 
 		if minSoln is not None and maxSoln is not None:
 			if Vlow >= 0 and Vhigh >= 0:
-				hypers.append([minSoln[2],maxSoln[2]])
+				hypers.append([[minSoln[2]],[maxSoln[2]]])
 				print "hyper found ",minSoln[2], maxSoln[2]
 			elif Vlow <= 0 and Vhigh <= 0:
-				hypers.append([-minSoln[2],-maxSoln[2]])
+				hypers.append([[-minSoln[2]],[-maxSoln[2]]])
 				print "hyper found ",-minSoln[2], -maxSoln[2]
 			mats.append(minMat)
 			mats.append(maxMat) 
 
-		if i == 0 or i == len(bounds)-1:
+		if i == 0 or i == len(bounds)-1 and triangle == False:
 			trapConstraintMin = objMinConstraint
 			trapConstraintMin += convertTrapezoidBoundsToConstraints(a, Vin, Vout, Vlow, Vhigh)
 			trapConstraintMin += overallConstraint
@@ -502,10 +465,10 @@ def fun1ConstraintsScale(bounds):
 
 			if minSoln is not None and maxSoln is not None:
 				if Vlow >= 0 and Vhigh >= 0:
-					hypers.append([minSoln[2],maxSoln[2]])
+					hypers.append([[minSoln[2]],[maxSoln[2]]])
 					print "hyper found ",minSoln[2], maxSoln[2]
 				elif Vlow <= 0 and Vhigh <= 0:
-					hypers.append([-minSoln[2],-maxSoln[2]])
+					hypers.append([[-minSoln[2]],[-maxSoln[2]]])
 					print "hyper found ",-minSoln[2], -maxSoln[2]
 				mats.append(minMat)
 				mats.append(maxMat)
@@ -514,20 +477,13 @@ def fun1ConstraintsScale(bounds):
 	print "hypers ", hypers
 	return hypers
 
-'''def fun2Constraints(bounds):
+def fun2Constraints(bounds,a,params,triangle):
 	Vins = ["x0", "x1"]
 	Vouts = ["y0", "y1"]
-	currents = ["I0", "I1"]
-	a = -5
-	params = [0.0]
-	boundForEachVariable = []
-	for bound in bounds:
-		boundForEachVariable.append([[bound[0],bound[0]],[bound[1],bound[1]]])
 	
-
 	allBounds = []
 	for i in range(len(Vins)):
-		allBounds.append(boundForEachVariable)
+		allBounds.append(bounds)
 
 	allConstraints = []
 	constraintBounds = []
@@ -551,51 +507,169 @@ def fun1ConstraintsScale(bounds):
 		allConstraints.append(outConstraints)
 		constraintBounds.append(constraintBound)
 
-	solutions = []
+	hypers = []
 	mats = []
 	for i in range(len(allConstraints[0])):
 		for j in range(len(allConstraints[1])):
+			print "i: ", i, " j: ", j
 			constrainti = allConstraints[0][i]
 			constraintj = allConstraints[1][j]
 			boundi = constraintBounds[0][i]
 			boundj = constraintBounds[1][j]
 			overallConstraint = constrainti + constraintj
+			
+			objMinConstraintx1 = ""
+			objMinConstraintx2 = ""
+			objMaxConstraintx1 = ""
+			objMaxConstraintx2 = ""
 
 			if boundj[0] >= 0 and boundj[1] >= 0:
-				overallConstraint += "1 "+Vouts[0]+" + "+"-1 "+Vins[1]+" == "+str(-params[0])+"\n"
+				if a <= 0:
+					if boundi[0] <= 0 and boundi[1] <= 0:
+						overallConstraint += "1 "+Vouts[0]+" + "+"-1 "+Vins[1]+" == "+str(-params[0])+"\n"
+					elif boundi[0] >= 0 and boundi[1] >= 0:
+						overallConstraint += "-1 "+Vouts[0]+" + "+"-1 "+Vins[1]+" == "+str(-params[0])+"\n"
+				else:
+					if boundi[0] >= 0 and boundi[1] >= 0:
+						overallConstraint += "1 "+Vouts[0]+" + "+"-1 "+Vins[1]+" == "+str(-params[0])+"\n"
+					elif boundi[0] <= 0 and boundi[1] <= 0:
+						overallConstraint += "-1 "+Vouts[0]+" + "+"-1 "+Vins[1]+" == "+str(-params[0])+"\n"
+
+				objMinConstraintx2 += "min 1 "+Vins[1]+"\n"
+				objMaxConstraintx2 += "max 1 "+Vins[1]+"\n"
+			
 			elif boundj[0] <= 0 and boundj[1] <= 0:
-				overallConstraint += "1 "+Vouts[0]+" + "+"1 "+Vins[1]+" == "+str(-params[0])+"\n"
+				if a<= 0:
+					if boundi[0] <= 0 and boundi[1] <= 0:
+						overallConstraint += "1 "+Vouts[0]+" + "+"1 "+Vins[1]+" == "+str(-params[0])+"\n"
+					elif boundi[0] >= 0 and boundi[1] >= 0:
+						overallConstraint += "-1 "+Vouts[0]+" + "+"1 "+Vins[1]+" == "+str(-params[0])+"\n"
+				else:
+					if boundi[0] >= 0 and boundi[1] >= 0:
+						overallConstraint += "1 "+Vouts[0]+" + "+"1 "+Vins[1]+" == "+str(-params[0])+"\n"
+					elif boundi[0] <= 0 and boundi[1] <= 0:
+						overallConstraint += "-1 "+Vouts[0]+" + "+"1 "+Vins[1]+" == "+str(-params[0])+"\n"
+				objMinConstraintx2 += "min -1 "+Vins[1]+"\n"
+				objMaxConstraintx2 += "max -1 "+Vins[1]+"\n"
+			
 			if boundi[0] >= 0 and boundi[1] >= 0:
-				overallConstraint += "1 "+Vouts[1]+" + "+"-1 "+Vins[0]+" == "+str(params[0])+"\n"
+				if a <= 0:
+					if boundj[0] <= 0 and boundj[1] <= 0:
+						overallConstraint += "1 "+Vouts[1]+" + "+"-1 "+Vins[0]+" == "+str(params[0])+"\n"
+					elif boundj[0] >= 0 and boundj[1] >= 0:
+						overallConstraint += "-1 "+Vouts[1]+" + "+"-1 "+Vins[0]+" == "+str(params[0])+"\n"
+				else:
+					if boundj[0] >= 0 and boundj[1] >= 0:
+						overallConstraint += "1 "+Vouts[1]+" + "+"-1 "+Vins[0]+" == "+str(params[0])+"\n"
+					elif boundj[0] <= 0 and boundj[1] <= 0:
+						overallConstraint += "-1 "+Vouts[1]+" + "+"-1 "+Vins[0]+" == "+str(params[0])+"\n"
+				objMinConstraintx1 += "min 1 "+Vins[0]+"\n"
+				objMaxConstraintx1 += "max 1 "+Vins[0]+"\n"
+			
 			elif boundi[0] <= 0 and boundi[1] <= 0:
-				overallConstraint += "1 "+Vouts[1]+" + "+"1 "+Vins[0]+" == "+str(params[0])+"\n"
+				if a <= 0:
+					if boundj[0] <= 0 and boundj[1] <= 0:
+						overallConstraint += "1 "+Vouts[1]+" + "+"1 "+Vins[0]+" == "+str(params[0])+"\n"
+					elif boundj[0] >= 0 and boundj[1] >= 0:
+						overallConstraint += "-1 "+Vouts[1]+" + "+"1 "+Vins[0]+" == "+str(params[0])+"\n"
+				else:
+					if boundj[0] >= 0 and boundj[1] >= 0:
+						overallConstraint += "1 "+Vouts[1]+" + "+"1 "+Vins[0]+" == "+str(params[0])+"\n"
+					elif boundj[0] <= 0 and boundj[1] <= 0:
+						overallConstraint += "-1 "+Vouts[1]+" + "+"1 "+Vins[0]+" == "+str(params[0])+"\n"
+				objMinConstraintx1 += "min -1 "+Vins[0]+"\n"
+				objMaxConstraintx1 += "max -1 "+Vins[0]+"\n"
+			
 			overallConstraint += Vouts[0] + " >= 0 " + Vins[0] + " >= 0 " + Vouts[1] + " >= 0 " + Vins[1] + " >= 0"
 
-			print "overallConstraint"
-			print overallConstraint
-			mat = normalize(overallConstraint)
-			print "mat from constraints"
-			print mat
-			mat,soln = dualSimplex(mat)
-			print "solutions ", soln
+			minx1Constraint = objMinConstraintx1 + overallConstraint
+			maxx1Constraint = objMaxConstraintx1 + overallConstraint
+			minx2Constraint = objMinConstraintx2 + overallConstraint
+			maxx2Constraint = objMaxConstraintx2 + overallConstraint
+
+			print "minx1Constraint"
+			print minx1Constraint
+			minx1Mat = normalize(minx1Constraint)
+			minx1Mat, minx1Soln = dualSimplex(minx1Mat)
+			print "minx1 soln ", minx1Soln
 			print ""
-			if soln is not None:
-				finalSol = []
-				if boundPosNegi == "pos":
-					finalSol.append(soln[2])
-				elif boundPosNegi == "neg":
-					finalSol.append(-soln[2])
-				if boundPosNegj == "pos":
-					finalSol.append(soln[4])
-				elif boundPosNegj == "neg":
-					finalSol.append(-soln[4])
-				mats.append(mat)
 
-	# need to combine constraints in allConstraints in every possible way
-	# need to add overall constraint to all constraints in allConstraints
+			print "maxx1Constraint"
+			print maxx1Constraint
+			maxx1Mat = normalize(maxx1Constraint)
+			maxx1Mat, maxx1Soln = dualSimplex(maxx1Mat)
+			print "maxx1 soln ", maxx1Soln
+			print ""
 
-		
-	return mats,solutions'''
+			print "minx2Constraint"
+			print minx2Constraint
+			minx2Mat = normalize(minx2Constraint)
+			minx2Mat, minx2Soln = dualSimplex(minx2Mat)
+			print "minx2 soln ", minx2Soln
+			print ""
+
+			print "maxx2Constraint"
+			print maxx2Constraint
+			maxx2Mat = normalize(maxx2Constraint)
+			maxx2Mat, maxx2Soln = dualSimplex(maxx2Mat)
+			print "maxx2 soln ", maxx2Soln
+			print ""
+
+			if minx1Soln is not None and maxx1Soln is not None and \
+				minx2Soln is not None and maxx2Soln is not None:
+				minBounds = []
+				maxBounds = []
+				if boundi[0] >= 0 and boundi[1] >= 0:
+					print "positive boundi"
+					minBounds.append(minx1Soln[2])
+					maxBounds.append(maxx1Soln[2])
+				elif boundi[0] <= 0 and boundi[1] <= 0:
+					print "negative boundi"
+					minBounds.append(-minx1Soln[2])
+					maxBounds.append(-maxx1Soln[2])
+				if boundj[0] >= 0 and boundj[1] >= 0:
+					print "positive boundj"
+					minBounds.append(minx2Soln[4])
+					maxBounds.append(maxx2Soln[4])
+				elif boundj[0] <= 0 and boundj[1] <= 0:
+					print "negative boundj"
+					minBounds.append(-minx2Soln[4])
+					maxBounds.append(-maxx2Soln[4])
+				hyper = [minBounds,maxBounds]
+				print "hyper found ", hyper
+				hypers.append(hyper)
+				mats.append(minx1Mat)
+				mats.append(minx2Mat)
+				mats.append(maxx1Mat)
+				mats.append(maxx2Mat)
+
+	finalHypers = removeRedundantHypers(hypers)
+	print "finalHypers "
+	print finalHypers
+	return finalHypers
+
+def removeRedundantHypers(hypers):
+	finalHypers = []
+	for i in range(len(hypers)):
+		hyperi = hypers[i]
+		if len(finalHypers) == 0:
+			finalHypers.append(hyperi)
+			continue
+		foundSameHyperrectangle = False
+		for j in range(len(finalHypers)):
+			hyperj = finalHypers[j]
+			sameHyperrectangle = True
+			for k in range(len(hyperi[0])):
+				if hyperi[k] != hyperj[k]:
+					sameHyperrectangle = False
+					break
+			if sameHyperrectangle:
+				foundSameHyperrectangle = True
+				break
+		if foundSameHyperrectangle == False:
+			finalHypers.append(hyperi)
+
+	return finalHypers
 
 # check if solution is feasible in mat
 def sillySyntax(mat, sol):
@@ -640,118 +714,164 @@ def sillySyntax(mat, sol):
 	return
 
 
-def findHyper(distances):
-	#bounds = [[-0.5,-0.25],[-0.25,0.0],[0.0,0.25],[0.25,0.5]]
-	bounds = [[-0.5,0.0],[0.0,0.5]]
-	fun1ConstraintsScale(bounds)
-	'''mats,solutions = fun1Constraints(bounds)
-	print "all solutions"
-	print solutions
-	newConstraint = ""
-	finalSolutions = {}
-	for sol in solutions:
-		finalSolutions[sol] = True
-	count = 0
-	hypers = []
-	while len(solutions) > 0:
-		newSolutions = []
-		newMats = []
-		for i in range(len(solutions)):
-			soln = solutions[i]
-			print "solution Number ", i, ": ", soln
-			lowVal = soln - distances
-			highVal = soln + distances
-			start = 0
-			hypers.append([lowVal,highVal])
-			for j in range(0,len(mats)):
-				print "mat number ", j
-				mat = mats[j]
-				newMat = np.zeros((mat.shape[0]+1,mat.shape[1]+1))
-				newMat[0:mat.shape[0],0:mat.shape[1]-1] = mat[:,0:mat.shape[1]-1]
-				newMat[0:mat.shape[0],newMat.shape[1]-1] = mat[:,mat.shape[1]-1]
-				if lowVal >= 0:
-					newMat[mat.shape[0]][2] = 1.0
-				elif lowVal <= 0:
-					newMat[mat.shape[0]][2] = -1.0
-				newMat[mat.shape[0]][mat.shape[1]-1] = 1.0
-				newMat[mat.shape[0]][newMat.shape[1]-1] = lowVal
-				#print "mat"
-				#print mat
-				print "lowVal ", lowVal
-				#print "newMat"
-				#print newMat
+def multiplyRegularMatWithIntervalMat(regMat,intervalMat):
+	mat1 = np.dot(regMat,intervalMat[:,:,0])
+	mat2 = np.dot(regMat,intervalMat[:,:,1])
+	result = np.zeros((regMat.shape[0],regMat.shape[1],2))
+	result[:,:,0] = np.minimum(mat1,mat2)
+	result[:,:,1] = np.maximum(mat1,mat2)
+	return result
 
-				nonzeroIndex = np.where(mat[:,2]!=0)[0][0]
-				newMat[mat.shape[0]] = newMat[mat.shape[0]] - (newMat[mat.shape[0]][2]/mat[nonzeroIndex][2])*newMat[nonzeroIndex]
-				finalMat,sols = dualSimplex(newMat)
-				if sols is not None:
-					if -sols[2] not in finalSolutions and -sols[2] <= lowVal:
-						finalSolutions[-sols[2]] = True
-						newSolutions.append(-sols[2])
-						print "found new solution ", -sols[2]
+def subtractIntervalMatFromRegularMat(regMat,intervalMat):
+	mat1 = regMat - intervalMat[:,:,0]
+	mat2 = regMat - intervalMat[:,:,1]
+	result = np.zeros((regMat.shape[0],regMat.shape[1],2))
+	result[:,:,0] = np.minimum(mat1,mat2)
+	result[:,:,1] = np.maximum(mat1,mat2)
+	return result
 
-					if sols[2] not in finalSolutions and sols[2] <= lowVal:
-						finalSolutions[sols[2]] = True
-						newSolutions.append(sols[2])
-						print "found new solution ", sols[2]
-					newMats.append(newMat)
+def multiplyIntervalMatWithIntervalVec(mat,vec):
+	mat1 = np.dot(mat[:,:,0],vec[:,0])
+	mat2 = np.dot(mat[:,:,1],vec[:,0])
+	mat3 = np.dot(mat[:,:,0],vec[:,1])
+	mat4 = np.dot(mat[:,:,1],vec[:,1])
+	result = np.zeros((mat.shape[0],vec.shape[1]))
+	result[:,0] = np.minimum(np.minimum(mat1,mat2),np.minimum(mat3,mat4))
+	result[:,1] = np.maximum(np.maximum(mat1,mat2),np.maximum(mat3,mat4))
+	return result
+
+
+#Check existence and uniqueness of solution using Krawczyk operator
+def checkExistenceOfSolution(a,params,hyperRectangle,funNum,funDer,funDerInterval):
+	print "lower bounds ", hyperRectangle[0]
+	print "upper bounds ",hyperRectangle[1]
+	numVolts = len(hyperRectangle[0])
+
+	startBounds = np.zeros((numVolts,2))
+	startBounds[:,0] = hyperRectangle[0]
+	startBounds[:,1] = hyperRectangle[1]
+
+	iteration = 0
+	while True:
+		print "iteration number: ", iteration
+		midPoint = (startBounds[:,0] + startBounds[:,1])/2.0
+		print "midPoint"
+		print midPoint
+		IMidPoint = funNum(midPoint,a,params)
+		jacMidPoint = funDer(midPoint,a,params)
+		C = np.linalg.inv(jacMidPoint)
+		I = np.identity(numVolts)
+
+		jacInterval = funDerInterval(a,params,startBounds)
+		C_IMidPoint = np.dot(C,IMidPoint)
+
+		C_jacInterval = multiplyRegularMatWithIntervalMat(C,jacInterval)
+		I_minus_C_jacInterval = subtractIntervalMatFromRegularMat(I,C_jacInterval)
+		xi_minus_midPoint = np.zeros((numVolts,2))
+		for i in range(numVolts):
+			xi_minus_midPoint[i][0] = startBounds[i][0] - midPoint[i]
+			xi_minus_midPoint[i][1] = startBounds[i][1] - midPoint[i]
+
+		lastTerm = multiplyIntervalMatWithIntervalVec(I_minus_C_jacInterval, xi_minus_midPoint)
+		
+		kInterval1 = midPoint - C_IMidPoint + lastTerm[:,0]
+		kInterval2 = midPoint - C_IMidPoint + lastTerm[:,1]
+		kInterval = np.zeros((numVolts,2))
+		kInterval[:,0] = np.minimum(kInterval1, kInterval2)
+		kInterval[:,1] = np.maximum(kInterval1, kInterval2)
+
+		print "kInterval "
+		print kInterval
+
+		uniqueSoln = True
+		for i in range(numVolts):
+			if kInterval[i][0] <= startBounds[i][0] or kInterval[i][0] >= startBounds[i][1]:
+				uniqueSoln = False
+			if kInterval[i][1] <= startBounds[i][0] or kInterval[i][1] >= startBounds[i][1]:
+				uniqueSoln = False
+
+		if uniqueSoln:
+			print "Hyperrectangle with unique solution found"
+			startBounds = np.transpose(startBounds)
+			print startBounds
+			return (True,startBounds)
+
+		intersect = np.zeros((numVolts,2))
+		for i in range(numVolts):
+			minVal = max(kInterval[i][0],startBounds[i][0])
+			maxVal = min(kInterval[i][1],startBounds[i][1])
+			if minVal <= maxVal and \
+				minVal >= kInterval[i][0] and minVal >= startBounds[i][0] and \
+				minVal <= kInterval[i][1] and minVal <= startBounds[i][1] and \
+				maxVal >= kInterval[i][0] and maxVal >= startBounds[i][0] and \
+				maxVal <= kInterval[i][1] and maxVal <= startBounds[i][1]:
+				intersect[i] = [minVal,maxVal]
+				intervalLength =  intersect[:,1] - intersect[:,0]
+			else:
+				intersect = None
+				break
+
+		print "intersect"
+		print intersect
+
+		if intersect is None:
+			print "hyperrectangle does not contain any solution"
+			return (False,None)
+		elif np.linalg.norm(intervalLength) < 1e-8:
+			if np.sum(np.absolute(intersect)) == 0:
+				print "Hyperrectangle with unique solution found - same bounds"
+				intersect = np.transpose(intersect)
+				print intersect
+				return (True,intersect)
+
+			print "Found smallest hyperrectangle containing solution"
+			intersect = np.transpose(intersect)
+			print intersect
+			return (False,intersect)
+		else:
+			startBounds = intersect
+		iteration += 1
+
+def findUniqueHypers():
+	'''a = 1.0
+	params = [0.3,0.1]
+	bounds = [[[-0.5],[0.0]],[[0.0],[0.5]]]
+	funConstraints = fun1Constraints
+	hypers = fun1Constraints(bounds,a,params,False)
+	funNum = fun1Num
+	funDer = fun1Der
+	funDerInterval = fun1DerInterval'''
+	a = -5.0
+	params = [0.0]
+	bounds = [[[-0.5,-0.5],[0.0,0.0]],[[0.0,0.0],[0.5,0.5]]]
+	funConstraints = fun2Constraints
+	funNum = fun2Num
+	funDer = fun2Der
+	funDerInterval = fun2DerInterval
+	finalHypers = []
+
+	hypers = funConstraints(bounds,a,params,False)
+	while len(hypers)!=0:
+		tempHypers = []
+		for i in range(len(hypers)):
+			print "Checking existience within hyperrectangle ", i
+			uniqueness,interval = checkExistenceOfSolution(a,params,hypers[i],funNum,funDer,funDerInterval)
+			if uniqueness:
+				print "hyperrectangle contains unique solution"
+				finalHypers.append(hypers[i])
+			else:
+				if interval is not None:
+					print "need to refine more"
+					hyper = funConstraintsScale(hypers[i],a,params,True)
+					tempHypers += hyper
 				else:
-					print "no new solution found"
-
-				newMat = np.zeros((mat.shape[0]+1,mat.shape[1]+1))
-				newMat[0:mat.shape[0],0:mat.shape[1]-1] = mat[:,0:mat.shape[1]-1]
-				newMat[0:mat.shape[0],newMat.shape[1]-1] = mat[:,mat.shape[1]-1]
-				# need to figure out this better constraint
-				if highVal >= 0:
-					newMat[mat.shape[0]][2] = -1.0
-				elif highVal <= 0:
-					newMat[mat.shape[0]][2] = 1.0
-				newMat[mat.shape[0]][mat.shape[1]-1] = 1.0
-				newMat[mat.shape[0]][newMat.shape[1]-1] = -highVal
-
-				#print "mat"
-				#print mat
-				print "highVal ", highVal
-				#print "newMat"
-				#print newMat
-			
-				newMat[mat.shape[0]] = newMat[mat.shape[0]] - (newMat[mat.shape[0]][2]/mat[nonzeroIndex][2])*newMat[nonzeroIndex]
-				finalMat,sols = dualSimplex(newMat)
-				if sols is not None:
-					if -sols[2] not in finalSolutions and -sols[2] >= highVal:
-						finalSolutions[-sols[2]] = True
-						newSolutions.append(-sols[2])
-						print "found new solution ", -sols[2]
-					if sols[2] not in finalSolutions and sols[2] >= highVal:
-						finalSolutions[sols[2]] = True
-						newSolutions.append(sols[2])
-						print "found new solution ", sols[2]
-					newMats.append(newMat)
-				else:
-					print "no new solution found"
-				print ""
-			#if i==0:
-			#	break
-
-		solutions = newSolutions
-		mats = newMats
-		count +=1
-	print "found all solutions"
-	print finalSolutions
-
-	print "hyperrectangles"
-	for hyper in hypers:
-		print hyper
-	print ""
-
-	return hypers'''
+					print "no solution in hyperrectangle"
+			print ""
+		hypers = tempHypers
 
 
 if __name__=="__main__":
-	'''solutions = fun1Constraints()
-	print "final solutions"
-	print solutions'''
-	allHypers = findHyper(0.5)
+	findUniqueHypers()
 
 # normalize LP - for min, should be greater than equal to. for max should be less than equal to
 #first do simple simplex and then do dual simplex

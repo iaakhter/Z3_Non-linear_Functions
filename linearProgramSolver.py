@@ -668,10 +668,28 @@ def ifOrderingFeasibleOscl(bounds,a,g_cc,g_fwd,intervalIndices):
 		decVariableConstraint += variable + " >= 0 "
 		VoutCc.append(variable)
 
+	constraint = constructBasicConstraints(V,VoutFwd,VoutCc,bounds,a,g_cc,g_fwd,intervalIndices)
+	objConstraint = "min 1 v0\n"
+	constraint = objConstraint + constraint + decVariableConstraint
+	#print "constraint"
+	#print constraint
+	mat = normalize(constraint)
+	mat, soln = dualSimplex(mat)
+	#print "soln ", soln
+
+	if soln is None:
+		print "Not feasible"
+		return False
+
+	print "Feasible"
+	return True
+
+# basic constraints for rambus oscillator without any objective function
+def constructBasicConstraints(V,VoutFwd,VoutCc,bounds,a,g_cc,g_fwd,intervalIndices):
+	lenV = len(bounds[0][0])
 	Vin = [V[i % lenV] for i in range(-1,lenV-1)]
 	Vcc = [V[(i + lenV/2) % lenV] for i in range(lenV)]
 	constraint = ""
-	objConstraint = "min 1 v0\n"
 	for i in range(lenV):
 		fwdIndex = (i-1)%lenV
 		ccIndex = (i+lenV/2)%lenV
@@ -751,19 +769,7 @@ def ifOrderingFeasibleOscl(bounds,a,g_cc,g_fwd,intervalIndices):
 							+ " + "+str(constCc)+" "+VoutCc[i]+" + "+str(constVi2)+" "+V[i]+" == 0\n"
 		constraint += finalConstraint
 
-	constraint = objConstraint + constraint + decVariableConstraint
-	#print "constraint"
-	#print constraint
-	mat = normalize(constraint)
-	mat, soln = dualSimplex(mat)
-	#print "soln ", soln
-
-	if soln is None:
-		print "Not feasible"
-		return False
-
-	print "Feasible"
-	return True
+	return constraint
 		
 
 #given the appropriate feasible interval index for each decision variable
@@ -788,7 +794,6 @@ def createInitialHyperRectangles(bounds,a,g_cc,g_fwd,intervalIndices):
 	Vin = [V[i % lenV] for i in range(-1,lenV-1)]
 	Vcc = [V[(i + lenV/2) % lenV] for i in range(lenV)]
 	constraint = ""
-	objConstraint = "min 1 v0\n"
 	for i in range(lenV):
 		fwdIndex = (i-1)%lenV
 		ccIndex = (i+lenV/2)%lenV
@@ -868,6 +873,7 @@ def createInitialHyperRectangles(bounds,a,g_cc,g_fwd,intervalIndices):
 							+ " + "+str(constCc)+" "+VoutCc[i]+" + "+str(constVi2)+" "+V[i]+" == 0\n"
 		constraint += finalConstraint
 
+	objConstraint = "min 1 v0\n"
 	constraint = objConstraint + constraint + decVariableConstraint
 	#print "constraint"
 	#print constraint

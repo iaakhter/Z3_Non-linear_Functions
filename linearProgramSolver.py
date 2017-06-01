@@ -648,6 +648,241 @@ def fun2Constraints(bounds,a,params,triangle):
 	print finalHypers
 	return finalHypers
 
+#check if this specific ordering of intervals where the decision variables
+# lie from bounds specified by intervalIndices is 
+#feasible or not
+def ifOrderingFeasibleOscl(bounds,a,g_cc,g_fwd,intervalIndices):
+	lenV = len(bounds[0][0])
+	V = []
+	VoutFwd = []
+	VoutCc = []
+	decVariableConstraint = ""
+	for i in range(lenV):
+		variable = "v"+str(i)
+		decVariableConstraint += variable + " >= 0 "
+		V.append(variable)
+		variable = "voutfwd" + str(i)
+		decVariableConstraint += variable + " >= 0 "
+		VoutFwd.append(variable)
+		variable = "voutcc"+str(i)
+		decVariableConstraint += variable + " >= 0 "
+		VoutCc.append(variable)
+
+	Vin = [V[i % lenV] for i in range(-1,lenV-1)]
+	Vcc = [V[(i + lenV/2) % lenV] for i in range(lenV)]
+	constraint = ""
+	objConstraint = "min 1 v0\n"
+	for i in range(lenV):
+		fwdIndex = (i-1)%lenV
+		ccIndex = (i+lenV/2)%lenV
+		boundfwdInd = intervalIndices[fwdIndex]
+		boundccInd = intervalIndices[ccIndex]
+		boundiInd = intervalIndices[i]
+		VlowFwd, VhighFwd = None, None
+		VlowCc, VhighCc = None, None
+		Vlowi, Vhighi = None, None
+		finalConstraint = None
+
+		if boundiInd == -1:
+			Vlowi = bounds[0][0][i]
+			Vhighi = bounds[0][1][i]
+		elif boundiInd == len(bounds):
+			Vlowi = bounds[len(bounds)-1][0][i]
+			Vhighi = bounds[len(bounds)-1][1][i]
+		elif boundiInd is not None:
+			Vlowi = bounds[boundiInd][0][i]
+			Vhighi = bounds[boundiInd][1][i]
+
+		if boundfwdInd == -1:
+			VlowFwd = bounds[0][0][fwdIndex]
+			VhighFwd = bounds[0][1][fwdIndex]
+			claimTrapFwd = convertTrapezoidBoundsToConstraints(a, Vin[i], VoutFwd[i], VlowFwd, VhighFwd)
+			constraint += claimTrapFwd
+		elif boundfwdInd == len(bounds):
+			VlowFwd = bounds[len(bounds)-1][0][fwdIndex]
+			VhighFwd = bounds[len(bounds)-1][1][fwdIndex]
+			claimTrapFwd = convertTrapezoidBoundsToConstraints(a, Vin[i], VoutFwd[i], VlowFwd, VhighFwd)
+			constraint += claimTrapFwd
+		elif boundfwdInd is not None:
+			VlowFwd = bounds[boundfwdInd][0][fwdIndex]
+			VhighFwd = bounds[boundfwdInd][1][fwdIndex]
+			claimTriFwd = convertTriangleBoundsToConstraints(a, Vin[i], VoutFwd[i], VlowFwd, VhighFwd)
+			constraint += claimTriFwd
+
+		if boundccInd == -1:
+			VlowCc = bounds[0][0][ccIndex]
+			VhighCc = bounds[0][1][ccIndex]
+			claimTrapCc = convertTrapezoidBoundsToConstraints(a, Vcc[i], VoutCc[i], VlowCc, VhighCc)
+			constraint += claimTrapCc
+
+		elif boundccInd == len(bounds):
+			VlowCc = bounds[len(bounds)-1][0][ccIndex]
+			VhighCc = bounds[len(bounds)-1][1][ccIndex]
+			claimTrapCc = convertTrapezoidBoundsToConstraints(a, Vcc[i], VoutCc[i], VlowCc, VhighCc)
+			constraint += claimTrapCc
+
+		elif boundccInd is not None:
+			VlowCc = bounds[boundccInd][0][ccIndex]
+			VhighCc = bounds[boundccInd][1][ccIndex]
+			claimTriCc = convertTriangleBoundsToConstraints(a, Vcc[i], VoutCc[i], VlowCc, VhighCc)
+			constraint += claimTriCc
+
+		constFwd = g_fwd
+		constCc = g_cc
+		constVi1 = -g_fwd
+		constVi2 = -g_cc
+
+		if Vlowi <= 0 and Vhighi <=0:
+			constVi1 = -constVi1
+			constVi2 = -constVi2
+			if i == 0:
+				objConstraint = "min -1 v0\n"
+		if a <= 0 and VlowFwd >= 0 and VhighFwd >= 0:
+			constFwd = -constFwd
+		elif a >= 0 and VlowFwd <= 0 and VhighFwd <= 0:
+			constFwd = -constFwd
+
+		if a <= 0 and VlowCc >= 0 and VhighCc >= 0:
+			constCc = -constCc
+		elif a >= 0 and VlowCc <= 0 and VhighCc <= 0:
+			constCc = -constCc
+
+		finalConstraint = str(constFwd)+" "+VoutFwd[i]+" + "+str(constVi1)+" "+V[i]\
+							+ " + "+str(constCc)+" "+VoutCc[i]+" + "+str(constVi2)+" "+V[i]+" == 0\n"
+		constraint += finalConstraint
+
+	constraint = objConstraint + constraint + decVariableConstraint
+	#print "constraint"
+	#print constraint
+	mat = normalize(constraint)
+	mat, soln = dualSimplex(mat)
+	#print "soln ", soln
+
+	if soln is None:
+		print "Not feasible"
+		return False
+
+	print "Feasible"
+	return True
+		
+
+#given the appropriate feasible interval index for each decision variable
+#find initial hyperrectangles
+def createInitialHyperRectangles(bounds,a,g_cc,g_fwd,intervalIndices):
+	lenV = len(bounds[0][0])
+	V = []
+	VoutFwd = []
+	VoutCc = []
+	decVariableConstraint = ""
+	for i in range(lenV):
+		variable = "v"+str(i)
+		decVariableConstraint += variable + " >= 0 "
+		V.append(variable)
+		variable = "voutfwd" + str(i)
+		decVariableConstraint += variable + " >= 0 "
+		VoutFwd.append(variable)
+		variable = "voutcc"+str(i)
+		decVariableConstraint += variable + " >= 0 "
+		VoutCc.append(variable)
+
+	Vin = [V[i % lenV] for i in range(-1,lenV-1)]
+	Vcc = [V[(i + lenV/2) % lenV] for i in range(lenV)]
+	constraint = ""
+	objConstraint = "min 1 v0\n"
+	for i in range(lenV):
+		fwdIndex = (i-1)%lenV
+		ccIndex = (i+lenV/2)%lenV
+		boundfwdInd = intervalIndices[fwdIndex]
+		boundccInd = intervalIndices[ccIndex]
+		boundiInd = intervalIndices[i]
+		VlowFwd, VhighFwd = None, None
+		VlowCc, VhighCc = None, None
+		Vlowi, Vhighi = None, None
+		finalConstraint = None
+
+		if boundiInd == -1:
+			Vlowi = bounds[0][0][i]
+			Vhighi = bounds[0][1][i]
+		elif boundiInd == len(bounds):
+			Vlowi = bounds[len(bounds)-1][0][i]
+			Vhighi = bounds[len(bounds)-1][1][i]
+		elif boundiInd is not None:
+			Vlowi = bounds[boundiInd][0][i]
+			Vhighi = bounds[boundiInd][1][i]
+
+		if boundfwdInd == -1:
+			VlowFwd = bounds[0][0][fwdIndex]
+			VhighFwd = bounds[0][1][fwdIndex]
+			claimTrapFwd = convertTrapezoidBoundsToConstraints(a, Vin[i], VoutFwd[i], VlowFwd, VhighFwd)
+			constraint += claimTrapFwd
+		elif boundfwdInd == len(bounds):
+			VlowFwd = bounds[len(bounds)-1][0][fwdIndex]
+			VhighFwd = bounds[len(bounds)-1][1][fwdIndex]
+			claimTrapFwd = convertTrapezoidBoundsToConstraints(a, Vin[i], VoutFwd[i], VlowFwd, VhighFwd)
+			constraint += claimTrapFwd
+		elif boundfwdInd is not None:
+			VlowFwd = bounds[boundfwdInd][0][fwdIndex]
+			VhighFwd = bounds[boundfwdInd][1][fwdIndex]
+			claimTriFwd = convertTriangleBoundsToConstraints(a, Vin[i], VoutFwd[i], VlowFwd, VhighFwd)
+			constraint += claimTriFwd
+
+		if boundccInd == -1:
+			VlowCc = bounds[0][0][ccIndex]
+			VhighCc = bounds[0][1][ccIndex]
+			claimTrapCc = convertTrapezoidBoundsToConstraints(a, Vcc[i], VoutCc[i], VlowCc, VhighCc)
+			constraint += claimTrapCc
+
+		elif boundccInd == len(bounds):
+			VlowCc = bounds[len(bounds)-1][0][ccIndex]
+			VhighCc = bounds[len(bounds)-1][1][ccIndex]
+			claimTrapCc = convertTrapezoidBoundsToConstraints(a, Vcc[i], VoutCc[i], VlowCc, VhighCc)
+			constraint += claimTrapCc
+
+		elif boundccInd is not None:
+			VlowCc = bounds[boundccInd][0][ccIndex]
+			VhighCc = bounds[boundccInd][1][ccIndex]
+			claimTriCc = convertTriangleBoundsToConstraints(a, Vcc[i], VoutCc[i], VlowCc, VhighCc)
+			constraint += claimTriCc
+
+		constFwd = g_fwd
+		constCc = g_cc
+		constVi1 = -g_fwd
+		constVi2 = -g_cc
+
+		if Vlowi <= 0 and Vhighi <=0:
+			constVi1 = -constVi1
+			constVi2 = -constVi2
+			if i == 0:
+				objConstraint = "min -1 v0\n"
+		if a <= 0 and VlowFwd >= 0 and VhighFwd >= 0:
+			constFwd = -constFwd
+		elif a >= 0 and VlowFwd <= 0 and VhighFwd <= 0:
+			constFwd = -constFwd
+
+		if a <= 0 and VlowCc >= 0 and VhighCc >= 0:
+			constCc = -constCc
+		elif a >= 0 and VlowCc <= 0 and VhighCc <= 0:
+			constCc = -constCc
+
+		finalConstraint = str(constFwd)+" "+VoutFwd[i]+" + "+str(constVi1)+" "+V[i]\
+							+ " + "+str(constCc)+" "+VoutCc[i]+" + "+str(constVi2)+" "+V[i]+" == 0\n"
+		constraint += finalConstraint
+
+	constraint = objConstraint + constraint + decVariableConstraint
+	#print "constraint"
+	#print constraint
+	mat = normalize(constraint)
+	mat, soln = dualSimplex(mat)
+	#print "soln ", soln
+
+	if soln is None:
+		print "Not feasible"
+		return False
+
+	print "Feasible"
+	return True
+
+			
 def removeRedundantHypers(hypers):
 	finalHypers = []
 	for i in range(len(hypers)):
@@ -869,9 +1104,91 @@ def findUniqueHypers():
 			print ""
 		hypers = tempHypers
 
+#Data structure to keep track all possible combination of interval indices
+class combinationNode:
+	def __init__(self,rootArray):
+		self.rootArray = copy.deepcopy(rootArray)
+		self.children = []
+
+	def addChild(self,childArray):
+		childNode = combinationNode(childArray)
+		self.children.append(childNode)
+
+def printCombinationNode(rootCombinationNode):
+	rootArray = rootCombinationNode.rootArray
+	print rootArray
+	for i in range(len(rootCombinationNode.children)):
+		printCombinationNode(rootCombinationNode.children[i])
+
+
+
+def addCombinationsAsChildren(rootCombinationNode,intervalIndexRange):
+	theArray = rootCombinationNode.rootArray
+	if theArray[len(theArray)-1]!= None:
+		return
+	possibleIntervalIndices = range(intervalIndexRange[0],intervalIndexRange[1]+1)
+	indexOfNone = 0
+	for i in range(len(theArray)):
+		if theArray[i] == None:
+			indexOfNone = i
+			break
+	for i in range(len(possibleIntervalIndices)):
+		childArray = copy.deepcopy(theArray)
+		childArray[indexOfNone] = possibleIntervalIndices[i]
+		rootCombinationNode.addChild(childArray)
+
+	for i in range(len(rootCombinationNode.children)):
+		addCombinationsAsChildren(rootCombinationNode.children[i],intervalIndexRange)
+
+# intervalIndexRange is inclusive for both lower and upper bound
+def combinationWithTrees(numIntervalIndices, intervalIndexRange):
+	possibleIntervalIndices = range(intervalIndexRange[0],intervalIndexRange[1]+1)
+	rootCombinationNodes = []
+	for i in range(len(possibleIntervalIndices)):
+		arr = [possibleIntervalIndices[i]]
+		for j in range(1,numIntervalIndices):
+			arr.append(None)
+		combNode = combinationNode(arr)
+		rootCombinationNodes.append(combNode)
+	for i in range(len(rootCombinationNodes)):
+		addCombinationsAsChildren(rootCombinationNodes[i],intervalIndexRange)
+	
+	return rootCombinationNodes
+	#printCombinationNode(rootCombinationNodes[0])
+
+def getFeasibleIntervalIndices(rootCombinationNode,a,g_cc,g_fwd,bounds,validIntervalIndices):
+	intervalIndices = rootCombinationNode.rootArray
+	feasible = ifOrderingFeasibleOscl(bounds,a,g_cc,g_fwd,intervalIndices)
+	if feasible == False:
+		return
+	indexOfNone = None
+	for i in range(len(intervalIndices)):
+		if intervalIndices[i] is None:
+			indexOfNone = i
+			break
+	if indexOfNone is None:
+		validIntervalIndices.append(copy.deepcopy(intervalIndices))
+	for i in range(len(rootCombinationNode.children)):
+		getFeasibleIntervalIndices(rootCombinationNode.children[i],a,g_cc,g_fwd,bounds,validIntervalIndices)
+
+
+def osclTest():
+	bounds = [[[-0.5,-0.5,-0.5,-0.5],[0.0,0.0,0.0,0.0]],
+				[[0.0,0.0,0.0,0.0],[0.5,0.5,0.5,0.5]]]
+	a = -5.0
+	g_cc = 0.5
+	g_fwd = 1.0
+
+	rootCombinationNodes = combinationWithTrees(4,[-1,2])
+	feasibleIntervalIndices = []
+	for i in range(len(rootCombinationNodes)):
+		getFeasibleIntervalIndices(rootCombinationNodes[i],a,g_cc,g_fwd,bounds,feasibleIntervalIndices)
+	print "validIntervalIndices ", feasibleIntervalIndices
+	
+
 
 if __name__=="__main__":
-	findUniqueHypers()
+	osclTest()
 
 # normalize LP - for min, should be greater than equal to. for max should be less than equal to
 #first do simple simplex and then do dual simplex

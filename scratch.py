@@ -406,6 +406,216 @@ def findHyper(distances):
 	return mats,solutions'''
 
 
+def osclConstraints(bounds,a,g_cc,g_fwd,triangle = False):
+	lenV = len(bounds[0][0])
+	V = []
+	VoutFwd = []
+	VoutCc = []
+	for i in range(lenV):
+		variable = "v"+str(i)
+		V.append(variable)
+		variable = "voutfwd" + str(i)
+		VoutFwd.append(variable)
+		variable = "voutcc"+str(i)
+		VoutCc.append(variable)
+
+	Vin = [V[i % lenV] for i in range(-1,lenV-1)]
+	Vcc = [V[(i + lenV/2) % lenV] for i in range(lenV)]
+	
+	allBounds = []
+	for i in range(lenV):
+		allBounds.append(bounds)
+
+	allConstraintsFwd = []
+	allConstraintsCc = []
+	allConstraintBoundsFwd = []
+	allConstraintBoundsCc = []
+	for i in range(lenV):
+		fwdConstraints = []
+		ccConstraints = []
+		constraintBoundFwd = []
+		constraintBoundCc = []
+		for j in range(len(bounds)):
+			for k in range(len(bounds)):
+				boundin = allBounds[(i-1)%lenV][j]
+				boundcc = allBounds[(i+lenV/2)%lenV][k]
+				claimFwd = convertTriangleBoundsToConstraints(a, Vin[i], VoutFwd[i], boundin[0][(i-1)%lenV],boundin[1][(i-1)%lenV])
+				claimCc = convertTriangleBoundsToConstraints(a, Vcc[i], VoutCc[i], boundcc[0][(i+lenV/2)%lenV],boundcc[1][(i+lenV/2)%lenV])
+				constraintBoundFwd.append([boundin[0][(i-1)%lenV], boundin[1][(i-1)%lenV]])
+				constraintBoundCc.append([boundcc[0][(i+lenV/2)%lenV],boundcc[1][(i+lenV/2)%lenV]])
+				fwdConstraints.append(claimFwd)
+				ccConstraints.append(claimCc)
+
+				if j==0 or j==len(allBounds)-1:
+					claimTrapFwd1 = convertTrapezoidBoundsToConstraints(a, Vin[i], VoutFwd[i], boundin[0][(i-1)%lenV], boundin[1][(i-1)%lenV])
+					constraintBoundFwd.append([boundin[0][(i-1)%lenV],boundin[1][(i-1)%lenV]])
+					fwdConstraints.append(claimTrapFwd1)
+				if k==0 or k==len(allBounds)-1:
+					claimTrapCc1 = convertTrapezoidBoundsToConstraints(a,Vcc[i],VoutCc[i],boundcc[0][(i+lenV/2)%lenV],boundcc[1][(i+lenV/2)%lenV])
+					constraintBoundCc.append([boundcc[0][(i+lenV/2)%lenV],boundcc[1][(i+lenV/2)%lenV]])
+					ccConstraints.append(claimTrapCc1)
+
+		allConstraintsFwd.append(fwdConstraints)
+		allConstraintsCc.append(ccConstraints)
+		allConstraintBoundsFwd.append(constraintBoundFwd)
+		allConstraintBoundsCc.append(constraintBoundCc)
+	
+	
+	hypers = []
+	mats = []
+	for i in range(lenV):
+		for j in range(len(allConstraintsFwd[i])):
+			for k in range(len(allConstraintsCc[i])):
+				boundFwd = allConstraintBoundsFwd[i][j]
+				boundCc = allConstraintBoundsCc[i][k]
+				#need to specifically add min max constraints after figuring out the combinations
+				constraint = allConstraintsFwd[i][j] + allConstraintsCc[i][k]
+				constraint += str(g_fwd)+" "+VoutFwd[i]+" + "+str(-g_fwd)+" "+V[i]\
+							+ " "+str(g_cc)+" "+VoutCc[i]+" + "+str(-g_cc)+" "+V[i]+"\n"
+
+
+	hypers = []
+	mats = []
+	for i in range(len(allConstraints[0])):
+		for j in range(len(allConstraints[1])):
+			print "i: ", i, " j: ", j
+			constrainti = allConstraints[0][i]
+			constraintj = allConstraints[1][j]
+			boundi = constraintBounds[0][i]
+			boundj = constraintBounds[1][j]
+			overallConstraint = constrainti + constraintj
+			
+			objMinConstraintx1 = ""
+			objMinConstraintx2 = ""
+			objMaxConstraintx1 = ""
+			objMaxConstraintx2 = ""
+
+			if boundj[0] >= 0 and boundj[1] >= 0:
+				if a <= 0:
+					if boundi[0] <= 0 and boundi[1] <= 0:
+						overallConstraint += "1 "+Vouts[0]+" + "+"-1 "+Vins[1]+" == "+str(-params[0])+"\n"
+					elif boundi[0] >= 0 and boundi[1] >= 0:
+						overallConstraint += "-1 "+Vouts[0]+" + "+"-1 "+Vins[1]+" == "+str(-params[0])+"\n"
+				else:
+					if boundi[0] >= 0 and boundi[1] >= 0:
+						overallConstraint += "1 "+Vouts[0]+" + "+"-1 "+Vins[1]+" == "+str(-params[0])+"\n"
+					elif boundi[0] <= 0 and boundi[1] <= 0:
+						overallConstraint += "-1 "+Vouts[0]+" + "+"-1 "+Vins[1]+" == "+str(-params[0])+"\n"
+
+				objMinConstraintx2 += "min 1 "+Vins[1]+"\n"
+				objMaxConstraintx2 += "max 1 "+Vins[1]+"\n"
+			
+			elif boundj[0] <= 0 and boundj[1] <= 0:
+				if a<= 0:
+					if boundi[0] <= 0 and boundi[1] <= 0:
+						overallConstraint += "1 "+Vouts[0]+" + "+"1 "+Vins[1]+" == "+str(-params[0])+"\n"
+					elif boundi[0] >= 0 and boundi[1] >= 0:
+						overallConstraint += "-1 "+Vouts[0]+" + "+"1 "+Vins[1]+" == "+str(-params[0])+"\n"
+				else:
+					if boundi[0] >= 0 and boundi[1] >= 0:
+						overallConstraint += "1 "+Vouts[0]+" + "+"1 "+Vins[1]+" == "+str(-params[0])+"\n"
+					elif boundi[0] <= 0 and boundi[1] <= 0:
+						overallConstraint += "-1 "+Vouts[0]+" + "+"1 "+Vins[1]+" == "+str(-params[0])+"\n"
+				objMinConstraintx2 += "min -1 "+Vins[1]+"\n"
+				objMaxConstraintx2 += "max -1 "+Vins[1]+"\n"
+			
+			if boundi[0] >= 0 and boundi[1] >= 0:
+				if a <= 0:
+					if boundj[0] <= 0 and boundj[1] <= 0:
+						overallConstraint += "1 "+Vouts[1]+" + "+"-1 "+Vins[0]+" == "+str(params[0])+"\n"
+					elif boundj[0] >= 0 and boundj[1] >= 0:
+						overallConstraint += "-1 "+Vouts[1]+" + "+"-1 "+Vins[0]+" == "+str(params[0])+"\n"
+				else:
+					if boundj[0] >= 0 and boundj[1] >= 0:
+						overallConstraint += "1 "+Vouts[1]+" + "+"-1 "+Vins[0]+" == "+str(params[0])+"\n"
+					elif boundj[0] <= 0 and boundj[1] <= 0:
+						overallConstraint += "-1 "+Vouts[1]+" + "+"-1 "+Vins[0]+" == "+str(params[0])+"\n"
+				objMinConstraintx1 += "min 1 "+Vins[0]+"\n"
+				objMaxConstraintx1 += "max 1 "+Vins[0]+"\n"
+			
+			elif boundi[0] <= 0 and boundi[1] <= 0:
+				if a <= 0:
+					if boundj[0] <= 0 and boundj[1] <= 0:
+						overallConstraint += "1 "+Vouts[1]+" + "+"1 "+Vins[0]+" == "+str(params[0])+"\n"
+					elif boundj[0] >= 0 and boundj[1] >= 0:
+						overallConstraint += "-1 "+Vouts[1]+" + "+"1 "+Vins[0]+" == "+str(params[0])+"\n"
+				else:
+					if boundj[0] >= 0 and boundj[1] >= 0:
+						overallConstraint += "1 "+Vouts[1]+" + "+"1 "+Vins[0]+" == "+str(params[0])+"\n"
+					elif boundj[0] <= 0 and boundj[1] <= 0:
+						overallConstraint += "-1 "+Vouts[1]+" + "+"1 "+Vins[0]+" == "+str(params[0])+"\n"
+				objMinConstraintx1 += "min -1 "+Vins[0]+"\n"
+				objMaxConstraintx1 += "max -1 "+Vins[0]+"\n"
+			
+			overallConstraint += Vouts[0] + " >= 0 " + Vins[0] + " >= 0 " + Vouts[1] + " >= 0 " + Vins[1] + " >= 0"
+
+			minx1Constraint = objMinConstraintx1 + overallConstraint
+			maxx1Constraint = objMaxConstraintx1 + overallConstraint
+			minx2Constraint = objMinConstraintx2 + overallConstraint
+			maxx2Constraint = objMaxConstraintx2 + overallConstraint
+
+			print "minx1Constraint"
+			print minx1Constraint
+			minx1Mat = normalize(minx1Constraint)
+			minx1Mat, minx1Soln = dualSimplex(minx1Mat)
+			print "minx1 soln ", minx1Soln
+			print ""
+
+			print "maxx1Constraint"
+			print maxx1Constraint
+			maxx1Mat = normalize(maxx1Constraint)
+			maxx1Mat, maxx1Soln = dualSimplex(maxx1Mat)
+			print "maxx1 soln ", maxx1Soln
+			print ""
+
+			print "minx2Constraint"
+			print minx2Constraint
+			minx2Mat = normalize(minx2Constraint)
+			minx2Mat, minx2Soln = dualSimplex(minx2Mat)
+			print "minx2 soln ", minx2Soln
+			print ""
+
+			print "maxx2Constraint"
+			print maxx2Constraint
+			maxx2Mat = normalize(maxx2Constraint)
+			maxx2Mat, maxx2Soln = dualSimplex(maxx2Mat)
+			print "maxx2 soln ", maxx2Soln
+			print ""
+
+			if minx1Soln is not None and maxx1Soln is not None and \
+				minx2Soln is not None and maxx2Soln is not None:
+				minBounds = []
+				maxBounds = []
+				if boundi[0] >= 0 and boundi[1] >= 0:
+					print "positive boundi"
+					minBounds.append(minx1Soln[2])
+					maxBounds.append(maxx1Soln[2])
+				elif boundi[0] <= 0 and boundi[1] <= 0:
+					print "negative boundi"
+					minBounds.append(-minx1Soln[2])
+					maxBounds.append(-maxx1Soln[2])
+				if boundj[0] >= 0 and boundj[1] >= 0:
+					print "positive boundj"
+					minBounds.append(minx2Soln[4])
+					maxBounds.append(maxx2Soln[4])
+				elif boundj[0] <= 0 and boundj[1] <= 0:
+					print "negative boundj"
+					minBounds.append(-minx2Soln[4])
+					maxBounds.append(-maxx2Soln[4])
+				hyper = [minBounds,maxBounds]
+				print "hyper found ", hyper
+				hypers.append(hyper)
+				mats.append(minx1Mat)
+				mats.append(minx2Mat)
+				mats.append(maxx1Mat)
+				mats.append(maxx2Mat)
+
+	finalHypers = removeRedundantHypers(hypers)
+	print "finalHypers "
+	print finalHypers
+	return finalHypers
+
+
 
 if __name__=="__main__":
 	stringConstraint = "max 2 x1 + 1 x2\n1 x1 + 1 x2 <= 10\n-1 x1 + 1 x2 >= 2\nx1 >= 0 x2 >= 0"

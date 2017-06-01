@@ -799,4 +799,4 @@ def testInvRegion(g_cc):
 	print "final filtered solutions"
 	print filteredHyperrectangles
 
-testInvRegion(10.0)
+testInvRegion(0.5)

@@ -669,7 +669,17 @@ def ifOrderingFeasibleOscl(bounds,a,g_cc,g_fwd,intervalIndices):
 		VoutCc.append(variable)
 
 	constraint = constructBasicConstraints(V,VoutFwd,VoutCc,bounds,a,g_cc,g_fwd,intervalIndices)
-	objConstraint = "min 1 v0\n"
+	minConstant = 1
+
+	bound0Ind = intervalIndices[0]
+	if bound0Ind == -1:
+		minConstant = -1
+	elif bound0Ind is not None and bound0Ind < len(bounds):
+		Vlow = bounds[bound0Ind][0][0]
+		Vhigh = bounds[bound0Ind][1][0]
+		if Vlow <=0 and Vhigh <= 0:
+			minConstant = -1
+	objConstraint = "min "+str(minConstant)+" v0\n"
 	constraint = objConstraint + constraint + decVariableConstraint
 	#print "constraint"
 	#print constraint
@@ -791,103 +801,31 @@ def createInitialHyperRectangles(bounds,a,g_cc,g_fwd,intervalIndices):
 		decVariableConstraint += variable + " >= 0 "
 		VoutCc.append(variable)
 
-	Vin = [V[i % lenV] for i in range(-1,lenV-1)]
-	Vcc = [V[(i + lenV/2) % lenV] for i in range(lenV)]
-	constraint = ""
+	constraint = constructBasicConstraints(V,VoutFwd,VoutCc,bounds,a,g_cc,g_fwd,intervalIndices)
+	
 	for i in range(lenV):
-		fwdIndex = (i-1)%lenV
-		ccIndex = (i+lenV/2)%lenV
-		boundfwdInd = intervalIndices[fwdIndex]
-		boundccInd = intervalIndices[ccIndex]
-		boundiInd = intervalIndices[i]
-		VlowFwd, VhighFwd = None, None
-		VlowCc, VhighCc = None, None
-		Vlowi, Vhighi = None, None
-		finalConstraint = None
+		variable = v+str(i)
+		minObjConstraint = "min 1 "+variable+"\n"
+		minConstraint = minObjConstraint + constraint + decVariableConstraint
+		#print "constraint"
+		#print constraint
+		minMat = normalize(minCnstraint)
+		minMat, minSoln = dualSimplex(minMat)
 
-		if boundiInd == -1:
-			Vlowi = bounds[0][0][i]
-			Vhighi = bounds[0][1][i]
-		elif boundiInd == len(bounds):
-			Vlowi = bounds[len(bounds)-1][0][i]
-			Vhighi = bounds[len(bounds)-1][1][i]
-		elif boundiInd is not None:
-			Vlowi = bounds[boundiInd][0][i]
-			Vhighi = bounds[boundiInd][1][i]
 
-		if boundfwdInd == -1:
-			VlowFwd = bounds[0][0][fwdIndex]
-			VhighFwd = bounds[0][1][fwdIndex]
-			claimTrapFwd = convertTrapezoidBoundsToConstraints(a, Vin[i], VoutFwd[i], VlowFwd, VhighFwd)
-			constraint += claimTrapFwd
-		elif boundfwdInd == len(bounds):
-			VlowFwd = bounds[len(bounds)-1][0][fwdIndex]
-			VhighFwd = bounds[len(bounds)-1][1][fwdIndex]
-			claimTrapFwd = convertTrapezoidBoundsToConstraints(a, Vin[i], VoutFwd[i], VlowFwd, VhighFwd)
-			constraint += claimTrapFwd
-		elif boundfwdInd is not None:
-			VlowFwd = bounds[boundfwdInd][0][fwdIndex]
-			VhighFwd = bounds[boundfwdInd][1][fwdIndex]
-			claimTriFwd = convertTriangleBoundsToConstraints(a, Vin[i], VoutFwd[i], VlowFwd, VhighFwd)
-			constraint += claimTriFwd
+		maxObjConstraint = "max 1 "+variable+"\n"
+		minConstraint = minObjConstraint + constraint + decVariableConstraint
+		#print "constraint"
+		#print constraint
+		minMat = normalize(minCnstraint)
+		minMat, minSoln = dualSimplex(minMat)
 
-		if boundccInd == -1:
-			VlowCc = bounds[0][0][ccIndex]
-			VhighCc = bounds[0][1][ccIndex]
-			claimTrapCc = convertTrapezoidBoundsToConstraints(a, Vcc[i], VoutCc[i], VlowCc, VhighCc)
-			constraint += claimTrapCc
+		if soln is None:
+			print "Not feasible"
+			return False
 
-		elif boundccInd == len(bounds):
-			VlowCc = bounds[len(bounds)-1][0][ccIndex]
-			VhighCc = bounds[len(bounds)-1][1][ccIndex]
-			claimTrapCc = convertTrapezoidBoundsToConstraints(a, Vcc[i], VoutCc[i], VlowCc, VhighCc)
-			constraint += claimTrapCc
-
-		elif boundccInd is not None:
-			VlowCc = bounds[boundccInd][0][ccIndex]
-			VhighCc = bounds[boundccInd][1][ccIndex]
-			claimTriCc = convertTriangleBoundsToConstraints(a, Vcc[i], VoutCc[i], VlowCc, VhighCc)
-			constraint += claimTriCc
-
-		constFwd = g_fwd
-		constCc = g_cc
-		constVi1 = -g_fwd
-		constVi2 = -g_cc
-
-		if Vlowi <= 0 and Vhighi <=0:
-			constVi1 = -constVi1
-			constVi2 = -constVi2
-			if i == 0:
-				objConstraint = "min -1 v0\n"
-		if a <= 0 and VlowFwd >= 0 and VhighFwd >= 0:
-			constFwd = -constFwd
-		elif a >= 0 and VlowFwd <= 0 and VhighFwd <= 0:
-			constFwd = -constFwd
-
-		if a <= 0 and VlowCc >= 0 and VhighCc >= 0:
-			constCc = -constCc
-		elif a >= 0 and VlowCc <= 0 and VhighCc <= 0:
-			constCc = -constCc
-
-		finalConstraint = str(constFwd)+" "+VoutFwd[i]+" + "+str(constVi1)+" "+V[i]\
-							+ " + "+str(constCc)+" "+VoutCc[i]+" + "+str(constVi2)+" "+V[i]+" == 0\n"
-		constraint += finalConstraint
-
-	objConstraint = "min 1 v0\n"
-	constraint = objConstraint + constraint + decVariableConstraint
-	#print "constraint"
-	#print constraint
-	mat = normalize(constraint)
-	mat, soln = dualSimplex(mat)
-	#print "soln ", soln
-
-	if soln is None:
-		print "Not feasible"
-		return False
-
-	print "Feasible"
-	return True
-
+		print "Feasible"
+		return True
 			
 def removeRedundantHypers(hypers):
 	finalHypers = []

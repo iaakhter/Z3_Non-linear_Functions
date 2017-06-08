@@ -1,6 +1,9 @@
 import numpy as np
 import copy
 
+# if not dual feasible, check primal feasibility. if primal feasible apply normal simplex
+# otherwise modified simplex. then dual simplex. check if primal simplex is implemented correctly
+
 def is_number(s):
 	try:
 		float(s)
@@ -12,97 +15,213 @@ def is_number(s):
 # the first row is the objective function
 # the first element in the first row must be positive
 def simplex(theMat):
+	print "PRIMAL SIMPLEX"
 	standardMat = copy.deepcopy(theMat)
 	numRows = standardMat.shape[0]
 	numCols = standardMat.shape[1]
 	count = 0
 	while len(np.where(standardMat[0,:numCols-1] < 0)[0]) > 0:
-		#print "mat "
-		#print standardMat
-		#print ""
-		enteringVariable = np.where(standardMat[0,:] < 0)[0][0]
+		'''print "mat first row"
+		print standardMat[0]
+		print ""
+		print "mat last column"
+		print standardMat[:,numCols-1]
+		print ""'''
+		enteringVariables = np.where(standardMat[0,:] < 0)[0]
+		minInRow = np.argsort(standardMat[0,:])
+		enteringVariable, pivot, possiblePivots = None, None, None
+		enteringVariable = minInRow[0]
+		if enteringVariable == numCols-1:
+			enteringVariable = minInRow[1]
 		ratios = np.divide(standardMat[:,numCols - 1],standardMat[:,enteringVariable])
 		ratioSortedIndices = np.argsort(ratios)
+		possiblePivots = []
+
 		for ind in ratioSortedIndices:
 			if ind != 0 and standardMat[ind,enteringVariable] > 0:
-				pivot = ind
-				break
+				possiblePivots.append(ind)
+
 		#print "entering variable ", enteringVariable
-		#print "ratios ", ratios
-		#print "ratioIndices", ratioSortedIndices
+		#print "entering variable column"
+		#print standardMat[:,enteringVariable]
 		#print "pivot ", pivot
+		largestMatValue = standardMat[possiblePivots[0]][enteringVariable]
+		pivot = possiblePivots[0]
+		if len(possiblePivots) > 1:
+			ind1 = possiblePivots[0]
+			ind2 = possiblePivots[1]
+			p = 1
+			if ratios[ind1] != ratios[ind2]:
+				pivot = ind1
+			else:
+				while p < len(possiblePivots) and ratios[ind1] == ratios[possiblePivots[p]]:
+					ind2 = possiblePivots[p]
+					if standardMat[ind2][enteringVariable] > largestMatValue:
+						pivot = ind2
+						largestMatValue = standardMat[ind2][enteringVariable]
+					p+=1
+
 		standardMat = gauss_jordan(standardMat,pivot,enteringVariable)
-		#print "mat after "
-		#print standardMat
-		#print ""
+		'''print "mat after "
+		print standardMat
+		print ""'''
 		count+=1
-		'''if count == 2:
-			return'''
 	sols = np.zeros((numCols - 1))
 	for i in range(len(sols)):
-		if np.sum(standardMat[:,i]==0) == numRows - 1:
+		if len(np.where(standardMat[:,i]==0)[0]) == numRows - 1:
 			nonzeroIndex = np.where(standardMat[:,i] != 0)[0][0]
+			#print "i ", i, "nonzeroIndex ", nonzeroIndex
 			if standardMat[nonzeroIndex][i] == 1:
+				#print "coming here?"
 				sols[i] = standardMat[nonzeroIndex][numCols-1]
+	print ""
 	return standardMat, sols
+
+
 
 def dualSimplex(theMat):
 	normalizedMat = copy.deepcopy(theMat)
 	numRows = normalizedMat.shape[0]
 	numCols = normalizedMat.shape[1]
-	numNegsIn1stRow = np.sum(normalizedMat[0,:numCols-1] < 0)
-	numPosInLastColumn = np.sum(normalizedMat[1:,numCols-1] > 0)
-
-	if numNegsIn1stRow != 0:
-		# this is not a correct action maybe
-		normalizedMat,_ = simplex(normalizedMat)
-		#print "mat after simplex "
-		#print normalizedMat
 	count = 0
-	while np.sum(normalizedMat[1:,numCols-1] < 0) > 0:
-		#print "mat "
-		#print normalizedMat
-		#print ""
+	if len(np.where(normalizedMat[0]<0)[0]) != 0:
+		print "Optimality condition is not met. Cannot apply dual complex"
+		return None, None
+	
+	while len(np.where(normalizedMat[1:,numCols-1] < 0)[0]) > 0:
+		'''print "normalizedMat first row"
+		print normalizedMat[0]
+		print "normalizedMat last column"
+		print normalizedMat[:,numCols-1]'''
 		enteringVariable, pivot = None, None
 		minInCol = np.argsort(normalizedMat[:,numCols-1])
-		for i in range(len(minInCol)):
-			minInd = minInCol[i]
-			foundEnteringVariable = False
-			if minInd != 0 and normalizedMat[minInd,numCols-1] < 0:
-				pivot = minInd
-				#print "pivot ", pivot
-				ratios = np.divide(-normalizedMat[0,:numCols - 1],normalizedMat[pivot,:numCols-1])
-				ratioSortedIndices = np.argsort(ratios)
-				'''print "ratios ", ratios
-				print "ratioIndices", ratioSortedIndices'''
-				for ind in ratioSortedIndices:
-					if ind != 0 and normalizedMat[pivot,ind] < 0:
-						enteringVariable = ind
-						foundEnteringVariable = True
-						break
-				if foundEnteringVariable:
-					break
-		if foundEnteringVariable == False:
+		pivot = minInCol[0]
+		if pivot== 0:
+			pivot = minInCol[1]
+
+		numNegsInRow = len(np.where(normalizedMat[pivot,:numCols-1] < 0)[0])
+		if numNegsInRow == 0:
 			print "No feasible solution"
 			return None, None
+		ratios = np.divide(-normalizedMat[0,:numCols - 1],normalizedMat[pivot,:numCols-1])
+		ratioSortedIndices = np.argsort(ratios)
+		'''print "ratios ", ratios
+		print "ratioIndices", ratioSortedIndices'''
+		possibleEnteringVariables = []
+		for ind in ratioSortedIndices:
+			if normalizedMat[pivot,ind] < 0:
+				possibleEnteringVariables.append(ind)
 
-		#print "pivot ", pivot
-		#print "enteringVariable ", enteringVariable
-		#print "entering variable ", enteringVariable
+		smallestMatValue = normalizedMat[pivot][possibleEnteringVariables[0]]
+		enteringVariable = possibleEnteringVariables[0]
+		
+		if len(possibleEnteringVariables) > 1:
+			#print "possibleEnteringVariables"
+			#print possibleEnteringVariables
+			ind1 = possibleEnteringVariables[0]
+			ind2 = possibleEnteringVariables[1]
+			p = 1
+			if ratios[ind1] != ratios[ind2]:
+				enteringVariable = ind1
+			else:
+				while p < len(possibleEnteringVariables) and ratios[ind1] == ratios[possibleEnteringVariables[p]]:
+					ind2 = possibleEnteringVariables[p]
+					if normalizedMat[pivot][ind2] > smallestMatValue:
+						enteringVariable = ind2
+						smallesMatValue = normalizedMat[pivot][ind2]
+					p+=1
+
+		#print "FINALpivot ", pivot, "enteringVariable ", enteringVariable
+		#print normalizedMat[pivot]
 		normalizedMat = gauss_jordan(normalizedMat,pivot,enteringVariable)
-		#print "mat after "
-		#print normalizedMat
-		#print ""
 		count+=1
 		'''if count == 2:
 			return'''
 	sols = np.zeros((numCols - 1))
 	for i in range(len(sols)):
-		if np.sum(normalizedMat[:,i]==0) == numRows - 1:
+		if len(np.where(normalizedMat[:,i]==0)[0]) == numRows - 1:
 			nonzeroIndex = np.where(normalizedMat[:,i] != 0)[0][0]
 			if normalizedMat[nonzeroIndex][i] == 1:
 				sols[i] = normalizedMat[nonzeroIndex][numCols-1]
+	#print "normalizedMat "
+	#print normalizedMat[:,normalizedMat.shape[1]-1]
+	print ""
 	return normalizedMat, sols
+
+
+
+def generalizedSimplex(theMat):
+	normalizedMat = copy.deepcopy(theMat)
+	numRows = normalizedMat.shape[0]
+	numCols = normalizedMat.shape[1]
+	numNegsIn1stRow = len(np.where(normalizedMat[0,:numCols-1] < 0)[0])
+	numNegsInLastCol = len(np.where(normalizedMat[1:,numCols-1] < 0)[0])
+	'''print "normalizedMat first row"
+	print normalizedMat[0]
+	print "normalizedMat last column"
+	print normalizedMat[:,numCols-1]'''
+
+	if numNegsIn1stRow != 0 and numNegsInLastCol != 0:
+		#print "before simplex"
+		#print normalizedMat[0]
+		print "MAKING TABLEAU FEASIBLE"
+		normalizedMat,soln = dualSimplex(normalizedMat)
+		if soln is None:
+			print "no feasible solution"
+			return None, None
+		numNegsIn1stRow = len(np.where(normalizedMat[0,:numCols-1] < 0)[0])
+		numNegsInLastCol = len(np.where(normalizedMat[1:,numCols-1] < 0)[0])
+		#print "normalizedMat first row"
+		#print normalizedMat[0]
+		#print "normalizedMat last column"
+		#print normalizedMat[:,numCols-1]
+		#return normalizedMat,soln
+		#print "mat after simplex "
+		#print normalizedMat[0:5]
+		#print "soln ", soln
+		#return
+		#normalizedMat = makeBasisDualFeasible(normalizedMat)
+		#numRows = normalizedMat.shape[0]
+		#numCols = normalizedMat.shape[1]
+		#print "after dual feasible process"
+		#print "normalizedMat firstRow"
+		#print normalizedMat[0]
+		#print "Optimality condition is not met"
+		#return None, None
+
+		if numNegsInLastCol == 0:
+			'''print "normalizedMat first row"
+			print normalizedMat[0]
+			print "normalizedMat last column"
+			print normalizedMat[:,numCols-1]'''
+			normalizedMat,soln = simplex(normalizedMat)
+			if soln is None:
+				print "solution is unbounded in primal simplex"
+				return None, None
+		return normalizedMat,soln
+	
+	elif numNegsInLastCol == 0:
+		normalizedMat,soln = simplex(normalizedMat)
+		if soln is None:
+			print "solution is unbounded in primal simplex"
+			return None, None
+		#print "normalizedMat first row"
+		#print normalizedMat[0]
+		#print "normalizedMat last column"
+		#print normalizedMat[:,numCols-1]	
+		return normalizedMat,soln	
+
+	print "START DUAL SIMPLEX"
+	normalizedMat,soln = dualSimplex(normalizedMat)
+	if soln is None:
+		print "no feasible solution"
+		return None, None
+	#print "normalizedMat first row"
+	#print normalizedMat[0]
+	#print "normalizedMat last column"
+	#print normalizedMat[:,numCols-1]
+	return normalizedMat,soln
+		
 
 
 def gauss_jordan(mat, pivot, enteringVariable):
@@ -643,10 +762,18 @@ def fun2Constraints(bounds,a,params,triangle):
 				mats.append(maxx1Mat)
 				mats.append(maxx2Mat)
 
+	print "hypers "
+	print hypers
 	finalHypers = removeRedundantHypers(hypers)
 	print "finalHypers "
 	print finalHypers
 	return finalHypers
+
+def checkArrayEqualities(arr1, arr2):
+	for i in range(len(arr1)):
+		if arr1[i] != arr2[i]:
+			return False
+	return True
 
 #check if this specific ordering of intervals where the decision variables
 # lie from bounds specified by intervalIndices is 
@@ -668,28 +795,36 @@ def ifOrderingFeasibleOscl(bounds,a,g_cc,g_fwd,intervalIndices):
 		decVariableConstraint += variable + " >= 0 "
 		VoutCc.append(variable)
 
-	constraint = constructBasicConstraints(V,VoutFwd,VoutCc,bounds,a,g_cc,g_fwd,intervalIndices)
 	minConstant = 1
-
-	bound0Ind = intervalIndices[0]
+	objFun = "min "
+	bound0Ind = intervalIndices[3]
 	if bound0Ind == -1:
 		minConstant = -1
+		objFun = "max "
 	elif bound0Ind is not None and bound0Ind < len(bounds):
 		Vlow = bounds[bound0Ind][0][0]
 		Vhigh = bounds[bound0Ind][1][0]
 		if Vlow <=0 and Vhigh <= 0:
 			minConstant = -1
-	objConstraint = "min "+str(minConstant)+" v0\n"
-	constraint = objConstraint + constraint + decVariableConstraint
-	#print "constraint"
-	#print constraint
-	mat = normalize(constraint)
-	mat, soln = dualSimplex(mat)
-	#print "soln ", soln
+			objFun = "max "
 
+	objConstraint = objFun+str(minConstant)+" v3\n"
+
+	constraint = constructBasicConstraints(V,VoutFwd,VoutCc,bounds,a,g_cc,g_fwd,intervalIndices)
+
+	constraint = objConstraint + constraint + decVariableConstraint
+	print "constraint"
+	print constraint
+	mat = normalize(constraint)
+	mat, soln = generalizedSimplex(mat)
+
+	
 	if soln is None:
 		print "Not feasible"
 		return False
+
+	print "soln"
+	print soln
 
 	print "Feasible"
 	return True
@@ -757,14 +892,10 @@ def constructBasicConstraints(V,VoutFwd,VoutCc,bounds,a,g_cc,g_fwd,intervalIndic
 
 		constFwd = g_fwd
 		constCc = g_cc
-		constVi1 = -g_fwd
-		constVi2 = -g_cc
+		constVi = -(g_fwd+g_cc)
 
 		if Vlowi <= 0 and Vhighi <=0:
-			constVi1 = -constVi1
-			constVi2 = -constVi2
-			if i == 0:
-				objConstraint = "min -1 v0\n"
+			constVi = -constVi
 		if a <= 0 and VlowFwd >= 0 and VhighFwd >= 0:
 			constFwd = -constFwd
 		elif a >= 0 and VlowFwd <= 0 and VhighFwd <= 0:
@@ -775,16 +906,17 @@ def constructBasicConstraints(V,VoutFwd,VoutCc,bounds,a,g_cc,g_fwd,intervalIndic
 		elif a >= 0 and VlowCc <= 0 and VhighCc <= 0:
 			constCc = -constCc
 
-		finalConstraint = str(constFwd)+" "+VoutFwd[i]+" + "+str(constVi1)+" "+V[i]\
-							+ " + "+str(constCc)+" "+VoutCc[i]+" + "+str(constVi2)+" "+V[i]+" == 0\n"
-		constraint += finalConstraint
+		if Vlowi is not None and VlowFwd is not None and VlowCc is not None:
+			finalConstraint = str(constFwd)+" "+VoutFwd[i]\
+							+ " + "+str(constCc)+" "+VoutCc[i]+" + "+str(constVi)+" "+V[i]+" == 0\n"
+			constraint += finalConstraint
 
 	return constraint
 		
 
 #given the appropriate feasible interval index for each decision variable
 #find initial hyperrectangles
-def createInitialHyperRectangles(bounds,a,g_cc,g_fwd,intervalIndices):
+def createInitialHyperRectangles(bounds,a,g_cc,g_fwd,intervalIndices,debug):
 	lenV = len(bounds[0][0])
 	V = []
 	VoutFwd = []
@@ -803,29 +935,74 @@ def createInitialHyperRectangles(bounds,a,g_cc,g_fwd,intervalIndices):
 
 	constraint = constructBasicConstraints(V,VoutFwd,VoutCc,bounds,a,g_cc,g_fwd,intervalIndices)
 	
-	for i in range(lenV):
-		variable = v+str(i)
-		minObjConstraint = "min 1 "+variable+"\n"
-		minConstraint = minObjConstraint + constraint + decVariableConstraint
+	hypers = np.zeros((2,lenV))
+	for i in range(len(V)):
+		variable = "v"+str(i)
+		objConstant = 1
+		boundInd = intervalIndices[i]
+		
+		if boundInd == -1:
+			objConstant = -1
+		elif boundInd is not None and boundInd < len(bounds):
+			Vlow = bounds[boundInd][0][0]
+			Vhigh = bounds[boundInd][1][0]
+			if Vlow <=0 and Vhigh <= 0:
+				objConstant = -1
+
+		minObjConstraint = "min "+str(objConstant)+" "+variable+"\n"
+		minConstraint = minObjConstraint +constraint + decVariableConstraint
 		#print "constraint"
 		#print constraint
-		minMat = normalize(minCnstraint)
-		minMat, minSoln = dualSimplex(minMat)
+		minMat = normalize(minConstraint)
+		minMat, minSoln = generalizedSimplex(minMat)
+		if debug:
+			print "minConstraint"
+			print minConstraint
+			#print "minMat"
+			#print minMat
+			print "minSoln"
+			print minSoln
+			#solFeasible = sillySyntax(minMat,-0.3024)
+			#print "specific solution is feasible: ", solFeasible
 
-
-		maxObjConstraint = "max 1 "+variable+"\n"
-		minConstraint = minObjConstraint + constraint + decVariableConstraint
+		maxObjConstraint = "max "+str(objConstant)+" "+variable+"\n"
+		maxConstraint = maxObjConstraint + constraint + decVariableConstraint
 		#print "constraint"
-		#print constraint
-		minMat = normalize(minCnstraint)
-		minMat, minSoln = dualSimplex(minMat)
+		#print constrain
+		maxMat = normalize(maxConstraint)
+		if debug:
+			print "maxConstraint"
+			print maxConstraint
+			#print "maxMat before simplex"
+			#print maxMat
+			#print maxMat[:,maxMat.shape[1]-1]
+			#print ""
+		maxMat, maxSoln = generalizedSimplex(maxMat)
+		if debug:
+			#print "maxMat"
+			#print maxMat
+			#print maxMat[:,maxMat.shape[1]-1]
+			print "maxSoln"
+			print maxSoln
 
-		if soln is None:
-			print "Not feasible"
-			return False
+		#minSoln = np.zeros((12))
 
-		print "Feasible"
-		return True
+		if minSoln is not None and maxSoln is not None:
+			if objConstant == 1:
+				hypers[0][i] = minSoln[i*(lenV-1)+1]
+			elif objConstant == -1:
+				hypers[0][i] = -minSoln[i*(lenV-1)+1]
+
+			if objConstant == 1:
+				hypers[1][i] = maxSoln[i*(lenV-1)+1]
+			elif objConstant == -1:
+				hypers[1][i] = -maxSoln[i*(lenV-1)+1]
+		else:
+			return None
+	if debug:
+		print "hyper found "
+		print hypers
+	return [hypers]
 			
 def removeRedundantHypers(hypers):
 	finalHypers = []
@@ -1012,21 +1189,22 @@ def checkExistenceOfSolution(a,params,hyperRectangle,funNum,funDer,funDerInterva
 		iteration += 1
 
 def findUniqueHypers():
-	'''a = 1.0
+	a = 1.0
 	params = [0.3,0.1]
 	bounds = [[[-0.5],[0.0]],[[0.0],[0.5]]]
 	funConstraints = fun1Constraints
 	hypers = fun1Constraints(bounds,a,params,False)
 	funNum = fun1Num
 	funDer = fun1Der
-	funDerInterval = fun1DerInterval'''
-	a = -5.0
+	funDerInterval = fun1DerInterval
+	'''a = -5.0
 	params = [0.0]
 	bounds = [[[-0.5,-0.5],[0.0,0.0]],[[0.0,0.0],[0.5,0.5]]]
 	funConstraints = fun2Constraints
 	funNum = fun2Num
 	funDer = fun2Der
-	funDerInterval = fun2DerInterval
+	funDerInterval = fun2DerInterval'''
+	
 	finalHypers = []
 
 	hypers = funConstraints(bounds,a,params,False)
@@ -1123,13 +1301,32 @@ def osclTest():
 	g_cc = 0.5
 	g_fwd = 1.0
 
+	feasible = ifOrderingFeasibleOscl(bounds,a,g_cc,g_fwd,[1,0,1,0])
+
 	rootCombinationNodes = combinationWithTrees(4,[-1,2])
 	feasibleIntervalIndices = []
 	for i in range(len(rootCombinationNodes)):
 		getFeasibleIntervalIndices(rootCombinationNodes[i],a,g_cc,g_fwd,bounds,feasibleIntervalIndices)
 	print "validIntervalIndices ", feasibleIntervalIndices
-	
+	hypers = []
+	for i in range(len(feasibleIntervalIndices)):
+		intervalIndices = feasibleIntervalIndices[i]
+		print "considering interval index: ", intervalIndices
+		debug = False
+		hyper = createInitialHyperRectangles(bounds,a,g_cc,g_fwd,intervalIndices,debug)
+		#print "hyper "
+		#print hyper
+		if hyper is not None:
+			hypers.append(hyper)
+	finalHypers = hypers
+	print "final hyperrectangles"
+	for i in range(len(finalHypers)):
+		print "hyper number ", i
+		print finalHypers[i]
 
+def simplexTest():
+	mat = np.array([[1,-1,3,0,0,0,0],[0,1,-1,1,0,0,2],[0,-1,-1,0,1,0,-4],[0,-2,2,0,0,1,-3]])
+	finalMat,soln = dualSimplex(mat)
 
 if __name__=="__main__":
 	osclTest()

@@ -230,17 +230,11 @@ def checkExistenceOfSolution(a,g_fwd,g_cc,hyperRectangle, oscNum, jacobian, jaco
 		#print "intersect"
 		#print intersect
 
-		unsure = False
-		if np.less_equal(startBounds[:,1] - startBounds[:,0], np.ones((numVolts))*1e-8 ).any():
-			unsure = True
-
-		if unsure == False and intersect is None:
+		if intersect is None:
 			#print "hyperrectangle does not contain any solution"
 			return (False,None)
-		if unsure:
-			intersect = startBounds
-			intervalLength =  intersect[:,1] - intersect[:,0]
-		if unsure or np.linalg.norm(intervalLength) < 1e-8 or np.linalg.norm(intersect-startBounds) < 1e-8:
+		
+		if np.linalg.norm(intervalLength) < 1e-8 or np.linalg.norm(intersect-startBounds) < 1e-8:
 			# TODO: Need a better way to deal with tiny hyperrectangles
 			if constructBiggerHyper == False and np.less_equal(intervalLength, np.ones((numVolts))*1e-10 ).all():
 				constructBiggerHyper = True

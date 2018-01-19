@@ -201,20 +201,32 @@ def fun2(s,x,bounds,a,params):
 	s.add(outVals[1] - params[0] - x[0] == 0)
 
 def plotFun1(a,params):
-	x = arange(-4.0,4.0,0.01)
+	x = arange(-3.0,3.0,0.01)
 	ytanh = tanhFun(a,x)
 	yLinear = params[0]*x + params[1]
+	yLess1 = -745579.0/1000000.0*x + 24553.0/40000.0
+	yLess2 = -3799433.0/1000000.0*x
+	yLess3 = -186473.0/250000.0*x + 153417.0/250000.0
+	yLess4 = -380003.0/100000.0*x
+	#yGreater1 = (993119.0/1000000.0)*x
+	#yGreater2 = (112037.0/125000.0)*x + 13969.0/1000000.0
 	plt.figure()
-	plt.plot(x,ytanh,'r',x,yLinear,'b')
+	#plt.plot(x,ytanh,'r',x,yLess1,'b',x,yLess2,'b',x,yLess3,'g',x,yLess4,'g')
 	#plt.plot(x,ytanh-yLinear)
+	plt.plot(x,ytanh,'r',x,yLinear,'b')
+	#plt.ylim(-1.0,1.0)
 	plt.show()
 
 #params in the form of [b]
 def plotFun2(a,params):
 	u = arange(-4.0,4.0,0.01)
+	y1 = -123.0/1000000.0*u + 6249.0/6250.0
+	y2 = -1341.0/200000.0*u + 198793.0/200000.0
+	y3 = -823.0/500000.0*u + 249503.0/250000.0
 	plt.figure()
-	plt.plot(u,tanhFun(a,u) + params[0],'r',tanhFun(a,u) - params[0],u,'b')
-	plt.legend(['I_y == 0','I_x == 0'])
+	plt.plot(u,tanhFun(a,u) + params[0],'r',tanhFun(a,u) - params[0],u,'b',
+		u,y1,'k',u,y2,'k',u,y3,'k')
+	#plt.legend(['I_y == 0','I_x == 0'])
 	plt.show()
 
 

@@ -89,10 +89,10 @@ def dualSimplex(theMat):
 		return None, None
 	
 	while len(np.where(normalizedMat[1:,numCols-1] < 0)[0]) > 0:
-		'''print "normalizedMat first row"
+		print "normalizedMat first row"
 		print normalizedMat[0]
 		print "normalizedMat last column"
-		print normalizedMat[:,numCols-1]'''
+		print normalizedMat[:,numCols-1]
 		enteringVariable, pivot = None, None
 		minInCol = np.argsort(normalizedMat[:,numCols-1])
 		pivot = minInCol[0]
@@ -103,7 +103,7 @@ def dualSimplex(theMat):
 		if numNegsInRow == 0:
 			print "No feasible solution"
 			return None, None
-		ratios = np.divide(-normalizedMat[0,:numCols - 1],normalizedMat[pivot,:numCols-1])
+		ratios = np.divide(np.absolute(normalizedMat[0,:numCols - 1]),np.absolute(normalizedMat[pivot,:numCols-1]))
 		ratioSortedIndices = np.argsort(ratios)
 		'''print "ratios ", ratios
 		print "ratioIndices", ratioSortedIndices'''
@@ -112,27 +112,10 @@ def dualSimplex(theMat):
 			if normalizedMat[pivot,ind] < 0:
 				possibleEnteringVariables.append(ind)
 
-		smallestMatValue = normalizedMat[pivot][possibleEnteringVariables[0]]
 		enteringVariable = possibleEnteringVariables[0]
 		
-		if len(possibleEnteringVariables) > 1:
-			#print "possibleEnteringVariables"
-			#print possibleEnteringVariables
-			ind1 = possibleEnteringVariables[0]
-			ind2 = possibleEnteringVariables[1]
-			p = 1
-			if ratios[ind1] != ratios[ind2]:
-				enteringVariable = ind1
-			else:
-				while p < len(possibleEnteringVariables) and ratios[ind1] == ratios[possibleEnteringVariables[p]]:
-					ind2 = possibleEnteringVariables[p]
-					if normalizedMat[pivot][ind2] > smallestMatValue:
-						enteringVariable = ind2
-						smallesMatValue = normalizedMat[pivot][ind2]
-					p+=1
-
-		#print "FINALpivot ", pivot, "enteringVariable ", enteringVariable
-		#print normalizedMat[pivot]
+		print "FINALpivot ", pivot, "enteringVariable ", enteringVariable
+		print normalizedMat[pivot]
 		normalizedMat = gauss_jordan(normalizedMat,pivot,enteringVariable)
 		count+=1
 		'''if count == 2:
@@ -200,6 +183,18 @@ def generalizedSimplex(theMat):
 				return None, None
 		return normalizedMat,soln
 	
+	elif numNegsIn1stRow == 0:
+		print "START DUAL SIMPLEX"
+		normalizedMat,soln = dualSimplex(normalizedMat)
+		if soln is None:
+			print "no feasible solution"
+			return None, None
+		#print "normalizedMat first row"
+		#print normalizedMat[0]
+		#print "normalizedMat last column"
+		#print normalizedMat[:,numCols-1]
+		return normalizedMat,soln
+
 	elif numNegsInLastCol == 0:
 		normalizedMat,soln = simplex(normalizedMat)
 		if soln is None:
@@ -209,23 +204,12 @@ def generalizedSimplex(theMat):
 		#print normalizedMat[0]
 		#print "normalizedMat last column"
 		#print normalizedMat[:,numCols-1]	
-		return normalizedMat,soln	
-
-	print "START DUAL SIMPLEX"
-	normalizedMat,soln = dualSimplex(normalizedMat)
-	if soln is None:
-		print "no feasible solution"
-		return None, None
-	#print "normalizedMat first row"
-	#print normalizedMat[0]
-	#print "normalizedMat last column"
-	#print normalizedMat[:,numCols-1]
-	return normalizedMat,soln
-		
-
+		return normalizedMat,soln
 
 def gauss_jordan(mat, pivot, enteringVariable):
+	#print "gauss_jordan before pivoting pivot row ", mat[pivot]
 	mat[pivot] = mat[pivot]/mat[pivot][enteringVariable]
+	#print "gauss_jordan after pivoting pivot row ", mat[pivot]
 	for i in range(mat.shape[0]):
 		if i!= pivot:
 			mat[i] = mat[i] - mat[i][enteringVariable]*mat[pivot]
@@ -385,6 +369,62 @@ def fun2DerInterval(a,params,bounds):
 	der[:,:,1] = np.maximum(der1,der2)
 	return der
 
+
+'''simulate oscillation with python numberical values to check if the
+z3 solutions make sense'''
+def oscNum(V,a,params):
+	g_fwd = params[0]
+	g_cc = params[1]
+	lenV = len(V)
+	Vin = [V[i % lenV] for i in range(-1,lenV-1)]
+	Vcc = [V[(i + lenV/2) % lenV] for i in range(lenV)]
+	VoutFwd = [tanhFun(a,Vin[i]) for i in range(lenV)]
+	VoutCc = [tanhFun(a,Vcc[i]) for i in range(lenV)]
+	return [((tanhFun(a,Vin[i])-V[i])*g_fwd
+			+(tanhFun(a,Vcc[i])-V[i])*g_cc) for i in range(lenV)]
+
+
+'''Get jacobian of rambus oscillator at V
+'''
+def getJacobian(V,a,params):
+	g_fwd = params[0]
+	g_cc = params[1]
+	lenV = len(V)
+	Vin = [V[i % lenV] for i in range(-1,lenV-1)]
+	Vcc = [V[(i + lenV/2) % lenV] for i in range(lenV)]
+	jacobian = np.zeros((lenV, lenV))
+	for i in range(lenV):
+		jacobian[i,i] = -(g_fwd+g_cc)
+		jacobian[i,(i-1)%lenV] = g_fwd*tanhFunder(a,V[(i-1)%lenV])
+		jacobian[i,(i + lenV/2) % lenV] = g_cc*tanhFunder(a,V[(i + lenV/2) % lenV])
+
+	return jacobian
+
+def getJacobianInterval(a,params,bounds):
+	#print "bounds in getJacobianInterval"
+	#print bounds
+	g_fwd = params[0]
+	g_cc = params[1]
+	lowerBound = bounds[:,0]
+	upperBound = bounds[:,1]
+	lenV = len(lowerBound)
+	jacobian = np.zeros((lenV, lenV,2))
+	jacobian[:,:,0] = jacobian[:,:,0] 
+	jacobian[:,:,1] = jacobian[:,:,1]
+	for i in range(lenV):
+		jacobian[i,i,0] = -(g_fwd+g_cc)
+		jacobian[i,i,1] = -(g_fwd+g_cc)
+		gfwdVal1 = g_fwd*tanhFunder(a,lowerBound[(i-1)%lenV])
+		gfwdVal2 = g_fwd*tanhFunder(a,upperBound[(i-1)%lenV])
+		jacobian[i,(i-1)%lenV,0] = min(gfwdVal1,gfwdVal2)
+		jacobian[i,(i-1)%lenV,1] = max(gfwdVal1,gfwdVal2)
+		gccVal1 = g_cc*tanhFunder(a,lowerBound[(i + lenV/2) % lenV])
+		gccVal2 = g_cc*tanhFunder(a,upperBound[(i + lenV/2) % lenV])
+		jacobian[i,(i + lenV/2) % lenV,0] = min(gccVal1,gccVal2)
+		jacobian[i,(i + lenV/2) % lenV,1] = max(gccVal1,gccVal2)
+
+	return jacobian
+
 '''
 takes in non-symbolic python values
 calculates the derivative of tanhFun of val
@@ -413,40 +453,40 @@ def convertTriangleBoundsToConstraints(a, Vin, Vout, Vlow, Vhigh):
 	if a > 0:
 		if Vlow >= 0 and Vhigh >=0:
 			#constraint = "min 1 "+Vout+"\n"
-			constraint = "1 " + Vout+" + "+str(-dThird) + " " + Vin +" >= "+str(cThird)+"\n"
-			constraint += "1 " + Vout+" + "+str(-dLow) + " " + Vin +" <= "+str(cLow)+"\n"
-			constraint += "1 " + Vout+" + "+str(-dHigh) + " " + Vin +" <= "+str(cHigh)+"\n"
-			if Vlow != 0:
+			constraint = "1.0 " + Vout+" + "+str(-dThird) + " " + Vin +" >= "+str(cThird)+"\n"
+			constraint += "1.0 " + Vout+" + "+str(-dLow) + " " + Vin +" <= "+str(cLow)+"\n"
+			constraint += "1.0 " + Vout+" + "+str(-dHigh) + " " + Vin +" <= "+str(cHigh)+"\n"
+			'''if Vlow != 0:
 				constraint += "1 " + Vin + " >= "+str(Vlow)+"\n"
-			constraint += "1 " + Vin + " <= "+str(Vhigh)+"\n"
+			constraint += "1 " + Vin + " <= "+str(Vhigh)+"\n"'''
 
 		elif Vlow <=0 and Vhigh <=0:
 			#constraint = "max -1 "+Vout+"\n"
-			constraint = "-1 " + Vout + " + " +str(dThird)+" "+Vin+" <= "+str(cThird)+"\n"
-			constraint += "-1 " + Vout + " + " +str(dLow)+" "+Vin+" >= "+str(cLow)+"\n"
-			constraint += "-1 " + Vout + " + " +str(dHigh)+" "+Vin+" >= "+str(cHigh)+"\n"
-			constraint += "-1 " + Vin + " >= "+str(Vlow)+"\n"
+			constraint = "-1.0 " + Vout + " + " +str(dThird)+" "+Vin+" <= "+str(cThird)+"\n"
+			constraint += "-1.0 " + Vout + " + " +str(dLow)+" "+Vin+" >= "+str(cLow)+"\n"
+			constraint += "-1.0 " + Vout + " + " +str(dHigh)+" "+Vin+" >= "+str(cHigh)+"\n"
+			'''constraint += "-1 " + Vin + " >= "+str(Vlow)+"\n"
 			if Vhigh != 0:
-				constraint += "-1 " + Vin + " <= "+str(Vhigh)+"\n"
+				constraint += "-1 " + Vin + " <= "+str(Vhigh)+"\n"'''
 	
 	elif a < 0:
 		if Vlow <= 0 and Vhigh <=0:
 			#constraint = "min 1 "+Vout+"\n"
-			constraint = "1 " + Vout+" + "+str(dThird) + " " + Vin +" >= "+str(cThird)+"\n"
-			constraint += "1 " + Vout+" + "+str(dLow) + " " + Vin +" <= "+str(cLow)+"\n"
-			constraint += "1 " + Vout+" + "+str(dHigh) + " " + Vin +" <= "+str(cHigh)+"\n"
-			constraint += "-1 " + Vin + " >= "+str(Vlow)+"\n"
+			constraint = "1.0 " + Vout+" + "+str(dThird) + " " + Vin +" >= "+str(cThird)+"\n"
+			constraint += "1.0 " + Vout+" + "+str(dLow) + " " + Vin +" <= "+str(cLow)+"\n"
+			constraint += "1.0 " + Vout+" + "+str(dHigh) + " " + Vin +" <= "+str(cHigh)+"\n"
+			'''constraint += "-1 " + Vin + " >= "+str(Vlow)+"\n"
 			if Vhigh != 0:
-				constraint += "-1 " + Vin + " <= "+str(Vhigh)+"\n"
+				constraint += "-1 " + Vin + " <= "+str(Vhigh)+"\n"'''
 		
 		elif Vlow >=0 and Vhigh >=0:
 			#constraint = "max -1 "+Vout+"\n"
-			constraint = "-1 " + Vout + " + "+str(-dThird)+" "+Vin+" <= "+str(cThird)+"\n"
-			constraint += "-1 " + Vout + " + "+str(-dLow)+" "+Vin+" >= "+str(cLow)+"\n"
-			constraint += "-1 " + Vout + " + "+str(-dHigh)+" "+Vin+" >= "+str(cHigh)+"\n"
-			if Vlow != 0:
+			constraint = "-1.0 " + Vout + " + "+str(-dThird)+" "+Vin+" <= "+str(cThird)+"\n"
+			constraint += "-1.0 " + Vout + " + "+str(-dLow)+" "+Vin+" >= "+str(cLow)+"\n"
+			constraint += "-1.0 " + Vout + " + "+str(-dHigh)+" "+Vin+" >= "+str(cHigh)+"\n"
+			'''if Vlow != 0:
 				constraint += "1 " + Vin + " >= "+str(Vlow)+"\n"
-			constraint += "1 " + Vin + " <= "+str(Vhigh)+"\n"
+			constraint += "1 " + Vin + " <= "+str(Vhigh)+"\n"'''
 	return constraint
 
 def convertTrapezoidBoundsToConstraints(a, Vin, Vout, Vlow, Vhigh):
@@ -466,30 +506,30 @@ def convertTrapezoidBoundsToConstraints(a, Vin, Vout, Vlow, Vhigh):
 	if a > 0:
 		if Vlow <= 0 and Vhigh <= 0:
 			#constraint = "max -1 "+Vout+"\n"
-			constraint = "-1 "+Vout+" + "+str(dLow)+" "+Vin+" >= "+str(cLow)+"\n"
-			constraint += "-1 "+Vout+" >= "+"-1\n"
-			constraint += "-1 "+Vout+" <= "+str(tanhFunVlow)+"\n"
-			constraint += "-1 "+Vin+" <= "+str(Vlow)+"\n"
+			constraint = "-1.0 "+Vout+" + "+str(dLow)+" "+Vin+" >= "+str(cLow)+"\n"
+			constraint += "-1.0 "+Vout+" >= "+"-1\n"
+			constraint += "-1.0 "+Vout+" <= "+str(tanhFunVlow)+"\n"
+			#constraint += "-1 "+Vin+" <= "+str(Vlow)+"\n"
 		elif Vlow >= 0 and Vhigh >=0:
 			#constraint = "min 1 "+Vout+"\n"
-			constraint = "1 "+Vout+" + "+str(-dHigh)+" "+Vin+" <= "+str(cHigh)+"\n"
-			constraint += "1 "+Vout+" <= "+"1\n"
-			constraint += "1 "+Vout+" >= "+str(tanhFunVhigh)+"\n"
-			constraint += "1 "+Vin+" >= "+str(Vhigh)+"\n"
+			constraint = "1.0 "+Vout+" + "+str(-dHigh)+" "+Vin+" <= "+str(cHigh)+"\n"
+			constraint += "1.0 "+Vout+" <= "+"1\n"
+			constraint += "1.0 "+Vout+" >= "+str(tanhFunVhigh)+"\n"
+			#constraint += "1 "+Vin+" >= "+str(Vhigh)+"\n"
 
 	elif a < 0:
 		if Vlow <= 0 and Vhigh <= 0:
 			#constraint = "min 1 "+Vout+"\n"
-			constraint = "1 "+Vout+" + "+str(dLow)+" "+Vin+" <= "+str(cLow)+"\n"
-			constraint += "1 "+Vout+" <= "+"1\n"
-			constraint += "1 "+Vout+" >= "+str(tanhFunVlow)+"\n"
-			constraint += "-1 "+Vin+" <= "+str(Vlow)+"\n"
+			constraint = "1.0 "+Vout+" + "+str(dLow)+" "+Vin+" <= "+str(cLow)+"\n"
+			constraint += "1.0 "+Vout+" <= "+"1.0\n"
+			constraint += "1.0 "+Vout+" >= "+str(tanhFunVlow)+"\n"
+			#constraint += "-1 "+Vin+" <= "+str(Vlow)+"\n"
 		elif Vlow >= 0 and Vhigh >=0:
 			#constraint = "max -1 "+Vout+"\n"
-			constraint = "-1 "+Vout+" + "+str(-dHigh)+" "+Vin+" >= "+str(cHigh)+"\n"
-			constraint += "-1 "+Vout+" >= "+"-1\n"
-			constraint += "-1 "+Vout+" <= "+str(tanhFunVhigh)+"\n"
-			constraint += "1 "+Vin+" >= "+str(Vhigh)+"\n"
+			constraint = "-1.0 "+Vout+" + "+str(-dHigh)+" "+Vin+" >= "+str(cHigh)+"\n"
+			constraint += "-1.0 "+Vout+" >= "+"-1\n"
+			constraint += "-1.0 "+Vout+" <= "+str(tanhFunVhigh)+"\n"
+			#constraint += "1 "+Vin+" >= "+str(Vhigh)+"\n"
 
 	return constraint
 
@@ -789,6 +829,7 @@ def ifOrderingFeasibleOscl(bounds,a,g_cc,g_fwd,intervalIndices):
 		decVariableConstraint += variable + " >= 0 "
 		V.append(variable)
 		variable = "voutfwd" + str(i)
+		
 		decVariableConstraint += variable + " >= 0 "
 		VoutFwd.append(variable)
 		variable = "voutcc"+str(i)
@@ -797,18 +838,19 @@ def ifOrderingFeasibleOscl(bounds,a,g_cc,g_fwd,intervalIndices):
 
 	minConstant = 1
 	objFun = "min "
-	bound0Ind = intervalIndices[3]
+	vind = 2
+	bound0Ind = intervalIndices[vind]
 	if bound0Ind == -1:
 		minConstant = -1
 		objFun = "max "
 	elif bound0Ind is not None and bound0Ind < len(bounds):
-		Vlow = bounds[bound0Ind][0][0]
-		Vhigh = bounds[bound0Ind][1][0]
+		Vlow = bounds[bound0Ind][0][vind]
+		Vhigh = bounds[bound0Ind][1][vind]
 		if Vlow <=0 and Vhigh <= 0:
 			minConstant = -1
 			objFun = "max "
 
-	objConstraint = objFun+str(minConstant)+" v3\n"
+	objConstraint = objFun+str(minConstant)+" v2\n"
 
 	constraint = constructBasicConstraints(V,VoutFwd,VoutCc,bounds,a,g_cc,g_fwd,intervalIndices)
 
@@ -912,7 +954,6 @@ def constructBasicConstraints(V,VoutFwd,VoutCc,bounds,a,g_cc,g_fwd,intervalIndic
 			constraint += finalConstraint
 
 	return constraint
-		
 
 #given the appropriate feasible interval index for each decision variable
 #find initial hyperrectangles
@@ -1002,7 +1043,8 @@ def createInitialHyperRectangles(bounds,a,g_cc,g_fwd,intervalIndices,debug):
 	if debug:
 		print "hyper found "
 		print hypers
-	return [hypers]
+	return hypers
+
 			
 def removeRedundantHypers(hypers):
 	finalHypers = []
@@ -1014,12 +1056,7 @@ def removeRedundantHypers(hypers):
 		foundSameHyperrectangle = False
 		for j in range(len(finalHypers)):
 			hyperj = finalHypers[j]
-			sameHyperrectangle = True
-			for k in range(len(hyperi[0])):
-				if hyperi[k] != hyperj[k]:
-					sameHyperrectangle = False
-					break
-			if sameHyperrectangle:
+			if np.array_equal(hyperi,hyperj):
 				foundSameHyperrectangle = True
 				break
 		if foundSameHyperrectangle == False:
@@ -1107,6 +1144,7 @@ def checkExistenceOfSolution(a,params,hyperRectangle,funNum,funDer,funDerInterva
 	startBounds[:,0] = hyperRectangle[0]
 	startBounds[:,1] = hyperRectangle[1]
 
+
 	iteration = 0
 	while True:
 		print "iteration number: ", iteration
@@ -1117,8 +1155,9 @@ def checkExistenceOfSolution(a,params,hyperRectangle,funNum,funDer,funDerInterva
 		jacMidPoint = funDer(midPoint,a,params)
 		C = np.linalg.inv(jacMidPoint)
 		I = np.identity(numVolts)
-
 		jacInterval = funDerInterval(a,params,startBounds)
+		#print "C ", C
+		#print "IMidPoint ", IMidPoint
 		C_IMidPoint = np.dot(C,IMidPoint)
 
 		C_jacInterval = multiplyRegularMatWithIntervalMat(C,jacInterval)
@@ -1183,6 +1222,9 @@ def checkExistenceOfSolution(a,params,hyperRectangle,funNum,funDer,funDerInterva
 			print "Found smallest hyperrectangle containing solution"
 			intersect = np.transpose(intersect)
 			print intersect
+			return (False,intersect)
+		elif np.array_equal(intersect,startBounds):
+			print "Can't refute existence of solution"
 			return (False,intersect)
 		else:
 			startBounds = intersect
@@ -1300,15 +1342,16 @@ def osclTest():
 	a = -5.0
 	g_cc = 0.5
 	g_fwd = 1.0
+	params = [g_fwd,g_cc]
 
-	feasible = ifOrderingFeasibleOscl(bounds,a,g_cc,g_fwd,[1,0,1,0])
+	feasible = ifOrderingFeasibleOscl(bounds,a,g_cc,g_fwd,[1,-1,1,0])
 
-	rootCombinationNodes = combinationWithTrees(4,[-1,2])
+	'''rootCombinationNodes = combinationWithTrees(4,[-1,2])
 	feasibleIntervalIndices = []
 	for i in range(len(rootCombinationNodes)):
 		getFeasibleIntervalIndices(rootCombinationNodes[i],a,g_cc,g_fwd,bounds,feasibleIntervalIndices)
-	print "validIntervalIndices ", feasibleIntervalIndices
-	hypers = []
+	print "validIntervalIndices ", feasibleIntervalIndices'''
+	'''hypers = []
 	for i in range(len(feasibleIntervalIndices)):
 		intervalIndices = feasibleIntervalIndices[i]
 		print "considering interval index: ", intervalIndices
@@ -1318,15 +1361,59 @@ def osclTest():
 		#print hyper
 		if hyper is not None:
 			hypers.append(hyper)
-	finalHypers = hypers
+	hypers = removeRedundantHypers(hypers)
 	print "final hyperrectangles"
-	for i in range(len(finalHypers)):
+	for i in range(len(hypers)):
 		print "hyper number ", i
-		print finalHypers[i]
+		print hypers[i]
+
+	finalHypers = []
+	while len(hypers)!=0:
+		tempHypers = []
+		for i in range(1,2):
+			print "Checking existience within hyperrectangle ", i
+			#checkExistenceOfSolution(a,params,hypers[i],funNum,funDer,funDerInterval)
+			uniqueness,interval = checkExistenceOfSolution(a,params,hypers[i],oscNum,getJacobian,getJacobianInterval)
+			if uniqueness:
+				print "hyperrectangle contains unique solution"
+				finalHypers.append(hypers[i])
+			else:
+				if interval is not None:
+					print "need to refine more"
+					midHyper = (hypers[i][0]+hypers[i][1])/2.0
+					bounds = [[hypers[i][0],midHyper],[midHyper,hypers[i][1]]]
+					print "new bounds "
+					print bounds
+					rootCombinationNodes = combinationWithTrees(4,[0,1])
+					feasibleIntervalIndices = []
+					for j in range(len(rootCombinationNodes)):
+						getFeasibleIntervalIndices(rootCombinationNodes[j],a,g_cc,g_fwd,bounds,feasibleIntervalIndices)
+					print "refine:validIntervalIndices ", feasibleIntervalIndices
+					feasible = ifOrderingFeasibleOscl(bounds,a,g_cc,g_fwd,[0,1,0,1])
+					for j in range(len(feasibleIntervalIndices)):
+						intervalIndices = feasibleIntervalIndices[j]
+						print "refine:considering interval index: ", intervalIndices
+						debug = False
+						hyper = createInitialHyperRectangles(bounds,a,g_cc,g_fwd,intervalIndices,debug)
+						#print "hyper "
+						#print hyper
+						if hyper is not None:
+							print "new hyperrectangle ", hyper
+							#tempHypers.append(hyper)
+					#hyper = funConstraintsScale(hypers[i],a,params,True)
+					#tempHypers.append(hyper)
+				else:
+					print "no solution in hyperrectangle"
+			print ""
+		hypers = tempHypers'''
 
 def simplexTest():
-	mat = np.array([[1,-1,3,0,0,0,0],[0,1,-1,1,0,0,2],[0,-1,-1,0,1,0,-4],[0,-2,2,0,0,1,-3]])
+	mat = np.array([[1.0,5.0,35.0,20.0,0.0,0.0,0.0],[0.0,1.0,-1.0,-1.0,1.0,0.0,-2.0],[0.0,-1.0,-3.0,0.0,0.0,1.0,-3.0]])
 	finalMat,soln = dualSimplex(mat)
+	print "finalMat "
+	print finalMat
+	print "soln"
+	print soln
 
 if __name__=="__main__":
 	osclTest()

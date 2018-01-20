@@ -45,11 +45,6 @@ def triangleConvexHullBounds(a, Vin, Vout, Vlow, Vhigh):
 
 	#print "dHigh ", dHigh, " cHigh ", cHigh
 
-	VNeg1 = -1.0
-	VPos1 = 1.0
-	tanhFunVNeg1 = 0.0
-	tanhFunVPos1 = 0.0
-
 	leftIntersectX = (cZero - cLow)/(dLow - dZero)
 	leftIntersectY = dLow*leftIntersectX + cLow
 	#print "leftIntersectX ", leftIntersectX, " leftIntersectY ", leftIntersectY
@@ -57,32 +52,58 @@ def triangleConvexHullBounds(a, Vin, Vout, Vlow, Vhigh):
 	#print "Vhigh ", Vhigh, " tanhFunVhigh ", tanhFunVhigh
 	rightIntersectX = (cZero - cHigh)/(dHigh - dZero)
 	rightIntersectY = dHigh*rightIntersectX + cHigh
-	#print "rightIntersectX ", rightIntersectX , " rightIntersectY ", rightIntersectY
-	dFromLeftIntersect = (tanhFunVhigh - leftIntersectY)/(Vhigh - leftIntersectX)
-	dFromRightIntersect = (rightIntersectY - tanhFunVlow)/(rightIntersectX - Vlow)
-	cFromLeftIntersect = leftIntersectY - dFromLeftIntersect*leftIntersectX
-	cFromRightIntersect = rightIntersectY - dFromRightIntersect*rightIntersectX
 
 	overallConstraint = "1 " + Vin + " >= " + str(Vlow) + "\n"
 	overallConstraint += "1 " + Vin + " <= " + str(Vhigh) + "\n"
-	if a > 0:
-		return overallConstraint + "1 "+Vout + " + " +str(-dFromLeftIntersect) + " " + Vin + " >= "+str(cFromLeftIntersect) + "\n"+\
-			"1 "+Vout + " + " +str(-dFromRightIntersect) + " " + Vin + " <= "+str(cFromRightIntersect) + "\n"
 
-	elif a < 0:
-		'''return overallConstraint + "1 "+Vout + " + " +str(-dLow) + " " + Vin + " <= "+str(cLow) + "\n"+\
-			"1 "+Vout + " + " +str(-dHigh) + " " + Vin + " >= "+str(cHigh) + "\n"+\
-			"1 "+Vout + " + " +str(-dFromLeftIntersect) + " " + Vin + " <= "+str(cFromLeftIntersect) + "\n"+\
-			"1 "+Vout + " + " +str(-dFromRightIntersect) + " " + Vin + " >= "+str(cFromRightIntersect) + "\n"'''
+	# Construct constraints from the convex hull of (Vlow, tanhFunVlow),
+	# (leftIntersectX, leftIntersectY), (0,0), (rightIntersectX, rightIntersectY),
+	# and (Vhigh, tanhFunVhigh)
+	# Use jarvis algorithm from https://www.geeksforgeeks.org/convex-hull-set-1-jarviss-algorithm-or-wrapping/
+	points = [(Vlow, tanhFunVlow),(leftIntersectX, leftIntersectY),
+				(0,0),(rightIntersectX, rightIntersectY), (Vhigh, tanhFunVhigh)]
+	#print "points ", points
+	leftMostIndex = 0
+	convexHullIndices = []
+	nextIndex = leftMostIndex
+	iters = 0
+	while(iters == 0 or nextIndex != leftMostIndex):
+		convexHullIndices.append(nextIndex)
+		otherIndex = (nextIndex + 1)%len(points)
+		for i in range(len(points)):
+			orientation = ((points[i][1] - points[nextIndex][1]) * (points[otherIndex][0] - points[i][0]) - 
+				(points[i][0] - points[nextIndex][0]) * (points[otherIndex][1] - points[i][1]))
+			if orientation < 0:
+				otherIndex = i
+		nextIndex = otherIndex
+		iters += 1
 
-		#print "Vlow", Vlow, "Vhigh", Vhigh
-		overallConstraint += "1 "+Vout + " + " +str(-dFromLeftIntersect) + " " + Vin + " <= "+str(cFromLeftIntersect) + "\n"+\
-			"1 "+Vout + " + " +str(-dFromRightIntersect) + " " + Vin + " >= "+str(cFromRightIntersect) + "\n"
-		#constr = overallConstraint + "1 "+Vout + " + " +str(-dFromRightIntersect) + " " + Vin + " >= "+str(cFromRightIntersect) + "\n"
-		#print constr
-		#overallConstraint += "1 " + Vout + " <= " + str(tanhFunVlow) + "\n"
-		#overallConstraint += "1 " + Vout + " >= " + str(tanhFunVhigh) + "\n"
-		return overallConstraint
+	#print "convexHull", convexHullIndices
+	for ci in range(len(convexHullIndices)):
+		i = convexHullIndices[ci]
+		ii = convexHullIndices[(ci + 1)%len(convexHullIndices)]
+		grad = (points[ii][1] - points[i][1])/(points[ii][0] - points[i][0])
+		c = points[i][1] - grad*points[i][0]
+		if points[i] == (Vlow, tanhFunVlow) and points[ii] == (rightIntersectX, rightIntersectY):
+			overallConstraint += "1 "+Vout + " + " +str(-grad) + " " + Vin + " >= "+str(c) + "\n"
+		elif points[i] == (rightIntersectX, rightIntersectY) and points[ii] == (Vhigh, tanhFunVhigh):
+			overallConstraint += "1 "+Vout + " + " +str(-grad) + " " + Vin + " >= "+str(c) + "\n"
+		elif points[i] == (Vhigh, tanhFunVhigh) and points[ii] == (leftIntersectX, leftIntersectY):
+			overallConstraint += "1 "+Vout + " + " +str(-grad) + " " + Vin + " <= "+str(c) + "\n"
+		elif points[i] == (leftIntersectX, leftIntersectY) and points[ii] == (Vlow, tanhFunVlow):
+			#print "grad", grad, "c", c
+			#print "dLow", dLow, "cLow", cLow
+			overallConstraint += "1 "+Vout + " + " +str(-grad) + " " + Vin + " <= "+str(c) + "\n"
+
+		elif points[i] == (Vhigh, tanhFunVhigh) and points[ii] == (Vlow, tanhFunVlow):
+			overallConstraint += "1 "+Vout + " + " +str(-grad) + " " + Vin + " <= "+str(c) + "\n"
+
+		elif points[i] == (Vlow, tanhFunVlow) and points[ii] == (Vhigh, tanhFunVhigh):
+			#print "coming here?"
+			overallConstraint += "1 "+Vout + " + " +str(-grad) + " " + Vin + " >= "+str(c) + "\n"
+
+	#print "overallConstraint", overallConstraint
+	return overallConstraint
 
 
 def triangleBounds(a, Vin, Vout, Vlow, Vhigh):
@@ -210,12 +231,16 @@ def ifFeasibleHyper(a,params,xs,ys,zs,hyperRectangle, hyperBound):
 	lenV = len(xs)
 	possibleExistence = False
 	while True:
-		#print "hyperRectangle "
-		#print hyperRectangle
+		print "hyperRectangle "
+		print hyperRectangle
 		allConstraints = ""
 		for i in range(lenV):
+			if i == 3 or i == 7:
+				continue
 			fwdInd = (i-1)%lenV
 			ccInd = (i+lenV/2)%lenV
+			if fwdInd == 3 or ccInd == 3:
+				print "problem"
 			#print "fwdInd ", fwdInd, " ccInd ", ccInd
 			#print "hyperRectangle[fwdInd][0]", hyperRectangle[fwdInd][0], "hyperRectangle[fwdInd][1]", hyperRectangle[fwdInd][1]
 			triangleClaimFwd = ""
@@ -245,6 +270,8 @@ def ifFeasibleHyper(a,params,xs,ys,zs,hyperRectangle, hyperBound):
 		
 		feasible = True
 		for i in range(lenV):
+			if i == 3 or i == 7:
+				continue
 			#print "min max ", i
 			minObjConstraint = "min 1 " + xs[i]
 			maxObjConstraint = "max 1 " + xs[i]
@@ -261,12 +288,12 @@ def ifFeasibleHyper(a,params,xs,ys,zs,hyperRectangle, hyperBound):
 				if maxSol["status"] == "optimal":
 					newHyperRectangle[i,1] = maxSol['x'][variableDict[xs[i]]]
 
-		#print "newHyperRectangle ", newHyperRectangle
+		print "newHyperRectangle ", newHyperRectangle
 		if feasible == False:
-			#print "LP not feasible"
+			print "LP not feasible"
 			return (False, None)
 
-		if np.less_equal(newHyperRectangle[:,1] - newHyperRectangle[:,1],hyperBound*np.ones((lenV))).any() or np.less_equal(np.absolute(newHyperRectangle - hyperRectangle),1e-4*np.ones((lenV,2))).all():
+		if np.less_equal(newHyperRectangle[:,1] - newHyperRectangle[:,0],hyperBound*np.ones((lenV))).all() or np.less_equal(np.absolute(newHyperRectangle - hyperRectangle),1e-4*np.ones((lenV,2))).all():
 			# because due to numerical issues the actual solution
 			# might lie slightly outside newHyperRectangle
 			newHyperRectangle = hyperRectangle
@@ -280,7 +307,7 @@ def ifFeasibleHyper(a,params,xs,ys,zs,hyperRectangle, hyperBound):
 				#print "LP feasible ", newHyperRectangle
 				return (True, newHyperRectangle)
 			else:
-				#print "LP not feasible"
+				print "K operator not feasible"
 				return (False, None)
 		hyperRectangle = newHyperRectangle
 
@@ -486,7 +513,7 @@ def determineStability(a,params,equilibrium):
 
 def rambusOscillator(a, numStages):
 	startExp = time.time()
-	params = [1.0,0.5]
+	params = [1.0,4.0]
 	lenV = numStages*2
 	xs = []
 	ys = []
@@ -523,28 +550,24 @@ def rambusOscillator(a, numStages):
 	print "minBoundMap ", minBoundMap, " maxBoundMap ", maxBoundMap
 	rootCombinationNodes = intervalUtils.combinationWithTrees(lenV,[minBoundMap,maxBoundMap],indexChoiceArray)
 	#intervalUtils.printCombinationNode(rootCombinationNodes[1])
-	hyperBound = 0.0001
-	#feasibility = ifFeasibleOrdering(a,params,xs,ys,zs,[0,1,0,1],boundMap, hyperBound)
+	hyperBound = 0.1
+	#feasibility = ifFeasibleOrdering(a,params,xs,ys,zs,[0,0,1,0,0,1,0,1],boundMap, hyperBound)
 	#print feasibility
-	'''hyperRectangle = np.zeros((lenV,2))
-	hyperRectangle[0,:] = [ 0.81635344, 0.90817673]
-	hyperRectangle[1,:] = [-0.99986002, -0.99981331]
-	hyperRectangle[2,:] = [-0.59942304, -0.54925001]
-	hyperRectangle[3,:] = [ 0.99889157, 0.99889681]
-	hyperRectangle[4,:] = [-0.03452613, 0.09640916]
-	hyperRectangle[5,:] = [-0.1792397, 0.20000004]
-	hyperRectangle[6,:] = [-0.92818052, -0.80495914]
-	hyperRectangle[7,:] = [ 0.9997996, 0.9998448 ]
-	hyperRectangle[8,:] = [ 0.59587838, 0.5958992 ]
-	hyperRectangle[9,:] = [-0.99977589, -0.98718653]
-	hyperRectangle[10,:] = [-0.07779784, -0.04154983]
-	hyperRectangle[11,:] = [-0.1626185, 0.20000004]
+	hyperRectangle = np.zeros((lenV,2))
+	hyperRectangle[0,:] = [-1, 0.2]
+	hyperRectangle[1,:] = [-1, 0.2]
+	hyperRectangle[2,:] = [0.2, 1.0]
+	hyperRectangle[3,:] = [-1.5, 0.2]
+	hyperRectangle[4,:] = [-1.0, 0.2]
+	hyperRectangle[5,:] = [0.2, 1.0]
+	hyperRectangle[6,:] = [-1.0, 0.2]
+	hyperRectangle[7,:] = [0.2, 1.0]
 
 	feasibility = ifFeasibleHyper(a,params,xs,ys,zs,hyperRectangle, hyperBound)
 	print feasibility
 	exampleSoln = (hyperRectangle[:,0] + hyperRectangle[:,1])/2.0
 	finalSoln = intervalUtils.newton(a,params,exampleSoln, oscNum, getJacobian)
-	print "finalSoln", finalSoln'''
+	print "finalSoln", finalSoln
 	'''ordering = [1, 0, 1, 0, 0, 1, 0, 1]
 	hypers = refineHyper(a, params, xs, ys, zs, ordering, boundMap, hyperBound)
 	print "hypers"
@@ -552,7 +575,7 @@ def rambusOscillator(a, numStages):
 	exampleSoln = (hypers[0][:,0] + hypers[0][:,1])/2.0
 	finalSoln = intervalUtils.newton(a,params,exampleSoln, oscNum, getJacobian)
 	print "finalSoln ", finalSoln'''
-	feasibleIntervalIndices = []
+	'''feasibleIntervalIndices = []
 	conflictIntervalIndices = []
 	for i in range(len(rootCombinationNodes)):
 		getFeasibleIntervalIndices(rootCombinationNodes[i],a,params,xs,ys,zs,boundMap,hyperBound, feasibleIntervalIndices,conflictIntervalIndices)
@@ -580,8 +603,8 @@ def rambusOscillator(a, numStages):
 			allHypers.append(refinedHyper[0])
 			exampleSoln = (refinedHyper[0][:,0] + refinedHyper[0][:,1])/2.0
 			finalSoln = intervalUtils.newton(a,params,exampleSoln, oscNum, getJacobian)
-			print "exampleSoln ", exampleSoln
-			print "finalSoln ", finalSoln
+			#print "exampleSoln ", exampleSoln
+			#print "finalSoln ", finalSoln
 			stable = determineStability(a,params,finalSoln)
 			if stable:
 				stableSols.append(finalSoln)
@@ -611,7 +634,7 @@ def rambusOscillator(a, numStages):
 
 				if foundSample == False:
 					sampleSols.append(finalSoln)
-					rotatedSols[len(sampleSols)-1] = []
+					rotatedSols[len(sampleSols)-1] = []'''
 	
 	'''for hi in range(len(allHypers)):
 		print "sol#", hi
@@ -621,7 +644,7 @@ def rambusOscillator(a, numStages):
 		print allSols[hi]
 		print ""'''
 
-	for hi in range(len(sampleSols)):
+	'''for hi in range(len(sampleSols)):
 		print "equivalence class# ", hi
 		print "main member ", sampleSols[hi]
 		print "number of other members ", len(rotatedSols[hi])
@@ -631,10 +654,10 @@ def rambusOscillator(a, numStages):
 		print ""
 
 	print "numSolutions, ", len(allHypers)
-	print "num stable solutions ", len(stableSols)
+	print "num stable solutions ", len(stableSols)'''
 	'''for si in range(len(stableSols)):
 		print stableSols[si]'''
-	print "num unstable solutions ", len(unstableSols)
+	#print "num unstable solutions ", len(unstableSols)
 	'''for si in range(len(unstableSols)):
 		print unstableSols[si]'''
 	endExp = time.time()

@@ -230,17 +230,32 @@ def ifFeasibleHyper(a,params,xs,ys,zs,hyperRectangle, hyperBound):
 	solvers.options["show_progress"] = False
 	lenV = len(xs)
 	possibleExistence = False
+	#hyperRectangle[:,0] = hyperRectangle[:,0] - 1e-3
+	#hyperRectangle[:,1] = hyperRectangle[:,1] + 1e-3
+	foundSoln = False
+	hyperWilthSoln = None
+	oldHyperRectangle = None
+	print "hyperRectangle ", hyperRectangle
 	while True:
-		print "hyperRectangle "
-		print hyperRectangle
+		#print "hyperRectangle "
+		#print hyperRectangle
+		kResult = intervalUtils.checkExistenceOfSolution(a,params[0],params[1],hyperRectangle.transpose(), oscNum, getJacobian, getJacobianInterval)
+		if kResult[0] or (kResult[0] == False and kResult[1] is not None):
+				#print "LP feasible ", newHyperRectangle
+				foundSoln =  True
+				hyperWithSoln = kResult[1]
+		else:
+			if not(foundSoln):
+				print "K operator not feasible"
+				return (False, None)
+			return (True,hyperWithSoln)
+
+		if np.less_equal(hyperRectangle[:,1] - hyperRectangle[:,0],hyperBound*np.ones((lenV))).any() or (oldHyperRectangle is not None and np.less_equal(np.absolute(hyperRectangle - oldHyperRectangle),1e-4*np.ones((lenV,2))).all()):
+			return (True, hyperRectangle)
 		allConstraints = ""
 		for i in range(lenV):
-			if i == 3 or i == 7:
-				continue
 			fwdInd = (i-1)%lenV
 			ccInd = (i+lenV/2)%lenV
-			if fwdInd == 3 or ccInd == 3:
-				print "problem"
 			#print "fwdInd ", fwdInd, " ccInd ", ccInd
 			#print "hyperRectangle[fwdInd][0]", hyperRectangle[fwdInd][0], "hyperRectangle[fwdInd][1]", hyperRectangle[fwdInd][1]
 			triangleClaimFwd = ""
@@ -270,8 +285,6 @@ def ifFeasibleHyper(a,params,xs,ys,zs,hyperRectangle, hyperBound):
 		
 		feasible = True
 		for i in range(lenV):
-			if i == 3 or i == 7:
-				continue
 			#print "min max ", i
 			minObjConstraint = "min 1 " + xs[i]
 			maxObjConstraint = "max 1 " + xs[i]
@@ -288,28 +301,14 @@ def ifFeasibleHyper(a,params,xs,ys,zs,hyperRectangle, hyperBound):
 				if maxSol["status"] == "optimal":
 					newHyperRectangle[i,1] = maxSol['x'][variableDict[xs[i]]]
 
-		print "newHyperRectangle ", newHyperRectangle
-		if feasible == False:
+		'''if feasible == False:
 			print "LP not feasible"
-			return (False, None)
+			return (False, None)'''
 
-		if np.less_equal(newHyperRectangle[:,1] - newHyperRectangle[:,0],hyperBound*np.ones((lenV))).all() or np.less_equal(np.absolute(newHyperRectangle - hyperRectangle),1e-4*np.ones((lenV,2))).all():
-			# because due to numerical issues the actual solution
-			# might lie slightly outside newHyperRectangle
-			newHyperRectangle = hyperRectangle
-			for i in range(lenV):
-				# because this might be possible
-				if(newHyperRectangle[i,1] < newHyperRectangle[i,0]):
-					newHyperRectangle[i,0] = hyperRectangle[i,0]
-					newHyperRectangle[i,1] = hyperRectangle[i,1]
-			kResult = intervalUtils.checkExistenceOfSolution(a,params[0],params[1],newHyperRectangle.transpose(), oscNum, getJacobian, getJacobianInterval)
-			if kResult[0] or (kResult[0] == False and kResult[1] is not None):
-				#print "LP feasible ", newHyperRectangle
-				return (True, newHyperRectangle)
-			else:
-				print "K operator not feasible"
-				return (False, None)
-		hyperRectangle = newHyperRectangle
+
+		#print "newHyperRectangle ", newHyperRectangle
+		oldHyperRectangle = np.copy(hyperRectangle)
+		hyperRectangle = np.copy(newHyperRectangle)
 
 	
 
@@ -551,24 +550,24 @@ def rambusOscillator(a, numStages):
 	rootCombinationNodes = intervalUtils.combinationWithTrees(lenV,[minBoundMap,maxBoundMap],indexChoiceArray)
 	#intervalUtils.printCombinationNode(rootCombinationNodes[1])
 	hyperBound = 0.1
-	#feasibility = ifFeasibleOrdering(a,params,xs,ys,zs,[0,0,1,0,0,1,0,1],boundMap, hyperBound)
-	#print feasibility
+	'''feasibility = ifFeasibleOrdering(a,params,xs,ys,zs,[0,1,0,0,1,0,1,0],boundMap, hyperBound)
+	print feasibility'''
 	hyperRectangle = np.zeros((lenV,2))
-	hyperRectangle[0,:] = [-1, 0.2]
-	hyperRectangle[1,:] = [-1, 0.2]
-	hyperRectangle[2,:] = [0.2, 1.0]
-	hyperRectangle[3,:] = [-1.5, 0.2]
-	hyperRectangle[4,:] = [-1.0, 0.2]
-	hyperRectangle[5,:] = [0.2, 1.0]
-	hyperRectangle[6,:] = [-1.0, 0.2]
-	hyperRectangle[7,:] = [0.2, 1.0]
+	hyperRectangle[0,:] = [-1.0, -0.4]
+	hyperRectangle[1,:] = [0.97691672, 1]
+	hyperRectangle[2,:] = [-0.99991478, -0.99990834]
+	hyperRectangle[3,:] = [-0.11846491, 0.2]
+	hyperRectangle[4,:] = [0.57277207, 1.0]
+	hyperRectangle[5,:] = [-1.0, -0.83460651]
+	hyperRectangle[6,:] = [0.99979126, 1.0]
+	hyperRectangle[7,:] = [-0.74826725, 0.21]
 
 	feasibility = ifFeasibleHyper(a,params,xs,ys,zs,hyperRectangle, hyperBound)
 	print feasibility
 	exampleSoln = (hyperRectangle[:,0] + hyperRectangle[:,1])/2.0
 	finalSoln = intervalUtils.newton(a,params,exampleSoln, oscNum, getJacobian)
 	print "finalSoln", finalSoln
-	'''ordering = [1, 0, 1, 0, 0, 1, 0, 1]
+	'''ordering = [0,1,0,0,1,0,1,0]
 	hypers = refineHyper(a, params, xs, ys, zs, ordering, boundMap, hyperBound)
 	print "hypers"
 	print hypers

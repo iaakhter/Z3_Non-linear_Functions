@@ -167,23 +167,29 @@ def checkExistenceOfSolution(a,g_fwd,g_cc,hyperRectangle, oscNum, jacobian, jaco
 	iteration = 0
 	while True:
 		#print "iteration number: ", iteration
+		print "startBounds ", startBounds
 		midPoint = (startBounds[:,0] + startBounds[:,1])/2.0
-		#print "midPoint"
-		#print midPoint
+		print "midPoint"
+		print midPoint
 		_,_,IMidPoint = np.array(oscNum(midPoint,a,g_cc,g_fwd))
 		jacMidPoint = jacobian(midPoint,a,g_cc,g_fwd)
 		C = np.linalg.inv(jacMidPoint)
+		#print "C ", C
 		I = np.identity(numVolts)
 
 		jacInterval = jacobianInterval(startBounds,a,g_cc,g_fwd)
+		#print "jacMidPoint ", jacMidPoint
+		#print "jacInterval ", jacInterval
 		C_IMidPoint = np.dot(C,IMidPoint)
+		print "C_IMidPoint", C_IMidPoint
 
 		C_jacInterval = multiplyRegularMatWithIntervalMat(C,jacInterval)
+		print "C_jacInterval", C_jacInterval
 		I_minus_C_jacInterval = subtractIntervalMatFromRegularMat(I,C_jacInterval)
 		xi_minus_midPoint = np.zeros((numVolts,2))
 		for i in range(numVolts):
-			xi_minus_midPoint[i][0] = startBounds[i][0] - midPoint[i]
-			xi_minus_midPoint[i][1] = startBounds[i][1] - midPoint[i]
+			xi_minus_midPoint[i][0] = min(startBounds[i][0] - midPoint[i], startBounds[i][1] - midPoint[i])
+			xi_minus_midPoint[i][1] = max(startBounds[i][0] - midPoint[i], startBounds[i][1] - midPoint[i])
 
 		lastTerm = multiplyIntervalMatWithIntervalVec(I_minus_C_jacInterval, xi_minus_midPoint)
 		
@@ -194,10 +200,8 @@ def checkExistenceOfSolution(a,g_fwd,g_cc,hyperRectangle, oscNum, jacobian, jaco
 		kInterval[:,0] = np.minimum(kInterval1, kInterval2)
 		kInterval[:,1] = np.maximum(kInterval1, kInterval2)
 
-		#print "startBounds ", startBounds
-
-		#print "kInterval "
-		#print kInterval
+		print "kInterval "
+		print kInterval
 
 		uniqueSoln = True
 		for i in range(numVolts):
@@ -223,7 +227,7 @@ def checkExistenceOfSolution(a,g_fwd,g_cc,hyperRectangle, oscNum, jacobian, jaco
 				intersect[i] = [minVal,maxVal]
 				intervalLength =  intersect[:,1] - intersect[:,0]
 			else:
-				#print "problem index ", i
+				print "problem index ", i
 				intersect = None
 				break
 

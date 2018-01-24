@@ -224,11 +224,11 @@ def ifFeasibleOrdering(a,params,xs,ys,zs,ordering,boundMap, hyperBound):
 	hyperRectangle = np.zeros((lenV,2))
 	for i in range(lenV):
 		if(ordering[i] is not None):
-			hyperRectangle[i][0] = boundMap[ordering[i]][0]
-			hyperRectangle[i][1] = boundMap[ordering[i]][1]
+			hyperRectangle[i][0] = boundMap[i][ordering[i]][0]
+			hyperRectangle[i][1] = boundMap[i][ordering[i]][1]
 		else:
-			hyperRectangle[i][0] = -1.0
-			hyperRectangle[i][1] = 1.0
+			hyperRectangle[i][0] = boundMap[i][0][0]
+			hyperRectangle[i][1] = boundMap[i][1][1]
 	return ifFeasibleHyper(a,params,xs,ys,zs,hyperRectangle,hyperBound)
 
 
@@ -253,7 +253,20 @@ solution.
 def ifFeasibleHyper(a,params,xs,ys,zs,hyperRectangle, hyperBound):
 	solvers.options["show_progress"] = False
 	lenV = len(xs)
-	possibleExistence = False
+	print "hyperRectangle before"
+	print hyperRectangle
+	# TODO: replace this with more precise numerical methods
+	for i in range(lenV):
+		if hyperRectangle[i][0] < 0 and abs(hyperRectangle[i][0]) < 1e-4:
+			hyperRectangle[i][0] = -hyperBound
+		if hyperRectangle[i][0] > 0 and abs(hyperRectangle[i][0]) < 1e-4:
+			hyperRectangle[i][0] = 0.0
+		if hyperRectangle[i][1] < 0 and abs(hyperRectangle[i][1]) < 1e-4:
+			hyperRectangle[i][1] = 0.0
+		if hyperRectangle[i][1] > 0 and abs(hyperRectangle[i][1]) < 1e-4:
+			hyperRectangle[i][1] = hyperBound
+
+
 	print "hyperRectangle"
 	print hyperRectangle
 	iterNum = 0
@@ -313,7 +326,7 @@ def ifFeasibleHyper(a,params,xs,ys,zs,hyperRectangle, hyperBound):
 				if maxSol["status"] == "optimal":
 					newHyperRectangle[i,1] = maxSol['x'][variableDict[xs[i]]]
 
-		#print "newHyperRectangle ", newHyperRectangle
+		print "newHyperRectangle ", newHyperRectangle
 		if feasible == False:
 			print "LP not feasible"
 			return (False, None)
@@ -325,9 +338,11 @@ def ifFeasibleHyper(a,params,xs,ys,zs,hyperRectangle, hyperBound):
 					newHyperRectangle[i,0] = hyperRectangle[i,0]
 					newHyperRectangle[i,1] = hyperRectangle[i,1]
 			kResult = intervalUtils.checkExistenceOfSolution(a,params[0],params[1],newHyperRectangle.transpose(), oscNum, getJacobian, getJacobianInterval)
-			if kResult[0] or (kResult[0] == False and kResult[1] is not None):
+			if kResult[0]:
 				#print "LP feasible ", newHyperRectangle
 				return (True, newHyperRectangle)
+			if kResult[0] == False and kResult[1] is not None:
+				return (False, newHyperRectangle)
 			else:
 				print "K operator not feasible"
 				return (False, None)
@@ -361,73 +376,56 @@ infeasible.
 	For -1.0 <= xs[0] <= -0.1 and 0.1 <= xs[1] <= 1.0 and so on, the problem
 	has a feasible solution 
 '''
-def getFeasibleIntervalIndices(rootCombinationNode,a,params,xs,ys,zs,boundMap,hyperBound, outValidIntervalIndices, outConflictIntervalIndices):
+def getFeasibleIntervalIndices(rootCombinationNode,a,params,xs,ys,zs,boundMap,hyperBound, excludingBound,refinedHypers):
 	intervalIndices = rootCombinationNode.rootArray
-	#print "intervalIndices", intervalIndices
-	# Check if the current intervalIndices array
-	# matches with any conflict array already discovered
-	# If it does then we ignore it and its children 
-	for conflict in outConflictIntervalIndices:
-		foundConflict = True
-		for i in range(len(conflict)):
-			if conflict[i] is not None:
-				if conflict[i] != intervalIndices[i]:
-					foundConflict = False
-					break
-		if foundConflict:
-			#print "found conflict: match is between"
-			#print conflict, " and ", intervalIndices 
-			return
-
+	print "intervalIndices", intervalIndices
+	print "boundMap", boundMap
+	lenV = len(intervalIndices)
 	
-	feasiblity = ifFeasibleOrdering(a,params,xs,ys,zs,intervalIndices,boundMap,hyperBound)
-	#print "intervalIndices ", intervalIndices
-	
-	# Generate a conflict interval array if constraints are infeasible
-	if feasiblity[0] == False:
-		#print "Not feasible"
-		baseConflictInterval = copy.deepcopy(intervalIndices)
-		indexChanged = None
-		# Keep setting non None indices to None as long as
-		# lp is infeasible. This will lead us to an array with
-		# the least number of non None's that have been causing 
-		# infeasibility
-		while True:
-			for i in range(len(intervalIndices)):
-				if baseConflictInterval[i] is not None and i > indexChanged:
-					indexChanged =  i
-					break
-				if i == len(intervalIndices) - 1:
-					if baseConflictInterval != intervalIndices:
-						outConflictIntervalIndices.append(baseConflictInterval)
-						#print "finalBaseConflictInterval ", baseConflictInterval
-					return
-			indexBefore = baseConflictInterval[indexChanged]
-			#print "baseConflictInterval before ", baseConflictInterval
-			baseConflictInterval[indexChanged] = None
-			feasibility = ifFeasibleOrdering(a,params,xs,ys,zs,baseConflictInterval,boundMap,hyperBound)
-			if feasibility[0]:
-				baseConflictInterval[indexChanged] = indexBefore
-			#print "baseConflictInterval after ", baseConflictInterval
+	feasibility = ifFeasibleOrdering(a,params,xs,ys,zs,intervalIndices,boundMap,hyperBound)
+	print "feasibility"
+	print feasibility
+	if feasibility[0]:
+		refinedHypers.append(feasibility[1])
 		return
-	
+
+	# Generate a conflict interval array if constraints are infeasible
+	if feasibility[0] == False and feasibility[1] is None:
+		return
+
+	newBoundMap = copy.deepcopy(boundMap)
+	hyperRectangle = feasibility[1]
+	for i in range(lenV):
+		if intervalIndices[i] is None:
+			lowBound = hyperRectangle[i][0]
+			upperBound = hyperRectangle[i][1]
+			newBoundMap[i][0][0] = lowBound
+			newBoundMap[i][1][1] = upperBound
+			if lowBound < 0 and upperBound > 0 and upperBound > excludingBound:
+				newBoundMap[i][0][1] = excludingBound
+				newBoundMap[i][1][0] = excludingBound
+			else:
+				newBoundMap[i][0][1] = (lowBound + upperBound)/2.0
+				newBoundMap[i][1][0] = (lowBound + upperBound)/2.0
+
 	indexOfNone = None
 	for i in range(len(intervalIndices)):
 		if intervalIndices[i] is None:
 			indexOfNone = i
 			break
 	if indexOfNone is None:
-		outValidIntervalIndices.append(copy.deepcopy(intervalIndices))
+		bisectionHypers = refineHyper(a, params, xs, ys, zs, intervalIndices, boundMap, hyperBound)
+		refinedHypers = refinedHypers + bisectionHypers
 	for i in range(len(rootCombinationNode.children)):
-		getFeasibleIntervalIndices(rootCombinationNode.children[i],a,params,xs,ys,zs,boundMap,hyperBound,outValidIntervalIndices, outConflictIntervalIndices)
+		getFeasibleIntervalIndices(rootCombinationNode.children[i],a,params,xs,ys,zs,newBoundMap,hyperBound,excludingBound,refinedHypers)
 
 def refineHyper(a, params, xs, ys, zs, ordering, boundMap, maxHyperBound):
 	lenV = len(xs)
 	hyperRectangle = np.zeros((lenV,2))
 	excludingRegConstraint = ""
 	for i in range(lenV):
-		hyperRectangle[i][0] = boundMap[ordering[i]][0]
-		hyperRectangle[i][1] = boundMap[ordering[i]][1]
+		hyperRectangle[i][0] = boundMap[i][ordering[i]][0]
+		hyperRectangle[i][1] = boundMap[i][ordering[i]][1]
 	finalHyper = []
 	count = 0
 	volumes = []
@@ -483,16 +481,16 @@ def bisectHyper(a,params,xs,ys,zs,hyperBound,hyperRectangle,bisectingIndex, fina
 	midVal = (hyperRectangle[bisectingIndex][0] + hyperRectangle[bisectingIndex][1])/2.0
 	leftHyper[bisectingIndex][1] = midVal
 	rightHyper[bisectingIndex][0] = midVal
-	#print "leftHyper"
-	#print leftHyper
-	#print "rightHyper"
-	#print rightHyper
+	print "leftHyper"
+	print leftHyper
+	print "rightHyper"
+	print rightHyper
 	feasLeft = ifFeasibleHyper(a,params,xs,ys,zs,leftHyper, hyperBound)
 	feasRight = ifFeasibleHyper(a,params,xs,ys,zs,rightHyper, hyperBound)
-	#print "feasLeft"
-	#print feasLeft
-	#print "feasRight"
-	#print feasRight
+	print "feasLeft"
+	print feasLeft
+	print "feasRight"
+	print feasRight
 
 	if feasLeft[0]:
 		leftHyper = feasLeft[1]
@@ -519,8 +517,8 @@ def findExcludingBound(a,params,xs,ys,zs,ordering,boundMap, maxDiff = 0.2):
 	hyperRectangle = np.zeros((lenV,2))
 	hyperBound = 0.001
 	for i in range(lenV):
-		hyperRectangle[i][0] = boundMap[ordering[i]][0]
-		hyperRectangle[i][1] = boundMap[ordering[i]][1]
+		hyperRectangle[i][0] = boundMap[i][ordering[i]][0]
+		hyperRectangle[i][1] = boundMap[i][ordering[i]][1]
 	soln = hyperRectangle[:,0] + (hyperRectangle[:,1] - hyperRectangle[:,0])*0.75;
 	soln = intervalUtils.newton(a,params,soln,oscNum,getJacobian)
 	diff = maxDiff
@@ -532,13 +530,10 @@ def findExcludingBound(a,params,xs,ys,zs,ordering,boundMap, maxDiff = 0.2):
 			diff = diff/2.0;
 		else:
 			break
-	boundMap[0][1] = diff
-	boundMap[1][0] = diff
-	'''boundMap[-1] = [-1.0,-diff]
-	boundMap[0] = [-diff,0.0]
-	boundMap[1] = [0.0, diff]
-	boundMap[2] = [diff, 1.0]
-	return [0,1]'''
+	for i in range(lenV):
+		boundMap[i][0][1] = diff
+		boundMap[i][1][0] = diff
+	return diff
 
 '''
 Return true if stable and false otherwise
@@ -553,7 +548,7 @@ def determineStability(a,params,equilibrium):
 
 def rambusOscillator(a, numStages):
 	startExp = time.time()
-	params = [1.0,0.5]
+	params = [1.0,4.0]
 	lenV = numStages*2
 	xs = []
 	ys = []
@@ -576,36 +571,24 @@ def rambusOscillator(a, numStages):
 			secondIndex -= 1
 	
 	print "indexChoiceArray", indexChoiceArray
-	boundMap = {0:[-1.0,0.1],1:[0.1,1.0]}
-	findExcludingBound(a,params,xs,ys,zs,exampleOrdering,boundMap)
+	boundMap = []
+	for i in range(lenV):
+		boundMap.append({0:[-1.0,0.0],1:[0.0,1.0]})
+	excludingBound = findExcludingBound(a,params,xs,ys,zs,exampleOrdering,boundMap)
 	print "boundMap ", boundMap
-	minBoundMap = float('inf')
-	maxBoundMap = float('-inf')
-	for key in boundMap:
-		if key > maxBoundMap:
-			maxBoundMap = key
-		if key < minBoundMap:
-			minBoundMap = key
-
-	print "minBoundMap ", minBoundMap, " maxBoundMap ", maxBoundMap
+	minBoundMap = 0
+	maxBoundMap = 1
 	rootCombinationNodes = intervalUtils.combinationWithTrees(lenV,[minBoundMap,maxBoundMap],indexChoiceArray)
-	#intervalUtils.printCombinationNode(rootCombinationNodes[1])
-	'''hyperBound = 0.1
-	feasibility = ifFeasibleOrdering(a,params,xs,ys,zs,[None,None,None,0,None,None,None,None],boundMap, hyperBound)
-	print feasibility'''
+	hyperBound = excludingBound
 	'''hyperRectangle = np.zeros((lenV,2))
-	hyperRectangle[0,:] = [-1.0, -0.4]
-	hyperRectangle[1,:] = [0.97691672, 1]
-	hyperRectangle[2,:] = [-0.99991478, -0.99990834]
-	hyperRectangle[3,:] = [-0.11846491, 0.2]
-	hyperRectangle[4,:] = [0.57277207, 1.0]
-	hyperRectangle[5,:] = [-1.0, -0.83460651]
-	hyperRectangle[6,:] = [0.99979126, 1.0]
-	hyperRectangle[7,:] = [-1.0, 0.2]
+	hyperRectangle[0,:] = [-3.44776791e-05, 5.81141813e-01]
+	hyperRectangle[1,:] = [-1.00000000e+00, 5.00000000e-02]
+	hyperRectangle[2,:] = [-3.44780741e-05, 5.81141813e-01]
+	hyperRectangle[3,:] = [-2.90553668e-01, 3.44778356e-05]
 
 	feasibility = ifFeasibleHyper(a,params,xs,ys,zs,hyperRectangle, hyperBound)
-	print feasibility
-	#exampleSoln = (hyperRectangle[:,0] + hyperRectangle[:,1])/2.0
+	print feasibility'''
+	'''#exampleSoln = (hyperRectangle[:,0] + hyperRectangle[:,1])/2.0
 	exampleSoln = np.array([-0.86730826,  0.99985882,
  -0.99990911, -0.07034628, 0.86730826, -0.99985882,  0.99990911, 0.07034628])
 	finalSoln = intervalUtils.newton(a,params,exampleSoln, oscNum, getJacobian)
@@ -617,74 +600,52 @@ def rambusOscillator(a, numStages):
 	exampleSoln = (hypers[0][:,0] + hypers[0][:,1])/2.0
 	finalSoln = intervalUtils.newton(a,params,exampleSoln, oscNum, getJacobian)
 	print "finalSoln ", finalSoln'''
-	feasibleIntervalIndices = []
-	conflictIntervalIndices = []
+	allHypers = []
 	for i in range(len(rootCombinationNodes)):
-		getFeasibleIntervalIndices(rootCombinationNodes[i],a,params,xs,ys,zs,boundMap,hyperBound, feasibleIntervalIndices,conflictIntervalIndices)
+		getFeasibleIntervalIndices(rootCombinationNodes[i],a,params,xs,ys,zs,boundMap,hyperBound, excludingBound,allHypers)
 	
-	#feasibleIntervalIndices = [[0, 0, 0, 0]]
-	print "feasibleIntervalIndices"
-	print feasibleIntervalIndices
-	print "conflictIntervalIndices"
-	print conflictIntervalIndices
-	'''allHypers = []
-	allSols = []
+	print "allHypers"
+	print allHypers
 	sampleSols = []
 	rotatedSols = {}
 	stableSols = []
 	unstableSols = []
-	
-	maxHyperBound = 0.1
-	for fi in range(len(feasibleIntervalIndices)):
-		feasibleIntervalIndex = feasibleIntervalIndices[fi]
-		#print "feasibleIntervalIndex ", feasibleIntervalIndex
-		refinedHyper = refineHyper(a, params, xs, ys, zs, feasibleIntervalIndex, boundMap, maxHyperBound)
-		#print "refinedHyper "
-		#print refinedHyper
-		if(len(refinedHyper) > 0):
-			allHypers.append(refinedHyper[0])
-			exampleSoln = (refinedHyper[0][:,0] + refinedHyper[0][:,1])/2.0
-			finalSoln = intervalUtils.newton(a,params,exampleSoln, oscNum, getJacobian)
-			#print "exampleSoln ", exampleSoln
-			#print "finalSoln ", finalSoln
-			stable = determineStability(a,params,finalSoln)
-			if stable:
-				stableSols.append(finalSoln)
-			else:
-				unstableSols.append(finalSoln)
-			allSols.append(finalSoln)
-			
-			# Classify the solutions into equivalence classes
-			if len(sampleSols) == 0:
-				sampleSols.append(finalSoln)
-				rotatedSols[0] = []
-			else:
-				foundSample = False
-				for si in range(len(sampleSols)):
-					sample = sampleSols[si]
-					for ii in range(lenV):
-						if abs(finalSoln[0] - sample[ii]) < 1e-8:
-							rotatedSample = np.zeros_like(finalSoln)
-							for ri in range(lenV):
-								rotatedSample[ri] = sample[(ii+ri)%lenV]
-							if np.less_equal(np.absolute(rotatedSample - finalSoln), np.ones((lenV))*1e-8 ).all():
-								foundSample = True
-								rotatedSols[si].append(ii)
-								break
-					if foundSample:
-						break
+	allSols = []
+	for hyper in allHypers:
+		exampleSoln = (hyper[:,0] + hyper[:,1])/2.0
+		finalSoln = intervalUtils.newton(a,params,exampleSoln, oscNum, getJacobian)
+		#print "exampleSoln ", exampleSoln
+		#print "finalSoln ", finalSoln
+		stable = determineStability(a,params,finalSoln)
+		if stable:
+			stableSols.append(finalSoln)
+		else:
+			unstableSols.append(finalSoln)
+		allSols.append(finalSoln)
+		
+		# Classify the solutions into equivalence classes
+		if len(sampleSols) == 0:
+			sampleSols.append(finalSoln)
+			rotatedSols[0] = []
+		else:
+			foundSample = False
+			for si in range(len(sampleSols)):
+				sample = sampleSols[si]
+				for ii in range(lenV):
+					if abs(finalSoln[0] - sample[ii]) < 1e-8:
+						rotatedSample = np.zeros_like(finalSoln)
+						for ri in range(lenV):
+							rotatedSample[ri] = sample[(ii+ri)%lenV]
+						if np.less_equal(np.absolute(rotatedSample - finalSoln), np.ones((lenV))*1e-8 ).all():
+							foundSample = True
+							rotatedSols[si].append(ii)
+							break
+				if foundSample:
+					break
 
-				if foundSample == False:
-					sampleSols.append(finalSoln)
-					rotatedSols[len(sampleSols)-1] = []'''
-	
-	'''for hi in range(len(allHypers)):
-		print "sol#", hi
-		print "hyper "
-		print allHypers[hi]
-		print "actual sol"
-		print allSols[hi]
-		print ""
+			if foundSample == False:
+				sampleSols.append(finalSoln)
+				rotatedSols[len(sampleSols)-1] = []
 
 	for hi in range(len(sampleSols)):
 		print "equivalence class# ", hi
@@ -696,10 +657,10 @@ def rambusOscillator(a, numStages):
 		print ""
 
 	print "numSolutions, ", len(allHypers)
-	print "num stable solutions ", len(stableSols)'''
+	print "num stable solutions ", len(stableSols)
 	'''for si in range(len(stableSols)):
 		print stableSols[si]'''
-	#print "num unstable solutions ", len(unstableSols)
+	print "num unstable solutions ", len(unstableSols)
 	'''for si in range(len(unstableSols)):
 		print unstableSols[si]'''
 	endExp = time.time()

@@ -174,7 +174,7 @@ def checkExistenceOfSolution(a,g_fwd,g_cc,hyperRectangle, oscNum, jacobian, jaco
 	iteration = 0
 	while True:
 		#print "iteration number: ", iteration
-		#print "startBounds ", startBounds
+		print "startBounds ", startBounds
 		midPoint = (startBounds[:,0] + startBounds[:,1])/2.0
 		#midPoint = startBounds[:,0] + (startBounds[:,1] - startBounds[:,0])*0.25
 		#print "midPoint"
@@ -221,8 +221,8 @@ def checkExistenceOfSolution(a,g_fwd,g_cc,hyperRectangle, oscNum, jacobian, jaco
 		kInterval[:,0] = np.minimum(kInterval1, kInterval2)
 		kInterval[:,1] = np.maximum(kInterval1, kInterval2)
 
-		#print "kInterval "
-		#print kInterval
+		print "kInterval "
+		print kInterval
 
 		uniqueSoln = True
 		for i in range(numVolts):
@@ -270,7 +270,7 @@ def checkExistenceOfSolution(a,g_fwd,g_cc,hyperRectangle, oscNum, jacobian, jaco
 		
 		if np.less_equal(intervalLength,1e-8*np.ones((numVolts))).all() or  np.less_equal(np.absolute(intersect - startBounds),1e-4*np.ones((numVolts,2))).all():
 			# TODO: Need a better way to deal with tiny hyperrectangles
-			if constructBiggerHyper == False and np.less_equal(intervalLength, np.ones((numVolts))*1e-10 ).all():
+			if constructBiggerHyper == False and np.less_equal(intervalLength, np.ones((numVolts))*1e-10 ).any():
 				constructBiggerHyper = True
 				exampleVolt = (intersect[:,0] + intersect[:,1])/2.0
 				soln = newton(a,[g_fwd, g_cc],exampleVolt,oscNum,jacobian)
@@ -283,7 +283,7 @@ def checkExistenceOfSolution(a,g_fwd,g_cc,hyperRectangle, oscNum, jacobian, jaco
 						#print "maxDiff ", maxDiff
 						intersect[si,0] = soln[si] - maxDiff
 						intersect[si,1] = soln[si] + maxDiff
-					#print "bigger hyper ", intersect
+					print "bigger hyper ", intersect
 					startBounds = intersect
 					
 				else:

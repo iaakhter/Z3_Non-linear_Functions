@@ -111,11 +111,18 @@ def combinationWithTrees(numIntervalIndices, intervalIndexRange, indexChoiceArra
 	return rootCombinationNodes
 
 def multiplyRegularMatWithIntervalMat(regMat,intervalMat):
-	mat1 = np.dot(regMat,intervalMat[:,:,0])
-	mat2 = np.dot(regMat,intervalMat[:,:,1])
-	result = np.zeros((regMat.shape[0],regMat.shape[1],2))
-	result[:,:,0] = np.minimum(mat1,mat2)
-	result[:,:,1] = np.maximum(mat1,mat2)
+	result = np.zeros((regMat.shape[0],intervalMat.shape[1],2))
+	for i in range(regMat.shape[0]):
+		for j in range(intervalMat.shape[1]):
+			intervalVal = np.zeros(2)
+			for k in range(intervalMat.shape[1]):
+				multMin = min(regMat[i,k]*intervalMat[k,j,0], regMat[i,k]*intervalMat[k,j,1])
+				multMax = max(regMat[i,k]*intervalMat[k,j,0], regMat[i,k]*intervalMat[k,j,1])
+				intervalVal[0] += multMin
+				intervalVal[1] += multMax
+			result[i,j,0] = intervalVal[0]
+			result[i,j,1] = intervalVal[1]
+
 	return result
 
 def subtractIntervalMatFromRegularMat(regMat,intervalMat):
@@ -167,32 +174,46 @@ def checkExistenceOfSolution(a,g_fwd,g_cc,hyperRectangle, oscNum, jacobian, jaco
 	iteration = 0
 	while True:
 		#print "iteration number: ", iteration
-		print "startBounds ", startBounds
+		#print "startBounds ", startBounds
 		midPoint = (startBounds[:,0] + startBounds[:,1])/2.0
-		print "midPoint"
-		print midPoint
+		#midPoint = startBounds[:,0] + (startBounds[:,1] - startBounds[:,0])*0.25
+		#print "midPoint"
+		#print midPoint
 		_,_,IMidPoint = np.array(oscNum(midPoint,a,g_cc,g_fwd))
 		jacMidPoint = jacobian(midPoint,a,g_cc,g_fwd)
+		#print "jacMidPoint"
+		#print jacMidPoint
 		C = np.linalg.inv(jacMidPoint)
+		#print "C"
+		#print C
+		#print "condition number of C", np.linalg.cond(C)
+
 		#print "C ", C
 		I = np.identity(numVolts)
 
 		jacInterval = jacobianInterval(startBounds,a,g_cc,g_fwd)
-		#print "jacMidPoint ", jacMidPoint
-		#print "jacInterval ", jacInterval
+		#print "jacInterval"
+		#print jacInterval
+		#print "IMidPoint"
+		#print IMidPoint
 		C_IMidPoint = np.dot(C,IMidPoint)
-		print "C_IMidPoint", C_IMidPoint
+		#print "C_IMidPoint", C_IMidPoint
 
 		C_jacInterval = multiplyRegularMatWithIntervalMat(C,jacInterval)
-		print "C_jacInterval", C_jacInterval
+		#print "C_jacInterval"
+		#print C_jacInterval
 		I_minus_C_jacInterval = subtractIntervalMatFromRegularMat(I,C_jacInterval)
+		#print "I_minus_C_jacInterval"
+		#print I_minus_C_jacInterval
 		xi_minus_midPoint = np.zeros((numVolts,2))
 		for i in range(numVolts):
 			xi_minus_midPoint[i][0] = min(startBounds[i][0] - midPoint[i], startBounds[i][1] - midPoint[i])
 			xi_minus_midPoint[i][1] = max(startBounds[i][0] - midPoint[i], startBounds[i][1] - midPoint[i])
-
+		#print "xi_minus_midPoint", xi_minus_midPoint
 		lastTerm = multiplyIntervalMatWithIntervalVec(I_minus_C_jacInterval, xi_minus_midPoint)
-		
+		#print "lastTerm "
+		#print lastTerm
+
 		kInterval1 = midPoint - C_IMidPoint + lastTerm[:,0]
 		kInterval2 = midPoint - C_IMidPoint + lastTerm[:,1]
 		kInterval = np.zeros((numVolts,2))
@@ -200,8 +221,8 @@ def checkExistenceOfSolution(a,g_fwd,g_cc,hyperRectangle, oscNum, jacobian, jaco
 		kInterval[:,0] = np.minimum(kInterval1, kInterval2)
 		kInterval[:,1] = np.maximum(kInterval1, kInterval2)
 
-		print "kInterval "
-		print kInterval
+		#print "kInterval "
+		#print kInterval
 
 		uniqueSoln = True
 		for i in range(numVolts):
@@ -219,7 +240,12 @@ def checkExistenceOfSolution(a,g_fwd,g_cc,hyperRectangle, oscNum, jacobian, jaco
 		for i in range(numVolts):
 			minVal = max(kInterval[i][0],startBounds[i][0])
 			maxVal = min(kInterval[i][1],startBounds[i][1])
-			if minVal <= maxVal and \
+			# numerical error
+			if minVal > maxVal and abs(minVal - maxVal) < 1e-8:
+				#print "i ", i, "minVal ", minVal, "maxVal", maxVal
+				intersect[i] = [startBounds[i][0],startBounds[i][1]]
+				intervalLength =  intersect[:,1] - intersect[:,0]
+			elif minVal <= maxVal and \
 				minVal >= kInterval[i][0] and minVal >= startBounds[i][0] and \
 				minVal <= kInterval[i][1] and minVal <= startBounds[i][1] and \
 				maxVal >= kInterval[i][0] and maxVal >= startBounds[i][0] and \
@@ -227,7 +253,11 @@ def checkExistenceOfSolution(a,g_fwd,g_cc,hyperRectangle, oscNum, jacobian, jaco
 				intersect[i] = [minVal,maxVal]
 				intervalLength =  intersect[:,1] - intersect[:,0]
 			else:
-				print "problem index ", i
+				#print "problem index ", i
+				#print "kInterval[i]", kInterval[i][0], kInterval[i][1]
+				#print "startBounds[i]", startBounds[i][0], startBounds[i][1]
+				#print "minVal ", minVal, "maxVal",maxVal
+				#print minVal <= maxVal
 				intersect = None
 				break
 
@@ -238,7 +268,7 @@ def checkExistenceOfSolution(a,g_fwd,g_cc,hyperRectangle, oscNum, jacobian, jaco
 			#print "hyperrectangle does not contain any solution"
 			return (False,None)
 		
-		if np.linalg.norm(intervalLength) < 1e-8 or np.linalg.norm(intersect-startBounds) < 1e-8:
+		if np.less_equal(intervalLength,1e-8*np.ones((numVolts))).all() or  np.less_equal(np.absolute(intersect - startBounds),1e-4*np.ones((numVolts,2))).all():
 			# TODO: Need a better way to deal with tiny hyperrectangles
 			if constructBiggerHyper == False and np.less_equal(intervalLength, np.ones((numVolts))*1e-10 ).all():
 				constructBiggerHyper = True

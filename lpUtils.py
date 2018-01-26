@@ -4,20 +4,21 @@ from cvxopt import matrix,solvers
 def constructObjMatrix(objString, variableDict):
 	objStringList = objString.split(" ")
 	objFun = objStringList[0]
-	cMat = np.zeros((len(variableDict),1))
+	cMat = np.zeros((len(variableDict)))
 	#print "variableDict in constructObjMatrix"
 	#print variableDict
 	for i in range(len(objStringList)):
 		#print "objStringList ", i, objStringList[i], type(objStringList[i])
 		if objStringList[i] in variableDict:
 			#print "objStringList[i-1] ", objStringList[i-1]
-			cMat[variableDict[objStringList[i]]][0] = float(objStringList[i-1])
+			cMat[variableDict[objStringList[i]]] = float(objStringList[i-1])
 			if objFun == "max":
-				cMat[variableDict[objStringList[i]]][0] = -float(objStringList[i-1])
+				cMat[variableDict[objStringList[i]]] = -float(objStringList[i-1])
 	xoptCMat = matrix(cMat)
 	#print "xoptCMat"
 	#print xoptCMat
 	return xoptCMat
+	#return cMat
 
 def constructCoeffMatrices(constraintString):
 	constraintList = constraintString.split("\n")
@@ -66,3 +67,4 @@ def constructCoeffMatrices(constraintString):
 	#print "xoptAMat"
 	#print xoptAMat
 	return [variableDict,xoptAMat, xoptBMat]
+	#return [variableDict, AMat, bMat]

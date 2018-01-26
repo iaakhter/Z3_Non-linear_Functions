@@ -173,7 +173,7 @@ def checkExistenceOfSolutionGS(a,g_fwd,g_cc,hyperRectangle, oscNum, jacobian, ja
 	iteration = 0
 	while True:
 		#print "iteration number: ", iteration
-		print "startBounds ", startBounds
+		#print "startBounds ", startBounds
 		midPoint = (startBounds[:,0] + startBounds[:,1])/2.0
 		#midPoint = startBounds[:,0] + (startBounds[:,1] - startBounds[:,0])*0.25
 		#print "midPoint"
@@ -207,17 +207,16 @@ def checkExistenceOfSolutionGS(a,g_fwd,g_cc,hyperRectangle, oscNum, jacobian, ja
 		for i in range(numVolts):
 			sumTerm = np.zeros((2))
 			for j in range(numVolts):
-				if i!=j:
-					subTerm1 = gsIntersect[j,0] - midPoint[j]
-					subTerm2 = gsIntersect[j,1] - midPoint[j]
-					mult = np.zeros((2))
-					mult1 = I_minus_C_jacInterval[i,j,0] * subTerm1
-					mult2 = I_minus_C_jacInterval[i,j,0] * subTerm2
-					mult3 = I_minus_C_jacInterval[i,j,1] * subTerm1
-					mult4 = I_minus_C_jacInterval[i,j,1] * subTerm2
-					mult[0] = min(mult1, mult2, mult3, mult4)
-					mult[1] = max(mult1, mult2, mult3, mult4)
-					sumTerm += mult
+				subTerm1 = gsIntersect[j,0] - midPoint[j]
+				subTerm2 = gsIntersect[j,1] - midPoint[j]
+				mult = np.zeros((2))
+				mult1 = I_minus_C_jacInterval[i,j,0] * subTerm1
+				mult2 = I_minus_C_jacInterval[i,j,0] * subTerm2
+				mult3 = I_minus_C_jacInterval[i,j,1] * subTerm1
+				mult4 = I_minus_C_jacInterval[i,j,1] * subTerm2
+				mult[0] = min(mult1, mult2, mult3, mult4)
+				mult[1] = max(mult1, mult2, mult3, mult4)
+				sumTerm += mult
 			C_ImidPoint_minus_sumTerm = np.zeros((2))
 			C_ImidPoint_minus_sumTerm[0] = min(C_IMidPoint[i] - sumTerm[0], C_IMidPoint[i] - sumTerm[1])
 			C_ImidPoint_minus_sumTerm[1] = max(C_IMidPoint[i] - sumTerm[0], C_IMidPoint[i] - sumTerm[1])
@@ -231,7 +230,6 @@ def checkExistenceOfSolutionGS(a,g_fwd,g_cc,hyperRectangle, oscNum, jacobian, ja
 			#print "divTerm ", divTerm
 			gsInterval[i][0] = min(midPoint[i] - C_ImidPoint_minus_sumTerm[0], midPoint[i] - C_ImidPoint_minus_sumTerm[1])
 			gsInterval[i][1] = max(midPoint[i] - C_ImidPoint_minus_sumTerm[0], midPoint[i] - C_ImidPoint_minus_sumTerm[1])
-			print "gsInterval[i] ", gsInterval[i]
 			minVal = max(gsInterval[i][0],startBounds[i][0])
 			maxVal = min(gsInterval[i][1],startBounds[i][1])
 			if minVal <= maxVal and \
@@ -243,10 +241,10 @@ def checkExistenceOfSolutionGS(a,g_fwd,g_cc,hyperRectangle, oscNum, jacobian, ja
 			else:
 				return (False, None)
 
-		print "gsInterval "
-		print gsInterval
-		print "gsIntersect "
-		print gsIntersect
+		#print "gsInterval "
+		#print gsInterval
+		#print "gsIntersect "
+		#print gsIntersect
 		uniqueSoln = True
 		for i in range(numVolts):
 			if gsInterval[i][0] <= startBounds[i][0] or gsInterval[i][0] >= startBounds[i][1]:

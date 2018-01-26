@@ -46,24 +46,18 @@ def triangleConvexHullBounds(a, Vin, Vout, Vlow, Vhigh):
 
 	#print "dHigh ", dHigh, " cHigh ", cHigh
 
-	if abs(dLow) < 1e-8:
-		leftIntersectY = 1.0
-		leftIntersectX = (leftIntersectY - cZero)/dZero
-	elif abs(dLow - dZero) < 1e-8:
-		leftIntersectX = (Vlow + VZero)/2.0
-		leftIntersectY = (tanhFunVlow + tanhFunVZero)/2.0
+	if abs(dLow - dZero) < 1e-8:
+		leftIntersectX = Vlow
+		leftIntersectY = tanhFunVlow
 	else:
 		leftIntersectX = (cZero - cLow)/(dLow - dZero)
 		leftIntersectY = dLow*leftIntersectX + cLow
+	#print "dLow, ", dLow, "dZero", dZero
 	#print "leftIntersectX ", leftIntersectX, " leftIntersectY ", leftIntersectY
-	#print "Vlow ", Vlow, "tanhFunVlow ", tanhFunVlow
-	#print "Vhigh ", Vhigh, " tanhFunVhigh ", tanhFunVhigh
-	if abs(dHigh) < 1e-8:
-		rightIntersectY = -1.0
-		rightIntersectX = (rightIntersectY - cZero)/dZero
-	elif abs(dHigh - dZero) < 1e-8:
-		rightIntersectX = (Vhigh + VZero)/2.0
-		rightIntersectY = (tanhFunVhigh + tanhFunVZero)/2.0
+	#print "Vlow ", Vlow, "Vhigh ", Vhigh
+	if abs(dHigh - dZero) < 1e-8:
+		rightIntersectX = Vhigh
+		rightIntersectY = tanhFunVhigh
 	else:
 		rightIntersectX = (cZero - cHigh)/(dHigh - dZero)
 		rightIntersectY = dHigh*rightIntersectX + cHigh
@@ -75,9 +69,14 @@ def triangleConvexHullBounds(a, Vin, Vout, Vlow, Vhigh):
 	# (leftIntersectX, leftIntersectY), (0,0), (rightIntersectX, rightIntersectY),
 	# and (Vhigh, tanhFunVhigh)
 	# Use jarvis algorithm from https://www.geeksforgeeks.org/convex-hull-set-1-jarviss-algorithm-or-wrapping/
-	points = [(Vlow, tanhFunVlow),(leftIntersectX, leftIntersectY),
+	origPoints = [(Vlow, tanhFunVlow),(leftIntersectX, leftIntersectY),
 				(0,0),(rightIntersectX, rightIntersectY), (Vhigh, tanhFunVhigh)]
-	#print "points ", points
+	points = []
+	for point in origPoints:
+		if point not in points:
+			points.append(point)
+	#print "points"
+	#print points
 	leftMostIndex = 0
 	convexHullIndices = []
 	nextIndex = leftMostIndex
@@ -253,26 +252,33 @@ solution.
 def ifFeasibleHyper(a,params,xs,ys,zs,hyperRectangle, hyperBound):
 	solvers.options["show_progress"] = False
 	lenV = len(xs)
-	print "hyperRectangle before"
-	print hyperRectangle
-	# TODO: replace this with more precise numerical methods
-	for i in range(lenV):
-		if hyperRectangle[i][0] < 0 and abs(hyperRectangle[i][0]) < 1e-4:
-			hyperRectangle[i][0] = -hyperBound
-		if hyperRectangle[i][0] > 0 and abs(hyperRectangle[i][0]) < 1e-4:
-			hyperRectangle[i][0] = 0.0
-		if hyperRectangle[i][1] < 0 and abs(hyperRectangle[i][1]) < 1e-4:
-			hyperRectangle[i][1] = 0.0
-		if hyperRectangle[i][1] > 0 and abs(hyperRectangle[i][1]) < 1e-4:
-			hyperRectangle[i][1] = hyperBound
-
-
 	print "hyperRectangle"
 	print hyperRectangle
 	iterNum = 0
 	while True:
-		#print "hyperRectangle "
-		#print hyperRectangle
+		# TODO: replace this with more precise numerical methods
+		'''for i in range(lenV):
+			if hyperRectangle[i][0] < 0 and abs(hyperRectangle[i][0]) < 1e-7:
+				hyperRectangle[i][0] = -hyperBound
+			if hyperRectangle[i][0] > 0 and abs(hyperRectangle[i][0]) < 1e-7:
+				hyperRectangle[i][0] = 0.0
+			if hyperRectangle[i][1] < 0 and abs(hyperRectangle[i][1]) < 1e-7:
+				hyperRectangle[i][1] = 0.0
+			if hyperRectangle[i][1] > 0 and abs(hyperRectangle[i][1]) < 1e-7:
+				hyperRectangle[i][1] = hyperBound
+
+		print "hyperRectangle "
+		print hyperRectangle'''
+		kResult = intervalUtils.checkExistenceOfSolutionGS(a,params[0],params[1],hyperRectangle.transpose(), oscNum, getJacobian, getJacobianInterval)
+		if kResult[0]:
+			#print "LP feasible ", newHyperRectangle
+			return (True, kResult[1])
+
+		if kResult[0] == False and kResult[1] is None:
+			print "K operator not feasible"
+			return (False, None)
+		#print "kResult"
+		#print kResult
 		allConstraints = ""
 		for i in range(lenV):
 			fwdInd = (i-1)%lenV
@@ -307,7 +313,6 @@ def ifFeasibleHyper(a,params,xs,ys,zs,hyperRectangle, hyperBound):
 		print allConstraints'''
 		variableDict, A, B = lpUtils.constructCoeffMatrices(allConstraints)
 		newHyperRectangle = copy.deepcopy(hyperRectangle)
-		
 		feasible = True
 		for i in range(lenV):
 			#print "min max ", i
@@ -325,6 +330,17 @@ def ifFeasibleHyper(a,params,xs,ys,zs,hyperRectangle, hyperBound):
 					newHyperRectangle[i,0] = minSol['x'][variableDict[xs[i]]]
 				if maxSol["status"] == "optimal":
 					newHyperRectangle[i,1] = maxSol['x'][variableDict[xs[i]]]
+			
+			#if infeasible
+			if (minSol["status"] == "primal infeasible" or maxSol["status"] == "primal infeasible"):
+				feasible = False
+				break
+			else:
+				# if optimal
+				if minSol["status"] == "optimal":
+					newHyperRectangle[i,0] = minSol['x'][variableDict[xs[i]]] - 1e-5
+				if maxSol["status"] == "optimal":
+					newHyperRectangle[i,1] = maxSol['x'][variableDict[xs[i]]] + 1e-5
 
 		print "newHyperRectangle ", newHyperRectangle
 		if feasible == False:
@@ -332,7 +348,7 @@ def ifFeasibleHyper(a,params,xs,ys,zs,hyperRectangle, hyperBound):
 			return (False, None)
 
 		if np.less_equal(newHyperRectangle[:,1] - newHyperRectangle[:,0],hyperBound*np.ones((lenV))).all() or np.less_equal(np.absolute(newHyperRectangle - hyperRectangle),1e-4*np.ones((lenV,2))).all():
-			for i in range(lenV):
+			'''for i in range(lenV):
 				# because this might be possible
 				if(newHyperRectangle[i,1] < newHyperRectangle[i,0]):
 					newHyperRectangle[i,0] = hyperRectangle[i,0]
@@ -340,12 +356,12 @@ def ifFeasibleHyper(a,params,xs,ys,zs,hyperRectangle, hyperBound):
 			kResult = intervalUtils.checkExistenceOfSolutionGS(a,params[0],params[1],newHyperRectangle.transpose(), oscNum, getJacobian, getJacobianInterval)
 			if kResult[0]:
 				#print "LP feasible ", newHyperRectangle
-				return (True, kResult[1])
+				return (True, kResult[1])'''
 			if kResult[0] == False and kResult[1] is not None:
 				return (False, kResult[1])
-			else:
+			'''else:
 				print "K operator not feasible"
-				return (False, None)
+				return (False, None)'''
 		hyperRectangle = newHyperRectangle
 		iterNum+=1
 	
@@ -413,9 +429,15 @@ def getFeasibleIntervalIndices(rootCombinationNode,a,params,xs,ys,zs,boundMap,hy
 		if intervalIndices[i] is None:
 			indexOfNone = i
 			break
+	print "indexOfNone ", indexOfNone
 	if indexOfNone is None:
-		bisectionHypers = refineHyper(a, params, xs, ys, zs, intervalIndices, boundMap, hyperBound)
-		refinedHypers = refinedHypers + bisectionHypers
+		bisectionHypers = refineHyper(a, params, xs, ys, zs, intervalIndices, newBoundMap, hyperBound)
+		print "bisectionHypers"
+		print bisectionHypers
+		print "len(refinedHypers) before ", len(refinedHypers)
+		for hyper in bisectionHypers:
+			refinedHypers.append(hyper)
+		print "len(refinedHypers) after ", len(refinedHypers)
 	for i in range(len(rootCombinationNode.children)):
 		getFeasibleIntervalIndices(rootCombinationNode.children[i],a,params,xs,ys,zs,newBoundMap,hyperBound,excludingBound,refinedHypers)
 
@@ -429,39 +451,10 @@ def refineHyper(a, params, xs, ys, zs, ordering, boundMap, maxHyperBound):
 	finalHyper = []
 	count = 0
 	volumes = []
-	#while True:
-		#print "Iteration #", count
-	diffHyper = hyperRectangle[:,1] - hyperRectangle[:,0]
-	volume = np.prod(diffHyper)
-	volumeRoot = volume**lenV
-	volumes.append(volumeRoot)
-	startRefine = time.time()
-	#feasibility = ifFeasibleOrdering(a,params,xs,ys,zs,ordering,boundMap, maxHyperBound)
-	feasibility = ifFeasibleHyper(a,params,xs,ys,zs,hyperRectangle, maxHyperBound)
-	print "feasibility"
-	print feasibility
-	if feasibility[0] == False:
-		return finalHyper
-	newHyperRectangle = feasibility[1]
-	endRefine = time.time()
-	#print "hyperRectangle ", newHyperRectangle
 
-	hyperRectangle = newHyperRectangle
-	
-	startKoperator = time.time()
-	kResult = intervalUtils.checkExistenceOfSolutionGS(a,params[0],params[1],hyperRectangle.transpose(), oscNum, getJacobian, getJacobianInterval)
-	endKoperator = time.time()
-	print "time taken to refine", endRefine - startRefine
-	print "time taken for Koperator", endKoperator - startKoperator
-	print "" 
-	count += 1
-	#TODO: need to deal with when K-operator does not know if unique solution or no solution
-	if kResult[0]:
-		finalHyper.append(hyperRectangle)
-	elif kResult[0] == False and kResult[1] is not None:
-		print "before bisecting num ", len(finalHyper)
-		bisectHyper(a,params,xs,ys,zs,maxHyperBound,hyperRectangle,0,finalHyper)
-		print "after bisecting num ", len(finalHyper)
+	print "before bisecting num ", len(finalHyper)
+	bisectHyper(a,params,xs,ys,zs,maxHyperBound,hyperRectangle,0,finalHyper)
+	print "after bisecting num ", len(finalHyper)
 
 	return finalHyper
 
@@ -490,24 +483,15 @@ def bisectHyper(a,params,xs,ys,zs,hyperBound,hyperRectangle,bisectingIndex, fina
 	print feasRight
 
 	if feasLeft[0]:
-		leftHyper = feasLeft[1]
-		kResultLeft = intervalUtils.checkExistenceOfSolutionGS(a,params[0],params[1],leftHyper.transpose(), oscNum, getJacobian, getJacobianInterval)
-		if kResultLeft[0]:
-			finalHypers.append(leftHyper)
-			#print "left appended"
-		if kResultLeft[0] == False and kResultLeft[1] is not None:
-			bisectHyper(a,params,xs,ys,zs,hyperBound,leftHyper,bisectingIndex+1,finalHypers)
+		finalHypers.append(leftHyper)
+	if feasLeft[0] == False and feasLeft[1] is not None:
+		bisectHyper(a,params,xs,ys,zs,hyperBound,leftHyper,bisectingIndex+1,finalHypers)
+
 	
 	if feasRight[0]:
-		rightHyper = feasRight[1]
-		kResultRight = intervalUtils.checkExistenceOfSolutionGS(a,params[0],params[1],rightHyper.transpose(), oscNum, getJacobian, getJacobianInterval)
-		if kResultRight[0]:
-			finalHypers.append(rightHyper)
-			#print "right appended"
-		if kResultRight[0] == False and kResultRight[1] is not None:
-			bisectHyper(a,params,xs,ys,zs,hyperBound,rightHyper,bisectingIndex+1,finalHypers)
-
-
+		finalHypers.append(rightHyper)
+	if feasRight[0] == False and feasRight[1] is not None:
+		bisectHyper(a,params,xs,ys,zs,hyperBound,rightHyper,bisectingIndex+1,finalHypers)
 
 def findExcludingBound(a,params,xs,ys,zs,ordering,boundMap, maxDiff = 0.2):
 	lenV = len(xs)
@@ -578,10 +562,10 @@ def rambusOscillator(a, numStages):
 	rootCombinationNodes = intervalUtils.combinationWithTrees(lenV,[minBoundMap,maxBoundMap],indexChoiceArray)
 	hyperBound = excludingBound
 	'''hyperRectangle = np.zeros((lenV,2))
-	hyperRectangle[0,:] = [-3.44776791e-05, 5.81141813e-01]
-	hyperRectangle[1,:] = [-1.00000000e+00, 5.00000000e-02]
-	hyperRectangle[2,:] = [-3.44780741e-05, 5.81141813e-01]
-	hyperRectangle[3,:] = [-2.90553668e-01, 3.44778356e-05]
+	hyperRectangle[0,:] = [-0.99983621, 0.99845864]
+	hyperRectangle[1,:] = [-0.99983605, 0.2       ]
+	hyperRectangle[2,:] = [-0.95224507, 0.9998362 ]
+	hyperRectangle[3,:] = [-0.4754362, 0.99979469]
 
 	feasibility = ifFeasibleHyper(a,params,xs,ys,zs,hyperRectangle, hyperBound)
 	print feasibility'''
@@ -679,5 +663,5 @@ triangleConstraint2 = triangleBounds(-5.0,"x1","y1",0.0,0.5)
 print objConstraint + triangleConstraint1 + triangleConstraint2
 variableDict, A, B = constructCoeffMatrices(triangleConstraint1 + triangleConstraint2)
 C = constructObjMatrix(objConstraint,variableDict)'''
-rambusOscillator(-5.0,2)
+rambusOscillator(-5.0,4)
 

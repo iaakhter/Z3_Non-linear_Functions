@@ -337,12 +337,12 @@ def ifFeasibleHyper(a,params,xs,ys,zs,hyperRectangle, hyperBound):
 				if(newHyperRectangle[i,1] < newHyperRectangle[i,0]):
 					newHyperRectangle[i,0] = hyperRectangle[i,0]
 					newHyperRectangle[i,1] = hyperRectangle[i,1]
-			kResult = intervalUtils.checkExistenceOfSolution(a,params[0],params[1],newHyperRectangle.transpose(), oscNum, getJacobian, getJacobianInterval)
+			kResult = intervalUtils.checkExistenceOfSolutionGS(a,params[0],params[1],newHyperRectangle.transpose(), oscNum, getJacobian, getJacobianInterval)
 			if kResult[0]:
 				#print "LP feasible ", newHyperRectangle
-				return (True, newHyperRectangle)
+				return (True, kResult[1])
 			if kResult[0] == False and kResult[1] is not None:
-				return (False, newHyperRectangle)
+				return (False, kResult[1])
 			else:
 				print "K operator not feasible"
 				return (False, None)
@@ -447,12 +447,9 @@ def refineHyper(a, params, xs, ys, zs, ordering, boundMap, maxHyperBound):
 	#print "hyperRectangle ", newHyperRectangle
 
 	hyperRectangle = newHyperRectangle
-	exampleSoln = (hyperRectangle[:,0] + hyperRectangle[:,1])/2.0
-	finalSoln = intervalUtils.newton(a,params,exampleSoln, oscNum, getJacobian)
-	#print "finalSoln ", finalSoln
-
+	
 	startKoperator = time.time()
-	kResult = intervalUtils.checkExistenceOfSolution(a,params[0],params[1],hyperRectangle.transpose(), oscNum, getJacobian, getJacobianInterval)
+	kResult = intervalUtils.checkExistenceOfSolutionGS(a,params[0],params[1],hyperRectangle.transpose(), oscNum, getJacobian, getJacobianInterval)
 	endKoperator = time.time()
 	print "time taken to refine", endRefine - startRefine
 	print "time taken for Koperator", endKoperator - startKoperator
@@ -494,7 +491,7 @@ def bisectHyper(a,params,xs,ys,zs,hyperBound,hyperRectangle,bisectingIndex, fina
 
 	if feasLeft[0]:
 		leftHyper = feasLeft[1]
-		kResultLeft = intervalUtils.checkExistenceOfSolution(a,params[0],params[1],leftHyper.transpose(), oscNum, getJacobian, getJacobianInterval)
+		kResultLeft = intervalUtils.checkExistenceOfSolutionGS(a,params[0],params[1],leftHyper.transpose(), oscNum, getJacobian, getJacobianInterval)
 		if kResultLeft[0]:
 			finalHypers.append(leftHyper)
 			#print "left appended"
@@ -503,7 +500,7 @@ def bisectHyper(a,params,xs,ys,zs,hyperBound,hyperRectangle,bisectingIndex, fina
 	
 	if feasRight[0]:
 		rightHyper = feasRight[1]
-		kResultRight = intervalUtils.checkExistenceOfSolution(a,params[0],params[1],rightHyper.transpose(), oscNum, getJacobian, getJacobianInterval)
+		kResultRight = intervalUtils.checkExistenceOfSolutionGS(a,params[0],params[1],rightHyper.transpose(), oscNum, getJacobian, getJacobianInterval)
 		if kResultRight[0]:
 			finalHypers.append(rightHyper)
 			#print "right appended"
@@ -525,7 +522,7 @@ def findExcludingBound(a,params,xs,ys,zs,ordering,boundMap, maxDiff = 0.2):
 	while True:
 		hyperRectangle[:,0] = soln - diff
 		hyperRectangle[:,1] = soln + diff
-		kResult = intervalUtils.checkExistenceOfSolution(a,params[0],params[1],hyperRectangle.transpose(), oscNum, getJacobian, getJacobianInterval)
+		kResult = intervalUtils.checkExistenceOfSolutionGS(a,params[0],params[1],hyperRectangle.transpose(), oscNum, getJacobian, getJacobianInterval)
 		if kResult[0] == False and kResult[1] is not None:
 			diff = diff/2.0;
 		else:
@@ -660,7 +657,7 @@ def rambusOscillator(a, numStages):
 	print "num stable solutions ", len(stableSols)
 	'''for si in range(len(stableSols)):
 		print stableSols[si]'''
-	print "num unstable solutions ", len(unstableSols)
+	#print "num unstable solutions ", len(unstableSols)
 	'''for si in range(len(unstableSols)):
 		print unstableSols[si]'''
 	endExp = time.time()

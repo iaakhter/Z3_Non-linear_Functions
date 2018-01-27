@@ -412,9 +412,9 @@ def getFeasibleIntervalIndices(rootCombinationNode,a,params,xs,ys,zs,boundMap,hy
 	newBoundMap = copy.deepcopy(boundMap)
 	hyperRectangle = feasibility[1]
 	for i in range(lenV):
+		lowBound = hyperRectangle[i][0]
+		upperBound = hyperRectangle[i][1]
 		if intervalIndices[i] is None:
-			lowBound = hyperRectangle[i][0]
-			upperBound = hyperRectangle[i][1]
 			newBoundMap[i][0][0] = lowBound
 			newBoundMap[i][1][1] = upperBound
 			if lowBound < 0 and upperBound > 0 and upperBound > excludingBound:
@@ -423,6 +423,9 @@ def getFeasibleIntervalIndices(rootCombinationNode,a,params,xs,ys,zs,boundMap,hy
 			else:
 				newBoundMap[i][0][1] = (lowBound + upperBound)/2.0
 				newBoundMap[i][1][0] = (lowBound + upperBound)/2.0
+		else:
+			newBoundMap[i][0] = [lowBound, upperBound]
+			newBoundMap[i][1] = [lowBound, upperBound]
 
 	indexOfNone = None
 	for i in range(len(intervalIndices)):
@@ -485,13 +488,13 @@ def bisectHyper(a,params,xs,ys,zs,hyperBound,hyperRectangle,bisectingIndex, fina
 	if feasLeft[0]:
 		finalHypers.append(feasLeft[1])
 	if feasLeft[0] == False and feasLeft[1] is not None:
-		bisectHyper(a,params,xs,ys,zs,hyperBound,leftHyper,bisectingIndex+1,finalHypers)
+		bisectHyper(a,params,xs,ys,zs,hyperBound,feasLeft[1],bisectingIndex+1,finalHypers)
 
 	
 	if feasRight[0]:
 		finalHypers.append(feasRight[1])
 	if feasRight[0] == False and feasRight[1] is not None:
-		bisectHyper(a,params,xs,ys,zs,hyperBound,rightHyper,bisectingIndex+1,finalHypers)
+		bisectHyper(a,params,xs,ys,zs,hyperBound,feasRight[1],bisectingIndex+1,finalHypers)
 
 def findExcludingBound(a,params,xs,ys,zs,ordering,boundMap, maxDiff = 0.2):
 	lenV = len(xs)
@@ -663,5 +666,5 @@ triangleConstraint2 = triangleBounds(-5.0,"x1","y1",0.0,0.5)
 print objConstraint + triangleConstraint1 + triangleConstraint2
 variableDict, A, B = constructCoeffMatrices(triangleConstraint1 + triangleConstraint2)
 C = constructObjMatrix(objConstraint,variableDict)'''
-rambusOscillator(-5.0,4)
+rambusOscillator(-5.0,6)
 

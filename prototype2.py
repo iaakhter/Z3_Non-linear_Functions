@@ -483,13 +483,13 @@ def bisectHyper(a,params,xs,ys,zs,hyperBound,hyperRectangle,bisectingIndex, fina
 	print feasRight
 
 	if feasLeft[0]:
-		finalHypers.append(leftHyper)
+		finalHypers.append(feasLeft[1])
 	if feasLeft[0] == False and feasLeft[1] is not None:
 		bisectHyper(a,params,xs,ys,zs,hyperBound,leftHyper,bisectingIndex+1,finalHypers)
 
 	
 	if feasRight[0]:
-		finalHypers.append(rightHyper)
+		finalHypers.append(feasRight[1])
 	if feasRight[0] == False and feasRight[1] is not None:
 		bisectHyper(a,params,xs,ys,zs,hyperBound,rightHyper,bisectingIndex+1,finalHypers)
 

@@ -171,6 +171,7 @@ def checkExistenceOfSolutionGS(a,g_fwd,g_cc,hyperRectangle, oscNum, jacobian, ja
 	startBounds[:,1] = hyperRectangle[1,:]
 	#print "startBounds ", startBounds
 	iteration = 0
+	constructBiggerHyper = False
 	while True:
 		#print "iteration number: ", iteration
 		#print "startBounds ", startBounds
@@ -258,7 +259,32 @@ def checkExistenceOfSolutionGS(a,g_fwd,g_cc,hyperRectangle, oscNum, jacobian, ja
 			return (True,gsInterval)
 		
 		if np.less_equal(gsIntersect[:,1] - gsIntersect[:,0],1e-8*np.ones((numVolts))).all() or  np.less_equal(np.absolute(gsIntersect - startBounds),1e-4*np.ones((numVolts,2))).all():
-			return (False,gsIntersect)
+			if constructBiggerHyper == False and np.less_equal(gsIntersect[:,1] - gsIntersect[:,0],1e-8*np.ones((numVolts))).all():
+				print "gsIntersect before"
+				print gsIntersect
+				constructBiggerHyper = True
+				exampleVolt = (gsIntersect[:,0] + gsIntersect[:,1])/2.0
+				soln = newton(a,[g_fwd, g_cc],exampleVolt,oscNum,jacobian)
+				print "soln ", soln
+				# the new hyper must contain the solution in the middle and enclose old hyper
+				# and then we check for uniqueness of solution in the newer bigger hyperrectangle
+				if np.greater_equal(soln, gsIntersect[:,0] ).all() and np.less_equal(soln, gsIntersect[:,1] ).all():
+					for si in range(numVolts):
+						maxDiff = max(gsIntersect[si,1] - soln[si], soln[si] - gsIntersect[si,0])
+						print "maxDiff", maxDiff
+						if maxDiff < 1e-6:
+							maxDiff = 1e-6
+						#print "maxDiff ", maxDiff
+						gsIntersect[si,0] = soln[si] - maxDiff
+						gsIntersect[si,1] = soln[si] + maxDiff
+					print "bigger hyper ", gsIntersect
+					startBounds = gsIntersect
+					
+				else:
+					#print "hyperrectangle does not contain any solution"
+					return (False, None)
+			else:
+				return (False,gsIntersect)
 		else:
 			startBounds = gsIntersect
 		iteration += 1

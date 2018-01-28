@@ -265,10 +265,10 @@ def ifFeasibleHyper(a,params,xs,ys,zs,hyperRectangle, hyperBound):
 			if hyperRectangle[i][1] < 0 and abs(hyperRectangle[i][1]) < 1e-7:
 				hyperRectangle[i][1] = 0.0
 			if hyperRectangle[i][1] > 0 and abs(hyperRectangle[i][1]) < 1e-7:
-				hyperRectangle[i][1] = hyperBound
+				hyperRectangle[i][1] = hyperBound'''
 
 		print "hyperRectangle "
-		print hyperRectangle'''
+		print hyperRectangle
 		kResult = intervalUtils.checkExistenceOfSolutionGS(a,params[0],params[1],hyperRectangle.transpose(), oscNum, getJacobian, getJacobianInterval)
 		if kResult[0]:
 			#print "LP feasible ", newHyperRectangle
@@ -338,9 +338,9 @@ def ifFeasibleHyper(a,params,xs,ys,zs,hyperRectangle, hyperBound):
 			else:
 				# if optimal
 				if minSol["status"] == "optimal":
-					newHyperRectangle[i,0] = minSol['x'][variableDict[xs[i]]] - 1e-5
+					newHyperRectangle[i,0] = minSol['x'][variableDict[xs[i]]] - 1e-4
 				if maxSol["status"] == "optimal":
-					newHyperRectangle[i,1] = maxSol['x'][variableDict[xs[i]]] + 1e-5
+					newHyperRectangle[i,1] = maxSol['x'][variableDict[xs[i]]] + 1e-4
 
 		print "newHyperRectangle ", newHyperRectangle
 		if feasible == False:
@@ -565,10 +565,18 @@ def rambusOscillator(a, numStages):
 	rootCombinationNodes = intervalUtils.combinationWithTrees(lenV,[minBoundMap,maxBoundMap],indexChoiceArray)
 	hyperBound = excludingBound
 	'''hyperRectangle = np.zeros((lenV,2))
-	hyperRectangle[0,:] = [-0.99983621, 0.99845864]
-	hyperRectangle[1,:] = [-0.99983605, 0.2       ]
-	hyperRectangle[2,:] = [-0.95224507, 0.9998362 ]
-	hyperRectangle[3,:] = [-0.4754362, 0.99979469]
+	hyperRectangle[0,:] = [-0.99891697, 0.06997283]
+	hyperRectangle[1,:] = [-0.86701504, -0.59588661]
+	hyperRectangle[2,:] = [ 0.99888614, 0.9998686 ]
+	hyperRectangle[3,:] = [-0.99990949, -0.99990851]
+	hyperRectangle[4,:] = [-0.59589669, -0.59589669]
+	hyperRectangle[5,:] = [-0.59695205, -0.59695205]
+	hyperRectangle[6,:] = [-0.06997392, 0.1       ]
+	hyperRectangle[7,:] = [ 0.59588661, 0.86702359]
+	hyperRectangle[8,:] = [-0.99986861, -0.99888614]
+	hyperRectangle[9,:] = [ 0.99990851, 0.99990949]
+	hyperRectangle[10,:] = [ 0.59589669, 0.59589669]
+	hyperRectangle[11,:] = [ 0.59695205, 0.59695205]
 
 	feasibility = ifFeasibleHyper(a,params,xs,ys,zs,hyperRectangle, hyperBound)
 	print feasibility'''
@@ -666,5 +674,5 @@ triangleConstraint2 = triangleBounds(-5.0,"x1","y1",0.0,0.5)
 print objConstraint + triangleConstraint1 + triangleConstraint2
 variableDict, A, B = constructCoeffMatrices(triangleConstraint1 + triangleConstraint2)
 C = constructObjMatrix(objConstraint,variableDict)'''
-rambusOscillator(-5.0,6)
+rambusOscillator(-5.0,4)
 

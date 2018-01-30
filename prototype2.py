@@ -338,9 +338,9 @@ def ifFeasibleHyper(a,params,xs,ys,zs,hyperRectangle, hyperBound):
 			else:
 				# if optimal
 				if minSol["status"] == "optimal":
-					newHyperRectangle[i,0] = minSol['x'][variableDict[xs[i]]] - 1e-4
+					newHyperRectangle[i,0] = minSol['x'][variableDict[xs[i]]] - 1e-5
 				if maxSol["status"] == "optimal":
-					newHyperRectangle[i,1] = maxSol['x'][variableDict[xs[i]]] + 1e-4
+					newHyperRectangle[i,1] = maxSol['x'][variableDict[xs[i]]] + 1e-5
 
 		print "newHyperRectangle ", newHyperRectangle
 		if feasible == False:
@@ -348,20 +348,8 @@ def ifFeasibleHyper(a,params,xs,ys,zs,hyperRectangle, hyperBound):
 			return (False, None)
 
 		if np.less_equal(newHyperRectangle[:,1] - newHyperRectangle[:,0],hyperBound*np.ones((lenV))).all() or np.less_equal(np.absolute(newHyperRectangle - hyperRectangle),1e-4*np.ones((lenV,2))).all():
-			'''for i in range(lenV):
-				# because this might be possible
-				if(newHyperRectangle[i,1] < newHyperRectangle[i,0]):
-					newHyperRectangle[i,0] = hyperRectangle[i,0]
-					newHyperRectangle[i,1] = hyperRectangle[i,1]
-			kResult = intervalUtils.checkExistenceOfSolutionGS(a,params[0],params[1],newHyperRectangle.transpose(), oscNum, getJacobian, getJacobianInterval)
-			if kResult[0]:
-				#print "LP feasible ", newHyperRectangle
-				return (True, kResult[1])'''
 			if kResult[0] == False and kResult[1] is not None:
 				return (False, kResult[1])
-			'''else:
-				print "K operator not feasible"
-				return (False, None)'''
 		hyperRectangle = newHyperRectangle
 		iterNum+=1
 	
@@ -564,25 +552,43 @@ def rambusOscillator(a, numStages):
 	maxBoundMap = 1
 	rootCombinationNodes = intervalUtils.combinationWithTrees(lenV,[minBoundMap,maxBoundMap],indexChoiceArray)
 	hyperBound = excludingBound
+	# Shows that feasible which is correct
 	'''hyperRectangle = np.zeros((lenV,2))
-	hyperRectangle[0,:] = [-0.99891697, 0.06997283]
-	hyperRectangle[1,:] = [-0.86701504, -0.59588661]
-	hyperRectangle[2,:] = [ 0.99888614, 0.9998686 ]
-	hyperRectangle[3,:] = [-0.99990949, -0.99990851]
-	hyperRectangle[4,:] = [-0.59589669, -0.59589669]
-	hyperRectangle[5,:] = [-0.59695205, -0.59695205]
-	hyperRectangle[6,:] = [-0.06997392, 0.1       ]
-	hyperRectangle[7,:] = [ 0.59588661, 0.86702359]
-	hyperRectangle[8,:] = [-0.99986861, -0.99888614]
-	hyperRectangle[9,:] = [ 0.99990851, 0.99990949]
-	hyperRectangle[10,:] = [ 0.59589669, 0.59589669]
-	hyperRectangle[11,:] = [ 0.59695205, 0.59695205]
+	hyperRectangle[0,:] = [ 0.0999, 0.59705205]
+	hyperRectangle[1,:] = [-0.99900698, -0.89009302]
+	hyperRectangle[2,:] = [-0.59629298, -0.59579687]
+	hyperRectangle[3,:] = [ 0.9987962, 0.99899924]
+	hyperRectangle[4,:] = [-1.00000894, -0.99980893]
+	hyperRectangle[5,:] = [-0.5959967, -0.59579669]
+	hyperRectangle[6,:] = [-0.59705205, -0.17062409]
+	hyperRectangle[7,:] = [ 0.7843508, 0.99900698]
+	hyperRectangle[8,:] = [ 0.59579687, 0.59654831]
+	hyperRectangle[9,:] = [-0.99900186, -0.99879619]
+	hyperRectangle[10,:] = [ 0.99980893, 1.00000894]
+	hyperRectangle[11,:] = [ 0.59579669, 0.5959967 ]'''
+
+	####### PROBLEM!!!!!!!!!
+	# shows that not feasible which is not correct
+	'''hyperRectangle = np.zeros((lenV,2))
+	hyperRectangle[0,:] = [ 0.0999, 0.59705205]
+	hyperRectangle[1,:] = [-0.99900698, -0.89009302]
+	hyperRectangle[2,:] = [-0.59597932, -0.59579687]
+	hyperRectangle[3,:] = [ 0.99889507, 0.99889704]
+	hyperRectangle[4,:] = [-0.99990894, -0.99990894]
+	hyperRectangle[5,:] = [-0.59589669, -0.59589669]
+	hyperRectangle[6,:] = [-0.59705205, -0.38383807]
+	hyperRectangle[7,:] = [ 0.84244429, 0.99900698]
+	hyperRectangle[8,:] = [ 0.59579687, 0.59599072]
+	hyperRectangle[9,:] = [-0.99889715, -0.99889486]
+	hyperRectangle[10,:] = [ 0.99990894, 0.99990894]
+	hyperRectangle[11,:] = [ 0.59589669, 0.59589669]
 
 	feasibility = ifFeasibleHyper(a,params,xs,ys,zs,hyperRectangle, hyperBound)
-	print feasibility'''
-	'''#exampleSoln = (hyperRectangle[:,0] + hyperRectangle[:,1])/2.0
-	exampleSoln = np.array([-0.86730826,  0.99985882,
- -0.99990911, -0.07034628, 0.86730826, -0.99985882,  0.99990911, 0.07034628])
+	print feasibility
+	#exampleSoln = (hyperRectangle[:,0] + hyperRectangle[:,1])/2.0'''
+	'''exampleSoln = np.array([0.59695205, -0.99890698, -0.59589688, 0.99889619,
+	 -0.99990894, -0.59589669, -0.59695205, 0.99890698, 0.59589688, -0.99889619,
+	 0.99990894, 0.59589669])
 	finalSoln = intervalUtils.newton(a,params,exampleSoln, oscNum, getJacobian)
 	print "finalSoln", finalSoln'''
 	'''ordering = [0,1,1,0,1,0,0,1]

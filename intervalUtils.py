@@ -239,7 +239,13 @@ def checkExistenceOfSolutionGS(a,g_fwd,g_cc,hyperRectangle, oscNum, jacobian, ja
 				maxVal >= gsInterval[i][0] and maxVal >= startBounds[i][0] and \
 				maxVal <= gsInterval[i][1] and maxVal <= startBounds[i][1]:
 				gsIntersect[i] = [minVal,maxVal]
+			elif np.less_equal(np.absolute(gsInterval[i,:] - startBounds[i,:]),1e-8*np.ones((2))).all():
+				gsIntersect[i] = startBounds[i]
 			else:
+				#print "problem i ", i
+				#print "gsInterval[i] ", gsInterval[i]
+				#print np.absolute(gsInterval[i,:] - startBounds[i,:])
+				#print minVal <= maxVal
 				return (False, None)
 
 		#print "gsInterval "
@@ -268,21 +274,17 @@ def checkExistenceOfSolutionGS(a,g_fwd,g_cc,hyperRectangle, oscNum, jacobian, ja
 				print "soln ", soln
 				# the new hyper must contain the solution in the middle and enclose old hyper
 				# and then we check for uniqueness of solution in the newer bigger hyperrectangle
-				if np.greater_equal(soln, gsIntersect[:,0] ).all() and np.less_equal(soln, gsIntersect[:,1] ).all():
-					for si in range(numVolts):
-						maxDiff = max(gsIntersect[si,1] - soln[si], soln[si] - gsIntersect[si,0])
-						print "maxDiff", maxDiff
-						if maxDiff < 1e-6:
-							maxDiff = 1e-6
-						#print "maxDiff ", maxDiff
-						gsIntersect[si,0] = soln[si] - maxDiff
-						gsIntersect[si,1] = soln[si] + maxDiff
-					print "bigger hyper ", gsIntersect
-					startBounds = gsIntersect
+				for si in range(numVolts):
+					maxDiff = max(abs(gsIntersect[si,1] - soln[si]), abs(soln[si] - gsIntersect[si,0]))
+					print "maxDiff", maxDiff
+					if maxDiff < 1e-6:
+						maxDiff = 1e-6
+					#print "maxDiff ", maxDiff
+					gsIntersect[si,0] = soln[si] - maxDiff
+					gsIntersect[si,1] = soln[si] + maxDiff
+				print "bigger hyper ", gsIntersect
+				startBounds = gsIntersect
 					
-				else:
-					#print "hyperrectangle does not contain any solution"
-					return (False, None)
 			else:
 				return (False,gsIntersect)
 		else:

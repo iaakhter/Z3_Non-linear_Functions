@@ -338,9 +338,9 @@ def ifFeasibleHyper(a,params,xs,ys,zs,hyperRectangle, hyperBound):
 			else:
 				# if optimal
 				if minSol["status"] == "optimal":
-					newHyperRectangle[i,0] = minSol['x'][variableDict[xs[i]]] - 1e-5
+					newHyperRectangle[i,0] = minSol['x'][variableDict[xs[i]]] - 1e-6
 				if maxSol["status"] == "optimal":
-					newHyperRectangle[i,1] = maxSol['x'][variableDict[xs[i]]] + 1e-5
+					newHyperRectangle[i,1] = maxSol['x'][variableDict[xs[i]]] + 1e-6
 
 		print "newHyperRectangle ", newHyperRectangle
 		if feasible == False:
@@ -654,6 +654,11 @@ def rambusOscillator(a, numStages):
 			print rotatedSols[hi][mi]
 		print ""
 
+	for hi in range(len(sampleSols)):
+		if len(rotatedSols[hi]) > lenV - 1:
+			print "problem equivalence class# ", hi
+			print "main member ", sampleSols[hi]
+
 	print "numSolutions, ", len(allHypers)
 	print "num stable solutions ", len(stableSols)
 	'''for si in range(len(stableSols)):
@@ -680,5 +685,5 @@ triangleConstraint2 = triangleBounds(-5.0,"x1","y1",0.0,0.5)
 print objConstraint + triangleConstraint1 + triangleConstraint2
 variableDict, A, B = constructCoeffMatrices(triangleConstraint1 + triangleConstraint2)
 C = constructObjMatrix(objConstraint,variableDict)'''
-rambusOscillator(-5.0,4)
+rambusOscillator(-5.0,8)
 

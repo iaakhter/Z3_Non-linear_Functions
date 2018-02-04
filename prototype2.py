@@ -256,17 +256,6 @@ def ifFeasibleHyper(a,params,xs,ys,zs,hyperRectangle, hyperBound):
 	print hyperRectangle
 	iterNum = 0
 	while True:
-		# TODO: replace this with more precise numerical methods
-		'''for i in range(lenV):
-			if hyperRectangle[i][0] < 0 and abs(hyperRectangle[i][0]) < 1e-7:
-				hyperRectangle[i][0] = -hyperBound
-			if hyperRectangle[i][0] > 0 and abs(hyperRectangle[i][0]) < 1e-7:
-				hyperRectangle[i][0] = 0.0
-			if hyperRectangle[i][1] < 0 and abs(hyperRectangle[i][1]) < 1e-7:
-				hyperRectangle[i][1] = 0.0
-			if hyperRectangle[i][1] > 0 and abs(hyperRectangle[i][1]) < 1e-7:
-				hyperRectangle[i][1] = hyperBound'''
-
 		print "hyperRectangle "
 		print hyperRectangle
 		kResult = intervalUtils.checkExistenceOfSolutionGS(a,params[0],params[1],hyperRectangle.transpose(), oscNum, getJacobian, getJacobianInterval)
@@ -326,17 +315,6 @@ def ifFeasibleHyper(a,params,xs,ys,zs,hyperRectangle, hyperBound):
 				feasible = False
 				break
 			else:
-				if minSol["status"] == "optimal":
-					newHyperRectangle[i,0] = minSol['x'][variableDict[xs[i]]]
-				if maxSol["status"] == "optimal":
-					newHyperRectangle[i,1] = maxSol['x'][variableDict[xs[i]]]
-			
-			#if infeasible
-			if (minSol["status"] == "primal infeasible" or maxSol["status"] == "primal infeasible"):
-				feasible = False
-				break
-			else:
-				# if optimal
 				if minSol["status"] == "optimal":
 					newHyperRectangle[i,0] = minSol['x'][variableDict[xs[i]]] - 1e-6
 				if maxSol["status"] == "optimal":
@@ -437,8 +415,12 @@ def refineHyper(a, params, xs, ys, zs, ordering, boundMap, maxHyperBound):
 	hyperRectangle = np.zeros((lenV,2))
 	excludingRegConstraint = ""
 	for i in range(lenV):
-		hyperRectangle[i][0] = boundMap[i][ordering[i]][0]
-		hyperRectangle[i][1] = boundMap[i][ordering[i]][1]
+		if ordering[i] is not None:
+			hyperRectangle[i][0] = boundMap[i][ordering[i]][0]
+			hyperRectangle[i][1] = boundMap[i][ordering[i]][1]
+		else:
+			hyperRectangle[i][0] = boundMap[i][0][0]
+			hyperRectangle[i][1] = boundMap[i][1][1]
 	finalHyper = []
 	count = 0
 	volumes = []
@@ -495,8 +477,8 @@ def findExcludingBound(a,params,xs,ys,zs,ordering,boundMap, maxDiff = 0.2):
 	soln = intervalUtils.newton(a,params,soln,oscNum,getJacobian)
 	diff = maxDiff
 	while True:
-		hyperRectangle[:,0] = soln - diff
-		hyperRectangle[:,1] = soln + diff
+		hyperRectangle[:,0] = soln[1] - diff
+		hyperRectangle[:,1] = soln[1] + diff
 		kResult = intervalUtils.checkExistenceOfSolutionGS(a,params[0],params[1],hyperRectangle.transpose(), oscNum, getJacobian, getJacobianInterval)
 		if kResult[0] == False and kResult[1] is not None:
 			diff = diff/2.0;
@@ -552,6 +534,9 @@ def rambusOscillator(a, numStages):
 	maxBoundMap = 1
 	rootCombinationNodes = intervalUtils.combinationWithTrees(lenV,[minBoundMap,maxBoundMap],indexChoiceArray)
 	hyperBound = excludingBound
+	'''bisectionHypers = refineHyper(a, params, xs, ys, zs, [None, None, None, None], boundMap, hyperBound)
+	print "bisectionHypers"
+	print bisectionHypers'''
 	# Shows that feasible which is correct
 	'''hyperRectangle = np.zeros((lenV,2))
 	hyperRectangle[0,:] = [ 0.0999, 0.59705205]
@@ -614,16 +599,16 @@ def rambusOscillator(a, numStages):
 		finalSoln = intervalUtils.newton(a,params,exampleSoln, oscNum, getJacobian)
 		#print "exampleSoln ", exampleSoln
 		#print "finalSoln ", finalSoln
-		stable = determineStability(a,params,finalSoln)
+		stable = determineStability(a,params,finalSoln[1])
 		if stable:
-			stableSols.append(finalSoln)
+			stableSols.append(finalSoln[1])
 		else:
-			unstableSols.append(finalSoln)
-		allSols.append(finalSoln)
+			unstableSols.append(finalSoln[1])
+		allSols.append(finalSoln[1])
 		
 		# Classify the solutions into equivalence classes
 		if len(sampleSols) == 0:
-			sampleSols.append(finalSoln)
+			sampleSols.append(finalSoln[1])
 			rotatedSols[0] = []
 		else:
 			foundSample = False
@@ -631,10 +616,10 @@ def rambusOscillator(a, numStages):
 				sample = sampleSols[si]
 				for ii in range(lenV):
 					if abs(finalSoln[0] - sample[ii]) < 1e-8:
-						rotatedSample = np.zeros_like(finalSoln)
+						rotatedSample = np.zeros_like(finalSoln[1])
 						for ri in range(lenV):
 							rotatedSample[ri] = sample[(ii+ri)%lenV]
-						if np.less_equal(np.absolute(rotatedSample - finalSoln), np.ones((lenV))*1e-8 ).all():
+						if np.less_equal(np.absolute(rotatedSample - finalSoln[1]), np.ones((lenV))*1e-8 ).all():
 							foundSample = True
 							rotatedSols[si].append(ii)
 							break
@@ -642,7 +627,7 @@ def rambusOscillator(a, numStages):
 					break
 
 			if foundSample == False:
-				sampleSols.append(finalSoln)
+				sampleSols.append(finalSoln[1])
 				rotatedSols[len(sampleSols)-1] = []
 
 	for hi in range(len(sampleSols)):
@@ -685,5 +670,5 @@ triangleConstraint2 = triangleBounds(-5.0,"x1","y1",0.0,0.5)
 print objConstraint + triangleConstraint1 + triangleConstraint2
 variableDict, A, B = constructCoeffMatrices(triangleConstraint1 + triangleConstraint2)
 C = constructObjMatrix(objConstraint,variableDict)'''
-rambusOscillator(-5.0,8)
+rambusOscillator(-5.0,6)
 

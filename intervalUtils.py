@@ -157,7 +157,9 @@ def newton(a,params,soln, oscNum, jacobian):
 		h = np.linalg.solve(jac,res)
 		soln = soln + h
 		count+=1
-	return soln
+	if count >= maxIter and np.linalg.norm(h) > 1e-8:
+		return(False, soln)
+	return (True,soln)
 
 '''
 Check existence of solution within a certain hyperRectangle
@@ -274,16 +276,17 @@ def checkExistenceOfSolutionGS(a,g_fwd,g_cc,hyperRectangle, oscNum, jacobian, ja
 				print "soln ", soln
 				# the new hyper must contain the solution in the middle and enclose old hyper
 				# and then we check for uniqueness of solution in the newer bigger hyperrectangle
-				for si in range(numVolts):
-					maxDiff = max(abs(gsIntersect[si,1] - soln[si]), abs(soln[si] - gsIntersect[si,0]))
-					print "maxDiff", maxDiff
-					if maxDiff < 1e-6:
-						maxDiff = 1e-6
-					#print "maxDiff ", maxDiff
-					gsIntersect[si,0] = soln[si] - maxDiff
-					gsIntersect[si,1] = soln[si] + maxDiff
-				print "bigger hyper ", gsIntersect
-				startBounds = gsIntersect
+				if soln[0]:
+					for si in range(numVolts):
+						maxDiff = max(abs(gsIntersect[si,1] - soln[1][si]), abs(soln[1][si] - gsIntersect[si,0]))
+						print "maxDiff", maxDiff
+						if maxDiff < 1e-6:
+							maxDiff = 1e-6
+						#print "maxDiff ", maxDiff
+						gsIntersect[si,0] = soln[1][si] - maxDiff
+						gsIntersect[si,1] = soln[1][si] + maxDiff
+					print "bigger hyper ", gsIntersect
+					startBounds = gsIntersect
 					
 			else:
 				return (False,gsIntersect)

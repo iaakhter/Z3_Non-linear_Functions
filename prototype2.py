@@ -1,224 +1,13 @@
-from cvxopt import matrix,solvers
 import numpy as np
 import matplotlib.pyplot as plt
 import time
 import copy
-import lpUtils
 import intervalUtils
-
-'''
-takes in non-symbolic python values
-calculates the tanhFun of val
-'''
-def tanhFun(a,val):
-	return np.tanh(a*val)
-	#return -(exp(a*val) - exp(-a*val))/(exp(a*val) + exp(-a*val))
-
-'''
-takes in non-symbolic python values
-calculates the derivative of tanhFun of val
-'''
-def tanhFunder(a,val):
-	den = np.cosh(a*val)*np.cosh(a*val)
-	#print "den ", den
-	return a/den
+import tanhModel
 
 
-'''
-when Vlow < 0 and Vhigh > 0, take the convex hull of 
-two triangles (one formed on the left side and one on the
-	right side)
-'''
-def triangleConvexHullBounds(a, Vin, Vout, Vlow, Vhigh):
-	if (Vlow >= 0 and Vhigh >= 0) or (Vlow <= 0 and Vhigh <= 0):
-		print "Vlow and Vhigh are in the same quadrants"
-		return
-	VZero = 0.0
-	tanhFunVlow = tanhFun(a,Vlow)
-	tanhFunVhigh = tanhFun(a,Vhigh)
-	tanhFunVZero = tanhFun(a,VZero)
-	dLow = tanhFunder(a,Vlow)
-	dHigh = tanhFunder(a,Vhigh)
-	dZero = tanhFunder(a,0)
-	cLow = tanhFunVlow - dLow*Vlow
-	cHigh = tanhFunVhigh - dHigh*Vhigh
-	cZero = tanhFunVZero - dZero*0
-
-	#print "dHigh ", dHigh, " cHigh ", cHigh
-
-	if abs(dLow - dZero) < 1e-8:
-		leftIntersectX = Vlow
-		leftIntersectY = tanhFunVlow
-	else:
-		leftIntersectX = (cZero - cLow)/(dLow - dZero)
-		leftIntersectY = dLow*leftIntersectX + cLow
-	#print "dLow, ", dLow, "dZero", dZero
-	#print "leftIntersectX ", leftIntersectX, " leftIntersectY ", leftIntersectY
-	#print "Vlow ", Vlow, "Vhigh ", Vhigh
-	if abs(dHigh - dZero) < 1e-8:
-		rightIntersectX = Vhigh
-		rightIntersectY = tanhFunVhigh
-	else:
-		rightIntersectX = (cZero - cHigh)/(dHigh - dZero)
-		rightIntersectY = dHigh*rightIntersectX + cHigh
-
-	overallConstraint = "1 " + Vin + " >= " + str(Vlow) + "\n"
-	overallConstraint += "1 " + Vin + " <= " + str(Vhigh) + "\n"
-
-	# Construct constraints from the convex hull of (Vlow, tanhFunVlow),
-	# (leftIntersectX, leftIntersectY), (0,0), (rightIntersectX, rightIntersectY),
-	# and (Vhigh, tanhFunVhigh)
-	# Use jarvis algorithm from https://www.geeksforgeeks.org/convex-hull-set-1-jarviss-algorithm-or-wrapping/
-	origPoints = [(Vlow, tanhFunVlow),(leftIntersectX, leftIntersectY),
-				(0,0),(rightIntersectX, rightIntersectY), (Vhigh, tanhFunVhigh)]
-	points = []
-	for point in origPoints:
-		if point not in points:
-			points.append(point)
-	#print "points"
-	#print points
-	leftMostIndex = 0
-	convexHullIndices = []
-	nextIndex = leftMostIndex
-	iters = 0
-	while(iters == 0 or nextIndex != leftMostIndex):
-		convexHullIndices.append(nextIndex)
-		otherIndex = (nextIndex + 1)%len(points)
-		for i in range(len(points)):
-			orientation = ((points[i][1] - points[nextIndex][1]) * (points[otherIndex][0] - points[i][0]) - 
-				(points[i][0] - points[nextIndex][0]) * (points[otherIndex][1] - points[i][1]))
-			if orientation < 0:
-				otherIndex = i
-		nextIndex = otherIndex
-		iters += 1
-
-	#print "convexHull", convexHullIndices
-	for ci in range(len(convexHullIndices)):
-		i = convexHullIndices[ci]
-		ii = convexHullIndices[(ci + 1)%len(convexHullIndices)]
-		grad = (points[ii][1] - points[i][1])/(points[ii][0] - points[i][0])
-		c = points[i][1] - grad*points[i][0]
-		if points[i] == (Vlow, tanhFunVlow) and points[ii] == (rightIntersectX, rightIntersectY):
-			overallConstraint += "1 "+Vout + " + " +str(-grad) + " " + Vin + " >= "+str(c) + "\n"
-		elif points[i] == (rightIntersectX, rightIntersectY) and points[ii] == (Vhigh, tanhFunVhigh):
-			overallConstraint += "1 "+Vout + " + " +str(-grad) + " " + Vin + " >= "+str(c) + "\n"
-		elif points[i] == (Vhigh, tanhFunVhigh) and points[ii] == (leftIntersectX, leftIntersectY):
-			overallConstraint += "1 "+Vout + " + " +str(-grad) + " " + Vin + " <= "+str(c) + "\n"
-		elif points[i] == (leftIntersectX, leftIntersectY) and points[ii] == (Vlow, tanhFunVlow):
-			#print "grad", grad, "c", c
-			#print "dLow", dLow, "cLow", cLow
-			overallConstraint += "1 "+Vout + " + " +str(-grad) + " " + Vin + " <= "+str(c) + "\n"
-
-		elif points[i] == (Vhigh, tanhFunVhigh) and points[ii] == (Vlow, tanhFunVlow):
-			overallConstraint += "1 "+Vout + " + " +str(-grad) + " " + Vin + " <= "+str(c) + "\n"
-
-		elif points[i] == (Vlow, tanhFunVlow) and points[ii] == (Vhigh, tanhFunVhigh):
-			#print "coming here?"
-			overallConstraint += "1 "+Vout + " + " +str(-grad) + " " + Vin + " >= "+str(c) + "\n"
-
-	#print "overallConstraint", overallConstraint
-	return overallConstraint
-
-
-def triangleBounds(a, Vin, Vout, Vlow, Vhigh):
-	tanhFunVlow = tanhFun(a,Vlow)
-	tanhFunVhigh = tanhFun(a,Vhigh)
-	dLow = tanhFunder(a,Vlow)
-	dHigh = tanhFunder(a,Vhigh)
-	diff = Vhigh - Vlow
-	if(diff == 0):
-		diff = 1e-10
-	dThird = (tanhFunVhigh - tanhFunVlow)/diff
-	cLow = tanhFunVlow - dLow*Vlow
-	cHigh = tanhFunVhigh - dHigh*Vhigh
-	cThird = tanhFunVlow - dThird*Vlow
-
-	overallConstraint = "1 " + Vin + " >= " + str(Vlow) + "\n"
-	overallConstraint += "1 " + Vin + " <= " + str(Vhigh) + "\n"
-
-	#print "dLow ", dLow, "dHigh ", dHigh, "dThird ", dThird
-	#print "cLow ", cLow, "cHigh ", cHigh, "cThird ", 
-
-	#print "a ", a, " Vlow ", Vlow, " Vhigh ", Vhigh
-
-	if a > 0:
-		if Vlow >= 0 and Vhigh >=0:
-			return overallConstraint + "1 "+ Vout + " + " +str(-dThird) + " " + Vin + " >= "+str(cThird)+"\n" +\
-			"1 "+Vout + " + " +str(-dLow) + " " + Vin + " <= "+str(cLow)+"\n" +\
-			"1 "+Vout + " + " +str(-dHigh) + " " + Vin + " <= "+str(cHigh) + "\n"
-
-		elif Vlow <=0 and Vhigh <=0:
-			return overallConstraint + "1 "+ Vout + " + " +str(-dThird) + " " + Vin + " <= "+str(cThird)+"\n" +\
-			"1 "+Vout + " + " +str(-dLow) + " " + Vin + " >= "+str(cLow)+"\n" +\
-			"1 "+Vout + " + " +str(-dHigh) + " " + Vin + " >= "+str(cHigh) + "\n"
-
-	elif a < 0:
-		if Vlow <= 0 and Vhigh <=0:
-			return overallConstraint + "1 "+Vout + " + " +str(-dThird) + " " + Vin + " >= "+str(cThird)+"\n" +\
-			"1 "+Vout + " + " +str(-dLow) + " " + Vin + " <= "+str(cLow)+"\n" +\
-			"1 "+Vout + " + " +str(-dHigh) + " " + Vin + " <= "+str(cHigh) + "\n"
-		elif Vlow >=0 and Vhigh >=0:
-			return overallConstraint + "1 "+Vout + " + " +str(-dThird) + " " + Vin + " <= "+str(cThird)+"\n" +\
-			"1 "+Vout + " + " +str(-dLow) + " " + Vin + " >= "+str(cLow)+"\n" +\
-			"1 "+Vout + " + " +str(-dHigh) + " " + Vin + " >= "+str(cHigh) + "\n"
-			
-def oscNum(V,a,g_cc,g_fwd = 1):
-	lenV = len(V)
-	Vin = [V[i % lenV] for i in range(-1,lenV-1)]
-	Vcc = [V[(i + lenV/2) % lenV] for i in range(lenV)]
-	VoutFwd = [tanhFun(a,Vin[i]) for i in range(lenV)]
-	VoutCc = [tanhFun(a,Vcc[i]) for i in range(lenV)]
-	return (VoutFwd, VoutCc, [((tanhFun(a,Vin[i])-V[i])*g_fwd
-			+(tanhFun(a,Vcc[i])-V[i])*g_cc) for i in range(lenV)])
-
-
-'''Get jacobian of rambus oscillator at V
-'''
-def getJacobian(V,a,g_cc,g_fwd = 1):
-	lenV = len(V)
-	Vin = [V[i % lenV] for i in range(-1,lenV-1)]
-	Vcc = [V[(i + lenV/2) % lenV] for i in range(lenV)]
-	jacobian = np.zeros((lenV, lenV))
-	for i in range(lenV):
-		jacobian[i,i] = -(g_fwd+g_cc)
-		jacobian[i,(i-1)%lenV] = g_fwd*tanhFunder(a,V[(i-1)%lenV])
-		jacobian[i,(i + lenV/2) % lenV] = g_cc*tanhFunder(a,V[(i + lenV/2) % lenV])
-
-	return jacobian
-
-def getJacobianInterval(bounds,a,g_cc,g_fwd=1):
-	lowerBound = bounds[:,0]
-	upperBound = bounds[:,1]
-	lenV = len(lowerBound)
-	jacobian = np.zeros((lenV, lenV,2))
-	jacobian[:,:,0] = jacobian[:,:,0] 
-	jacobian[:,:,1] = jacobian[:,:,1]
-	zerofwd =  g_fwd*tanhFunder(a,0)
-	zerocc = g_cc*tanhFunder(a,0)
-	for i in range(lenV):
-		jacobian[i,i,0] = -(g_fwd+g_cc)
-		jacobian[i,i,1] = -(g_fwd+g_cc)
-		gfwdVal1 = g_fwd*tanhFunder(a,lowerBound[(i-1)%lenV])
-		gfwdVal2 = g_fwd*tanhFunder(a,upperBound[(i-1)%lenV])
-		if lowerBound[(i-1)%lenV] < 0 and upperBound[(i-1)%lenV] > 0:
-			jacobian[i,(i-1)%lenV,0] = min(gfwdVal1,gfwdVal2,zerofwd)
-			jacobian[i,(i-1)%lenV,1] = max(gfwdVal1,gfwdVal2,zerofwd)
-		else:
-			jacobian[i,(i-1)%lenV,0] = min(gfwdVal1,gfwdVal2)
-			jacobian[i,(i-1)%lenV,1] = max(gfwdVal1,gfwdVal2)
-		gccVal1 = g_cc*tanhFunder(a,lowerBound[(i + lenV/2) % lenV])
-		gccVal2 = g_cc*tanhFunder(a,upperBound[(i + lenV/2) % lenV])
-		if lowerBound[(i + lenV/2) % lenV] < 0 and upperBound[(i + lenV/2) % lenV] > 0:
-			jacobian[i,(i + lenV/2) % lenV,0] = min(gccVal1,gccVal2,zerocc)
-			jacobian[i,(i + lenV/2) % lenV,1] = max(gccVal1,gccVal2,zerocc)
-		else:
-			jacobian[i,(i + lenV/2) % lenV,0] = min(gccVal1,gccVal2)
-			jacobian[i,(i + lenV/2) % lenV,1] = max(gccVal1,gccVal2)
-	return jacobian
-
-
-def ifFeasibleOrdering(a,params,xs,ys,zs,ordering,boundMap, hyperBound):
-	lenV = len(xs)
+def ifFeasibleOrdering(ordering,boundMap, hyperBound, model):
+	lenV = model.numStages*2
 	#print "ordering ", ordering
 	hyperRectangle = np.zeros((lenV,2))
 	for i in range(lenV):
@@ -228,7 +17,7 @@ def ifFeasibleOrdering(a,params,xs,ys,zs,ordering,boundMap, hyperBound):
 		else:
 			hyperRectangle[i][0] = boundMap[i][0][0]
 			hyperRectangle[i][1] = boundMap[i][1][1]
-	return ifFeasibleHyper(a,params,xs,ys,zs,hyperRectangle,hyperBound)
+	return ifFeasibleHyper(hyperRectangle,hyperBound,model)
 
 
 
@@ -249,16 +38,15 @@ solution.
 	xs[0] must be in the range [-1.0,0.1], xs[1] must be in the range [0.1,1.0]
 	and so on.
 '''
-def ifFeasibleHyper(a,params,xs,ys,zs,hyperRectangle, hyperBound):
-	solvers.options["show_progress"] = False
-	lenV = len(xs)
+def ifFeasibleHyper(hyperRectangle, hyperBound,model):
+	lenV = model.numStages*2
 	print "hyperRectangle"
 	print hyperRectangle
 	iterNum = 0
 	while True:
 		print "hyperRectangle "
 		print hyperRectangle
-		kResult = intervalUtils.checkExistenceOfSolutionGS(a,params[0],params[1],hyperRectangle.transpose(), oscNum, getJacobian, getJacobianInterval)
+		kResult = intervalUtils.checkExistenceOfSolutionGS(model,hyperRectangle.transpose())
 		if kResult[0]:
 			#print "LP feasible ", newHyperRectangle
 			return (True, kResult[1])
@@ -268,58 +56,8 @@ def ifFeasibleHyper(a,params,xs,ys,zs,hyperRectangle, hyperBound):
 			return (False, None)
 		#print "kResult"
 		#print kResult
-		allConstraints = ""
-		for i in range(lenV):
-			fwdInd = (i-1)%lenV
-			ccInd = (i+lenV/2)%lenV
-			#print "fwdInd ", fwdInd, " ccInd ", ccInd
-			#print "hyperRectangle[fwdInd][0]", hyperRectangle[fwdInd][0], "hyperRectangle[fwdInd][1]", hyperRectangle[fwdInd][1]
-			triangleClaimFwd = ""
-			if hyperRectangle[fwdInd,0] < 0 and hyperRectangle[fwdInd,1] > 0:
-				triangleClaimFwd += triangleConvexHullBounds(a,xs[fwdInd],ys[i],hyperRectangle[fwdInd,0],hyperRectangle[fwdInd,1])
-			else:
-				triangleClaimFwd += triangleBounds(a,xs[fwdInd],ys[i],hyperRectangle[fwdInd,0],hyperRectangle[fwdInd,1])
-			allConstraints += triangleClaimFwd
-
-			triangleClaimCc = ""
-			if hyperRectangle[ccInd,0] < 0 and hyperRectangle[ccInd,1] > 0:
-				triangleClaimCc += triangleConvexHullBounds(a,xs[ccInd],zs[i],hyperRectangle[ccInd,0],hyperRectangle[ccInd,1])
-			else:
-				triangleClaimCc += triangleBounds(a,xs[ccInd],zs[i],hyperRectangle[ccInd,0],hyperRectangle[ccInd,1])
-			allConstraints += triangleClaimCc
-				
-			allConstraints += str(params[0]) + " " + ys[i] + " + " + str(-params[0]-params[1]) + \
-			" " + xs[i] + " + " + str(params[1]) + " "  + zs[i] + " >= 0.0\n"
-			allConstraints += str(params[0]) + " " + ys[i] + " + " + str(-params[0]-params[1]) + \
-			" " + xs[i] + " + " + str(params[1]) + " "  + zs[i] + " <= 0.0\n"
-
-		'''allConstraintList = allConstraints.splitlines()
-		allConstraints = ""
-		for i in range(len(allConstraintList)):
-			allConstraints += allConstraintList[i] + "\n"
-		print "numConstraints ", len(allConstraintList)
-		print "allConstraints"
-		print allConstraints'''
-		variableDict, A, B = lpUtils.constructCoeffMatrices(allConstraints)
-		newHyperRectangle = copy.deepcopy(hyperRectangle)
-		feasible = True
-		for i in range(lenV):
-			#print "min max ", i
-			minObjConstraint = "min 1 " + xs[i]
-			maxObjConstraint = "max 1 " + xs[i]
-			Cmin = lpUtils.constructObjMatrix(minObjConstraint,variableDict)
-			Cmax = lpUtils.constructObjMatrix(maxObjConstraint,variableDict)
-			minSol = solvers.lp(Cmin,A,B)
-			maxSol = solvers.lp(Cmax,A,B)
-			if (minSol["status"] == "primal infeasible" or minSol["status"] == "dual infeasible")  and (maxSol["status"] == "primal infeasible" or maxSol["status"] == "dual infeasible"):
-				feasible = False
-				break
-			else:
-				if minSol["status"] == "optimal":
-					newHyperRectangle[i,0] = minSol['x'][variableDict[xs[i]]] - 1e-6
-				if maxSol["status"] == "optimal":
-					newHyperRectangle[i,1] = maxSol['x'][variableDict[xs[i]]] + 1e-6
-
+		feasible, newHyperRectangle = model.linearConstraints(hyperRectangle)
+	
 		print "newHyperRectangle ", newHyperRectangle
 		if feasible == False:
 			print "LP not feasible"
@@ -358,13 +96,14 @@ infeasible.
 	For -1.0 <= xs[0] <= -0.1 and 0.1 <= xs[1] <= 1.0 and so on, the problem
 	has a feasible solution 
 '''
-def getFeasibleIntervalIndices(rootCombinationNode,a,params,xs,ys,zs,boundMap,hyperBound, excludingBound,refinedHypers):
+def getFeasibleIntervalIndices(rootCombinationNode,boundMap,hyperBound, excludingBound,model,refinedHypers):
+
 	intervalIndices = rootCombinationNode.rootArray
 	print "intervalIndices", intervalIndices
 	print "boundMap", boundMap
 	lenV = len(intervalIndices)
 	
-	feasibility = ifFeasibleOrdering(a,params,xs,ys,zs,intervalIndices,boundMap,hyperBound)
+	feasibility = ifFeasibleOrdering(intervalIndices, boundMap, hyperBound,model)
 	print "feasibility"
 	print feasibility
 	if feasibility[0]:
@@ -400,7 +139,7 @@ def getFeasibleIntervalIndices(rootCombinationNode,a,params,xs,ys,zs,boundMap,hy
 			break
 	print "indexOfNone ", indexOfNone
 	if indexOfNone is None:
-		bisectionHypers = refineHyper(a, params, xs, ys, zs, intervalIndices, newBoundMap, hyperBound)
+		bisectionHypers = refineHyper(intervalIndices, newBoundMap, hyperBound, model)
 		print "bisectionHypers"
 		print bisectionHypers
 		print "len(refinedHypers) before ", len(refinedHypers)
@@ -408,10 +147,11 @@ def getFeasibleIntervalIndices(rootCombinationNode,a,params,xs,ys,zs,boundMap,hy
 			refinedHypers.append(hyper)
 		print "len(refinedHypers) after ", len(refinedHypers)
 	for i in range(len(rootCombinationNode.children)):
-		getFeasibleIntervalIndices(rootCombinationNode.children[i],a,params,xs,ys,zs,newBoundMap,hyperBound,excludingBound,refinedHypers)
+		getFeasibleIntervalIndices(rootCombinationNode.children[i],
+			newBoundMap, hyperBound, excludingBound, model, refinedHypers)
 
-def refineHyper(a, params, xs, ys, zs, ordering, boundMap, maxHyperBound):
-	lenV = len(xs)
+def refineHyper(ordering, boundMap, maxHyperBound, model):
+	lenV = model.numStages*2
 	hyperRectangle = np.zeros((lenV,2))
 	excludingRegConstraint = ""
 	for i in range(lenV):
@@ -426,12 +166,12 @@ def refineHyper(a, params, xs, ys, zs, ordering, boundMap, maxHyperBound):
 	volumes = []
 
 	print "before bisecting num ", len(finalHyper)
-	bisectHyper(a,params,xs,ys,zs,maxHyperBound,hyperRectangle,0,finalHyper)
+	bisectHyper(maxHyperBound, hyperRectangle, 0,model, finalHyper)
 	print "after bisecting num ", len(finalHyper)
 
 	return finalHyper
 
-def bisectHyper(a,params,xs,ys,zs,hyperBound,hyperRectangle,bisectingIndex, finalHypers):
+def bisectHyper(hyperBound,hyperRectangle,bisectingIndex, model,finalHypers):
 	#print "hyperRectangle"
 	#print hyperRectangle
 	lenV = hyperRectangle.shape[0]
@@ -448,8 +188,8 @@ def bisectHyper(a,params,xs,ys,zs,hyperBound,hyperRectangle,bisectingIndex, fina
 	print leftHyper
 	print "rightHyper"
 	print rightHyper
-	feasLeft = ifFeasibleHyper(a,params,xs,ys,zs,leftHyper, hyperBound)
-	feasRight = ifFeasibleHyper(a,params,xs,ys,zs,rightHyper, hyperBound)
+	feasLeft = ifFeasibleHyper(leftHyper, hyperBound, model)
+	feasRight = ifFeasibleHyper(rightHyper, hyperBound, model)
 	print "feasLeft"
 	print feasLeft
 	print "feasRight"
@@ -458,28 +198,28 @@ def bisectHyper(a,params,xs,ys,zs,hyperBound,hyperRectangle,bisectingIndex, fina
 	if feasLeft[0]:
 		finalHypers.append(feasLeft[1])
 	if feasLeft[0] == False and feasLeft[1] is not None:
-		bisectHyper(a,params,xs,ys,zs,hyperBound,feasLeft[1],bisectingIndex+1,finalHypers)
+		bisectHyper(hyperBound,feasLeft[1],bisectingIndex+1,model,finalHypers)
 
 	
 	if feasRight[0]:
 		finalHypers.append(feasRight[1])
 	if feasRight[0] == False and feasRight[1] is not None:
-		bisectHyper(a,params,xs,ys,zs,hyperBound,feasRight[1],bisectingIndex+1,finalHypers)
+		bisectHyper(hyperBound,feasRight[1],bisectingIndex+1,model,finalHypers)
 
-def findExcludingBound(a,params,xs,ys,zs,ordering,boundMap, maxDiff = 0.2):
-	lenV = len(xs)
+def findExcludingBound(ordering,boundMap, model, maxDiff = 0.2):
+	lenV = model.numStages*2
 	hyperRectangle = np.zeros((lenV,2))
 	hyperBound = 0.001
 	for i in range(lenV):
 		hyperRectangle[i][0] = boundMap[i][ordering[i]][0]
 		hyperRectangle[i][1] = boundMap[i][ordering[i]][1]
 	soln = hyperRectangle[:,0] + (hyperRectangle[:,1] - hyperRectangle[:,0])*0.75;
-	soln = intervalUtils.newton(a,params,soln,oscNum,getJacobian)
+	soln = intervalUtils.newton(model,soln)
 	diff = maxDiff
 	while True:
 		hyperRectangle[:,0] = soln[1] - diff
 		hyperRectangle[:,1] = soln[1] + diff
-		kResult = intervalUtils.checkExistenceOfSolutionGS(a,params[0],params[1],hyperRectangle.transpose(), oscNum, getJacobian, getJacobianInterval)
+		kResult = intervalUtils.checkExistenceOfSolutionGS(model,hyperRectangle.transpose())
 		if kResult[0] == False and kResult[1] is not None:
 			diff = diff/2.0;
 		else:
@@ -492,8 +232,8 @@ def findExcludingBound(a,params,xs,ys,zs,ordering,boundMap, maxDiff = 0.2):
 '''
 Return true if stable and false otherwise
 '''
-def determineStability(a,params,equilibrium):
-	jac = getJacobian(equilibrium,a,params[1],params[0])
+def determineStability(equilibrium,model):
+	jac = model.jacobian(equilibrium)
 	eigVals,_ = np.linalg.eig(jac)
 	maxEig = np.amax(eigVals.real)
 	if maxEig > 0:
@@ -501,20 +241,15 @@ def determineStability(a,params,equilibrium):
 	return True
 
 def rambusOscillator(a, numStages):
+	model = tanhModel.TanhModel(modelParam = a, g_cc = 4.0, g_fwd = 1.0, numStages=numStages)
+
 	startExp = time.time()
-	params = [1.0,4.0]
 	lenV = numStages*2
-	xs = []
-	ys = []
-	zs = []
 	exampleOrdering = []
 	indexChoiceArray = []
 	firstIndex = numStages - 1
 	secondIndex = numStages*2 - 1
 	for i in range(lenV):
-		xs.append("x" + str(i))
-		ys.append("y" + str(i))
-		zs.append("z" + str(i))
 		exampleOrdering.append(0)
 		#indexChoiceArray.append(i)
 		if i%2 == 0:
@@ -528,7 +263,7 @@ def rambusOscillator(a, numStages):
 	boundMap = []
 	for i in range(lenV):
 		boundMap.append({0:[-1.0,0.0],1:[0.0,1.0]})
-	excludingBound = findExcludingBound(a,params,xs,ys,zs,exampleOrdering,boundMap)
+	excludingBound = findExcludingBound(exampleOrdering,boundMap,model)
 	print "boundMap ", boundMap
 	minBoundMap = 0
 	maxBoundMap = 1
@@ -585,7 +320,7 @@ def rambusOscillator(a, numStages):
 	print "finalSoln ", finalSoln'''
 	allHypers = []
 	for i in range(len(rootCombinationNodes)):
-		getFeasibleIntervalIndices(rootCombinationNodes[i],a,params,xs,ys,zs,boundMap,hyperBound, excludingBound,allHypers)
+		getFeasibleIntervalIndices(rootCombinationNodes[i],boundMap,hyperBound, excludingBound,model,allHypers)
 	
 	print "allHypers"
 	print allHypers
@@ -596,10 +331,10 @@ def rambusOscillator(a, numStages):
 	allSols = []
 	for hyper in allHypers:
 		exampleSoln = (hyper[:,0] + hyper[:,1])/2.0
-		finalSoln = intervalUtils.newton(a,params,exampleSoln, oscNum, getJacobian)
+		finalSoln = intervalUtils.newton(model,exampleSoln)
 		#print "exampleSoln ", exampleSoln
 		#print "finalSoln ", finalSoln
-		stable = determineStability(a,params,finalSoln[1])
+		stable = determineStability(finalSoln[1],model)
 		if stable:
 			stableSols.append(finalSoln[1])
 		else:
@@ -670,5 +405,5 @@ triangleConstraint2 = triangleBounds(-5.0,"x1","y1",0.0,0.5)
 print objConstraint + triangleConstraint1 + triangleConstraint2
 variableDict, A, B = constructCoeffMatrices(triangleConstraint1 + triangleConstraint2)
 C = constructObjMatrix(objConstraint,variableDict)'''
-rambusOscillator(-5.0,6)
+rambusOscillator(-5.0,4)
 

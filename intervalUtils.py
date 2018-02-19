@@ -146,14 +146,14 @@ def multiplyIntervalMatWithIntervalVec(mat,vec):
 		result[i,1] = intervalVal[1]
 	return result
 
-def newton(a,params,soln, oscNum, jacobian):
+def newton(model,soln):
 	h = soln
 	count = 0
 	maxIter = 100
 	while np.linalg.norm(h) > 1e-8 and count < maxIter:
-		_,_,res = oscNum(soln,a,params[1],params[0])
+		_,_,res = model.oscNum(soln)
 		res = -np.array(res)
-		jac = jacobian(soln,a,params[1],params[0])
+		jac = model.jacobian(soln)
 		h = np.linalg.solve(jac,res)
 		soln = soln + h
 		count+=1
@@ -165,7 +165,7 @@ def newton(a,params,soln, oscNum, jacobian):
 Check existence of solution within a certain hyperRectangle
 using the Gauss-Siedel operator
 '''
-def checkExistenceOfSolutionGS(a,g_fwd,g_cc,hyperRectangle, oscNum, jacobian, jacobianInterval):
+def checkExistenceOfSolutionGS(model,hyperRectangle):
 	numVolts = len(hyperRectangle[0])
 
 	startBounds = np.zeros((numVolts,2))
@@ -181,8 +181,8 @@ def checkExistenceOfSolutionGS(a,g_fwd,g_cc,hyperRectangle, oscNum, jacobian, ja
 		#midPoint = startBounds[:,0] + (startBounds[:,1] - startBounds[:,0])*0.25
 		#print "midPoint"
 		#print midPoint
-		_,_,IMidPoint = np.array(oscNum(midPoint,a,g_cc,g_fwd))
-		jacMidPoint = jacobian(midPoint,a,g_cc,g_fwd)
+		_,_,IMidPoint = np.array(model.oscNum(midPoint))
+		jacMidPoint = model.jacobian(midPoint)
 		#print "jacMidPoint"
 		#print jacMidPoint
 		C = np.linalg.inv(jacMidPoint)
@@ -193,7 +193,7 @@ def checkExistenceOfSolutionGS(a,g_fwd,g_cc,hyperRectangle, oscNum, jacobian, ja
 		#print "C ", C
 		I = np.identity(numVolts)
 
-		jacInterval = jacobianInterval(startBounds,a,g_cc,g_fwd)
+		jacInterval = model.jacobianInterval(startBounds)
 		#print "jacInterval"
 		#print jacInterval
 		#print "IMidPoint"
@@ -272,7 +272,7 @@ def checkExistenceOfSolutionGS(a,g_fwd,g_cc,hyperRectangle, oscNum, jacobian, ja
 				print gsIntersect
 				constructBiggerHyper = True
 				exampleVolt = (gsIntersect[:,0] + gsIntersect[:,1])/2.0
-				soln = newton(a,[g_fwd, g_cc],exampleVolt,oscNum,jacobian)
+				soln = newton(model,exampleVolt)
 				print "soln ", soln
 				# the new hyper must contain the solution in the middle and enclose old hyper
 				# and then we check for uniqueness of solution in the newer bigger hyperrectangle
@@ -298,7 +298,7 @@ def checkExistenceOfSolutionGS(a,g_fwd,g_cc,hyperRectangle, oscNum, jacobian, ja
 Check existence of solution within a certain hyperRectangle
 using the Krawczyk operator
 '''
-def checkExistenceOfSolution(a,g_fwd,g_cc,hyperRectangle, oscNum, jacobian, jacobianInterval):
+def checkExistenceOfSolution(model,hyperRectangle):
 	numVolts = len(hyperRectangle[0])
 
 	startBounds = np.zeros((numVolts,2))
@@ -314,8 +314,8 @@ def checkExistenceOfSolution(a,g_fwd,g_cc,hyperRectangle, oscNum, jacobian, jaco
 		#midPoint = startBounds[:,0] + (startBounds[:,1] - startBounds[:,0])*0.25
 		#print "midPoint"
 		#print midPoint
-		_,_,IMidPoint = np.array(oscNum(midPoint,a,g_cc,g_fwd))
-		jacMidPoint = jacobian(midPoint,a,g_cc,g_fwd)
+		_,_,IMidPoint = np.array(model.oscNum(midPoint))
+		jacMidPoint = model.jacobian(midPoint)
 		#print "jacMidPoint"
 		#print jacMidPoint
 		C = np.linalg.inv(jacMidPoint)
@@ -326,7 +326,7 @@ def checkExistenceOfSolution(a,g_fwd,g_cc,hyperRectangle, oscNum, jacobian, jaco
 		#print "C ", C
 		I = np.identity(numVolts)
 
-		jacInterval = jacobianInterval(startBounds,a,g_cc,g_fwd)
+		jacInterval = model.jacobianInterval(startBounds)
 		#print "jacInterval"
 		#print jacInterval
 		#print "IMidPoint"
@@ -403,7 +403,7 @@ def checkExistenceOfSolution(a,g_fwd,g_cc,hyperRectangle, oscNum, jacobian, jaco
 			if constructBiggerHyper == False and np.less_equal(intervalLength, np.ones((numVolts))*1e-10 ).any():
 				constructBiggerHyper = True
 				exampleVolt = (intersect[:,0] + intersect[:,1])/2.0
-				soln = newton(a,[g_fwd, g_cc],exampleVolt,oscNum,jacobian)
+				soln = model.newton(exampleVolt)
 				#print "soln ", soln
 				# the new hyper must contain the solution in the middle and enclose old hyper
 				# and then we check for uniqueness of solution in the newer bigger hyperrectangle

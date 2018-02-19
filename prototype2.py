@@ -96,7 +96,7 @@ infeasible.
 	For -1.0 <= xs[0] <= -0.1 and 0.1 <= xs[1] <= 1.0 and so on, the problem
 	has a feasible solution 
 '''
-def getFeasibleIntervalIndices(rootCombinationNode,boundMap,hyperBound, excludingBound,model,refinedHypers):
+def getFeasibleIntervalIndices(rootCombinationNode,boundMap,hyperBound, model,refinedHypers):
 
 	intervalIndices = rootCombinationNode.rootArray
 	print "intervalIndices", intervalIndices
@@ -122,10 +122,7 @@ def getFeasibleIntervalIndices(rootCombinationNode,boundMap,hyperBound, excludin
 		if intervalIndices[i] is None:
 			newBoundMap[i][0][0] = lowBound
 			newBoundMap[i][1][1] = upperBound
-			if lowBound < 0 and upperBound > 0 and upperBound > excludingBound:
-				newBoundMap[i][0][1] = excludingBound
-				newBoundMap[i][1][0] = excludingBound
-			else:
+			if lowBound < 0 and upperBound > 0:
 				newBoundMap[i][0][1] = (lowBound + upperBound)/2.0
 				newBoundMap[i][1][0] = (lowBound + upperBound)/2.0
 		else:
@@ -148,7 +145,7 @@ def getFeasibleIntervalIndices(rootCombinationNode,boundMap,hyperBound, excludin
 		print "len(refinedHypers) after ", len(refinedHypers)
 	for i in range(len(rootCombinationNode.children)):
 		getFeasibleIntervalIndices(rootCombinationNode.children[i],
-			newBoundMap, hyperBound, excludingBound, model, refinedHypers)
+			newBoundMap, hyperBound, model, refinedHypers)
 
 def refineHyper(ordering, boundMap, maxHyperBound, model):
 	lenV = model.numStages*2
@@ -245,12 +242,12 @@ def rambusOscillator(a, numStages):
 
 	startExp = time.time()
 	lenV = numStages*2
-	exampleOrdering = []
+	#exampleOrdering = []
 	indexChoiceArray = []
 	firstIndex = numStages - 1
 	secondIndex = numStages*2 - 1
 	for i in range(lenV):
-		exampleOrdering.append(0)
+		#exampleOrdering.append(0)
 		#indexChoiceArray.append(i)
 		if i%2 == 0:
 			indexChoiceArray.append(firstIndex)
@@ -263,12 +260,13 @@ def rambusOscillator(a, numStages):
 	boundMap = []
 	for i in range(lenV):
 		boundMap.append({0:[-1.0,0.0],1:[0.0,1.0]})
-	excludingBound = findExcludingBound(exampleOrdering,boundMap,model)
+	#excludingBound = findExcludingBound(exampleOrdering,boundMap,model)
+	#excludingBound = 0.1
 	print "boundMap ", boundMap
 	minBoundMap = 0
 	maxBoundMap = 1
 	rootCombinationNodes = intervalUtils.combinationWithTrees(lenV,[minBoundMap,maxBoundMap],indexChoiceArray)
-	hyperBound = excludingBound
+	hyperBound = 0.1
 	'''bisectionHypers = refineHyper(a, params, xs, ys, zs, [None, None, None, None], boundMap, hyperBound)
 	print "bisectionHypers"
 	print bisectionHypers'''
@@ -320,7 +318,7 @@ def rambusOscillator(a, numStages):
 	print "finalSoln ", finalSoln'''
 	allHypers = []
 	for i in range(len(rootCombinationNodes)):
-		getFeasibleIntervalIndices(rootCombinationNodes[i],boundMap,hyperBound, excludingBound,model,allHypers)
+		getFeasibleIntervalIndices(rootCombinationNodes[i],boundMap,hyperBound,model,allHypers)
 	
 	print "allHypers"
 	print allHypers
@@ -350,7 +348,7 @@ def rambusOscillator(a, numStages):
 			for si in range(len(sampleSols)):
 				sample = sampleSols[si]
 				for ii in range(lenV):
-					if abs(finalSoln[0] - sample[ii]) < 1e-8:
+					if abs(finalSoln[1][0] - sample[ii]) < 1e-8:
 						rotatedSample = np.zeros_like(finalSoln[1])
 						for ri in range(lenV):
 							rotatedSample[ri] = sample[(ii+ri)%lenV]
@@ -375,10 +373,12 @@ def rambusOscillator(a, numStages):
 		print ""
 
 	for hi in range(len(sampleSols)):
-		if len(rotatedSols[hi]) > lenV - 1:
+		if len(rotatedSols[hi]) > lenV - 1 or (len(rotatedSols[hi]) >= 1 and rotatedSols[hi][0] == 0):
 			print "problem equivalence class# ", hi
 			print "main member ", sampleSols[hi]
+			print "num other Solutions ", len(rotatedSols[hi])
 
+	print ""
 	print "numSolutions, ", len(allHypers)
 	print "num stable solutions ", len(stableSols)
 	'''for si in range(len(stableSols)):
@@ -405,5 +405,5 @@ triangleConstraint2 = triangleBounds(-5.0,"x1","y1",0.0,0.5)
 print objConstraint + triangleConstraint1 + triangleConstraint2
 variableDict, A, B = constructCoeffMatrices(triangleConstraint1 + triangleConstraint2)
 C = constructObjMatrix(objConstraint,variableDict)'''
-rambusOscillator(-5.0,4)
+rambusOscillator(-5.0,8)
 

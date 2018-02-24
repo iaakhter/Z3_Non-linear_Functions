@@ -4,6 +4,7 @@ import time
 import copy
 import intervalUtils
 import tanhModel
+import mosfetModel
 
 
 def ifFeasibleOrdering(ordering,boundMap, hyperBound, model):
@@ -238,8 +239,12 @@ def determineStability(equilibrium,model):
 	return True
 
 def rambusOscillator(a, numStages):
-	model = tanhModel.TanhModel(modelParam = a, g_cc = 4.0, g_fwd = 1.0, numStages=numStages)
-
+	#model = tanhModel.TanhModel(modelParam = a, g_cc = 4.0, g_fwd = 1.0, numStages=numStages)
+	
+	#modelParam = [Vtp, Vtn, Vdd, Kn, Sn]
+	modelParam = [-0.25, 0.25, 1.0, 1.0, 1.0]
+	model = mosfetModel.MosfetModel(modelParam = modelParam, g_cc = 0.5, g_fwd = 1.0, numStages = numStages)
+	
 	startExp = time.time()
 	lenV = numStages*2
 	#exampleOrdering = []
@@ -259,7 +264,8 @@ def rambusOscillator(a, numStages):
 	print "indexChoiceArray", indexChoiceArray
 	boundMap = []
 	for i in range(lenV):
-		boundMap.append({0:[-1.0,0.0],1:[0.0,1.0]})
+		#boundMap.append({0:[-1.0,0.0],1:[0.0,1.0]})
+		boundMap.append({0:[0.0,0.5],1:[0.5,1.0]})
 	#excludingBound = findExcludingBound(exampleOrdering,boundMap,model)
 	#excludingBound = 0.1
 	print "boundMap ", boundMap
@@ -405,5 +411,5 @@ triangleConstraint2 = triangleBounds(-5.0,"x1","y1",0.0,0.5)
 print objConstraint + triangleConstraint1 + triangleConstraint2
 variableDict, A, B = constructCoeffMatrices(triangleConstraint1 + triangleConstraint2)
 C = constructObjMatrix(objConstraint,variableDict)'''
-rambusOscillator(-5.0,8)
+rambusOscillator(-5.0,2)
 

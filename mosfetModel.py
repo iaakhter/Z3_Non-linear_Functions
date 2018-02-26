@@ -1,9 +1,8 @@
 import numpy as np
 import lpUtils
 from cvxopt import matrix,solvers
-from sympy import Plane, Point3D, Line3D, Line
-from sympy import Polygon, Point
 from scipy.spatial import ConvexHull
+from osgeo import ogr
 
 class MosfetModel:
 	# modelParam = [Vtp, Vtn, Vdd, Kn, Sn]
@@ -26,6 +25,73 @@ class MosfetModel:
 			self.xs.append("x" + str(i))
 			self.IsFwd.append("ifwd" + str(i))
 			self.IsCc.append("icc" + str(i))
+
+		self.constructPolygonRegions()
+
+	def constructPolygonRegions(self):
+		rings = [None]*7
+		self.polygonRegs = [None]*7
+		rings[0] = ogr.Geometry(ogr.wkbLinearRing)
+		rings[0].AddPoint(0.0,0.0)
+		rings[0].AddPoint(self.Vtn, 0.0)
+		rings[0].AddPoint(self.Vtn, self.Vtn - self.Vtp)
+		rings[0].AddPoint(0.0,-self.Vtp)
+		rings[0].AddPoint(0.0, 0.0)
+		self.polygonRegs[0] = ogr.Geometry(ogr.wkbPolygon)
+		self.polygonRegs[0].AddGeometry(rings[0])
+
+		rings[1] = ogr.Geometry(ogr.wkbLinearRing)
+		rings[1].AddPoint(0.0,-self.Vtp)
+		rings[1].AddPoint(self.Vtn, self.Vtn - self.Vtp)
+		rings[1].AddPoint(self.Vtn, 1.0)
+		rings[1].AddPoint(0.0,1.0)
+		rings[1].AddPoint(0.0,-self.Vtp)
+		self.polygonRegs[1] = ogr.Geometry(ogr.wkbPolygon)
+		self.polygonRegs[1].AddGeometry(rings[1])
+
+		rings[2] = ogr.Geometry(ogr.wkbLinearRing)
+		rings[2].AddPoint(self.Vtn,0.0)
+		rings[2].AddPoint(1 + self.Vtp, 0.0)
+		rings[2].AddPoint(1 + self.Vtp, 1 + self.Vtp - self.Vtn)
+		rings[2].AddPoint(self.Vtn,0.0)
+		self.polygonRegs[2] = ogr.Geometry(ogr.wkbPolygon)
+		self.polygonRegs[2].AddGeometry(rings[2])
+
+		rings[3] = ogr.Geometry(ogr.wkbLinearRing)
+		rings[3].AddPoint(self.Vtn,0.0)
+		rings[3].AddPoint(1 + self.Vtp, 1 + self.Vtp - self.Vtn)
+		rings[3].AddPoint(1 + self.Vtp, 1.0)
+		rings[3].AddPoint(self.Vtn,self.Vtn -self.Vtp)
+		rings[3].AddPoint(self.Vtn,0.0)
+		self.polygonRegs[3] = ogr.Geometry(ogr.wkbPolygon)
+		self.polygonRegs[3].AddGeometry(rings[3])
+
+		rings[4] = ogr.Geometry(ogr.wkbLinearRing)
+		rings[4].AddPoint(self.Vtn,self.Vtn -self.Vtp)
+		rings[4].AddPoint(1 + self.Vtp, 1.0)
+		rings[4].AddPoint(self.Vtn, 1.0)
+		rings[4].AddPoint(self.Vtn,self.Vtn -self.Vtp)
+		self.polygonRegs[4] = ogr.Geometry(ogr.wkbPolygon)
+		self.polygonRegs[4].AddGeometry(rings[4])
+
+		rings[5] = ogr.Geometry(ogr.wkbLinearRing)
+		rings[5].AddPoint(1 + self.Vtp,0.0)
+		rings[5].AddPoint(1.0, 0.0)
+		rings[5].AddPoint(1.0, 1 - self.Vtn)
+		rings[5].AddPoint(1 + self.Vtp, 1 + self.Vtp - self.Vtn)
+		rings[5].AddPoint(1 + self.Vtp,0.0)
+		self.polygonRegs[5] = ogr.Geometry(ogr.wkbPolygon)
+		self.polygonRegs[5].AddGeometry(rings[5])
+
+		rings[6] = ogr.Geometry(ogr.wkbLinearRing)
+		rings[6].AddPoint(1 + self.Vtp,1 + self.Vtp - self.Vtn)
+		rings[6].AddPoint(1.0, 1 - self.Vtn)
+		rings[6].AddPoint(1.0, 1.0)
+		rings[6].AddPoint(1 + self.Vtp, 1)
+		rings[6].AddPoint(1 + self.Vtp,1 + self.Vtp - self.Vtn)
+		self.polygonRegs[6] = ogr.Geometry(ogr.wkbPolygon)
+		self.polygonRegs[6].AddGeometry(rings[6])
+
 
 	def currentFun(self, Vin, Vout):
 		In = 0.0
@@ -82,14 +148,14 @@ class MosfetModel:
 
 	# patch is a polygon
 	def ICrossRegConstraint(self,I, Vin, Vout, patch):
-		INum = [None]*4
-		firDerIn = [None]*4
-		firDerOut = [None]*4
-		secDerIn = [None]*4
-		secDerOut = [None]*4
+		INum = [None]*patch.shape[0]
+		firDerIn = [None]*patch.shape[0]
+		firDerOut = [None]*patch.shape[0]
+		secDerIn = [None]*patch.shape[0]
+		secDerOut = [None]*patch.shape[0]
 
 		for i in range(len(INum)):
-			[INum[i], firDerIn[i], firDerOut[i], secDerIn[i], secDerOut[i]] = self.currentFun(patch.vertices[i][0], patch.vertices[i][1])
+			[INum[i], firDerIn[i], firDerOut[i], secDerIn[i], secDerOut[i]] = self.currentFun(patch[i,0], patch[i,1])
 
 		if (secDerIn[1] >= 0 and secDerOut[1] >= 0 and secDerIn[2] >=0 and secDerOut[2] >= 0 and secDerIn[3] >= 0 and secDerOut[3] >= 0 \
 			and secDerIn[0] >= 0 and secDerOut[0] >= 0) or (\
@@ -98,231 +164,84 @@ class MosfetModel:
 
 			return self.IRegConstraint(I, Vin, Vout, patch)[0]
 
-		# the different regions with respect to the sign of the second derivative
-		# of I
-		polygonRegs = [None]*7
-		polygonRegs[0] = Polygon(Point(0.0,0.0), Point(self.Vtn, 0.0), Point(self.Vtn, self.Vtn - self.Vtp), Point(0.0,-self.Vtp))
-		polygonRegs[1] = Polygon(Point(0.0,-self.Vtp), Point(self.Vtn, self.Vtn - self.Vtp), Point(self.Vtn, 1.0), Point(0.0,1.0))
-		polygonRegs[2] = Polygon(Point(self.Vtn,0.0), Point(1 + self.Vtp, 0.0), Point(1 + self.Vtp, 1 + self.Vtp - self.Vtn))
-		polygonRegs[3] = Polygon(Point(self.Vtn,0.0), Point(1 + self.Vtp, 1 + self.Vtp - self.Vtn), Point(1 + self.Vtp, 1.0), Point(self.Vtn,self.Vtn -self.Vtp))
-		polygonRegs[4] = Polygon(Point(self.Vtn,self.Vtn -self.Vtp), Point(1 + self.Vtp, 1.0), Point(self.Vtn, 1.0))
-		polygonRegs[5] = Polygon(Point(1 + self.Vtp,0.0), Point(1.0, 0.0), Point(1.0, 1 - self.Vtn), Point(1 + self.Vtp, 1 + self.Vtp - self.Vtn))
-		polygonRegs[6] = Polygon(Point(1 + self.Vtp,1 + self.Vtp - self.Vtn), Point(1.0, 1 - self.Vtn), Point(1.0, 1.0), Point(1 + self.Vtp, 1))
-
+		patchRing = ogr.Geometry(ogr.wkbLinearRing)
+		for i in range(patch.shape[0] + 1):
+			patchRing.AddPoint(patch[(i+1)%patch.shape[0],0], patch[(i+1)%patch.shape[0],1])
+		patchPolygon = ogr.Geometry(ogr.wkbPolygon)
+		patchPolygon.AddGeometry(patchRing)
+		
 		feasiblePoints = []
-		# If one of the regions intersects with the hyperrectangle
-		# Construct constraints for that intersection
-		for polygon in polygonRegs:
-			print "polygon ", polygon
-			print "patch ", patch
-			intersect = None
-			polyVertsInsidePatch = True
-			polyVertsOutsidePatch = True
-			for vert in polygon.vertices:
-				if not(patch.encloses(vert)):
-					onLine = False
-					for side in patch.sides:
-						if side.contains(vert):
-							onLine = True
-							break
-					if not(onLine):
-						polyVertsInsidePatch = False
-				if patch.encloses(vert):
-					polyVertsOutsidePatch = False
-				else:
-					onLine = False
-					for side in patch.sides:
-						if side.contains(vert):
-							onLine = True
-							break
-					if onLine:
-						polyVertsOutsidePatch = False
-
-			patchVertsOutsidePoly = True
-			for vert in patch.vertices:
-				if polygon.encloses(vert):
-					patchVertsOutsidePoly = False
-				else:
-					onLine = False
-					for side in polygon.sides:
-						if side.contains(vert):
-							onLine = True
-							break
-					if onLine:
-						patchVertsOutsidePoly = False
-
-			#print ("polyVertsOutsidePatch", polyVertsOutsidePatch)
-			#print ("polyVertsInsidePatch", polyVertsInsidePatch)
-			#print ("patchVertsOutsidePoly", patchVertsOutsidePoly)
-			if polyVertsOutsidePatch and patchVertsOutsidePoly:
-				continue
-
-			if polyVertsInsidePatch:
-				intersect = polygon
-
-			else:
-				intersectionPoints = []
-				for vi in range(len(patch.vertices)):
-					if polygon.encloses_point(patch.vertices[vi]):
-						intersectionPoints.append(patch.vertices[vi])
-					else:
-						pointOnLine = False
-						for side in polygon.sides:
-							if side.contains(patch.vertices[vi]):
-								pointOnLine = True
-								break
-						if pointOnLine:
-							intersectionPoints.append(patch.vertices[vi])
-
-						else:
-							if patch.vertices[vi][0] >= polygon.bounds[0] and patch.vertices[vi][0] <= polygon.bounds[2]:
-								polygonLowLine, polygonHighLine = None, None
-								polygonLowLine = Line(polygon.vertices[0], polygon.vertices[1])
-								if len(polygon.vertices) == 4:									
-									polygonHighLine = Line(polygon.vertices[2], polygon.vertices[3])
-								if len(polygon.vertices) == 3:
-									if polygon.vertices[0][1] == 0:
-										polygonHighLine = Line(polygon.vertices[2], polygon.vertices[0])
-									else:
-										polygonHighLine = Line(polygon.vertices[1], polygon.vertices[2])
-							
-								print ("polygonLowLine", polygonLowLine)
-								print ("polygonHighLine", polygonHighLine)
-								vertLineAtPatchPt = Line(Point(patch.vertices[vi][0],0), Point(patch.vertices[vi][0],1))
-								#print ("patch.vertices[vi]", patch.vertices[vi])
-								#print ("")
-								lowIntersection = polygonLowLine.intersection(vertLineAtPatchPt)
-								highIntersection = polygonHighLine.intersection(vertLineAtPatchPt)
-								print ("patch.vertices[vi]", patch.vertices[vi])
-								print ("vertLineAtPatchPt", vertLineAtPatchPt)
-								print ("lowIntersection", lowIntersection)
-								print ("highIntersection", highIntersection)
-								if len(lowIntersection) >= 1:
-									lowIntersection = lowIntersection[0]
-									if patch.vertices[vi][1] <= lowIntersection[1]:
-										intersectionPoints.append(Point(patch.vertices[vi][0], lowIntersection[1]))
-								if len(highIntersection) >= 1:
-									highIntersection = highIntersection[0]
-									if patch.vertices[vi][1] >= highIntersection[1]:
-										intersectionPoints.append(Point(patch.vertices[vi][0], highIntersection[1]))
-							
-							elif patch.vertices[vi][1] >= polygon.bounds[1] and patch.vertices[vi][1] <= polygon.bounds[3]:
-								polygonLeftLine = Line(polygon.vertices[0], polygon.vertices[-1])
-								polygonRightLine = Line(polygon.vertices[1], polygon.vertices[2])
-								if len(polygon.vertices) == 3:
-									if polygon.vertices[0][1] == 0:
-										polygonRightLine = Line(polygon.vertices[1], polygon.vertices[2])
-									else:
-										polygonRightLine = Line(polygon.vertices[0], polygon.vertices[1])
-								lowerLeftY = min(polygonLeftLine.p1[1], polygonLeftLine.p2[1])
-								upperLeftY = max(polygonLeftLine.p1[1], polygonLeftLine.p2[1])
-
-								lowerRightY = min(polygonRightLine.p1[1], polygonRightLine.p2[1])
-								upperRightY = max(polygonRightLine.p1[1], polygonRightLine.p2[1])
-								
-								print ("polygonLeftLine", polygonLeftLine)
-								print ("polygonRightLine", polygonRightLine)
-								horLineAtPatchPt = Line(Point(0, patch.vertices[vi][1]), Point(1, patch.vertices[vi][1]))
-								print ("patch.vertices[vi]", patch.vertices[vi])
-								print ("horLineAtPatchPt", horLineAtPatchPt)
-								leftIntersection = polygonLeftLine.intersection(horLineAtPatchPt)
-								rightIntersection = polygonRightLine.intersection(horLineAtPatchPt)
-								print ("leftIntersection", leftIntersection)
-								print ("rightIntersection", rightIntersection)
-								if len(leftIntersection) >= 1:
-									leftIntersection = leftIntersection[0]
-									if patch.vertices[vi][0] <= leftIntersection[0] and patch.vertices[vi][1] >= lowerLeftY and patch.vertices[vi][1] <= upperLeftY:
-										intersectionPoints.append(Point(leftIntersection[0], patch.vertices[vi][1]))
-									elif patch.vertices[vi][0] <= leftIntersection[0] and patch.vertices[vi][1] <= lowerLeftY:
-										intersectionPoints.append(Point(leftIntersection[0], lowerLeftY))
-									elif patch.vertices[vi][0] <= leftIntersection[0] and patch.vertices[vi][1] >= upperLeftY:
-										intersectionPoints.append(Point(leftIntersection[0], upperLeftY))
-								
-								if len(rightIntersection) >= 1:
-									rightIntersection = rightIntersection[0]
-									if patch.vertices[vi][0] >= rightIntersection[0] and patch.vertices[vi][1] >= lowerRightY and patch.vertices[vi][1] <= upperRightY:
-										intersectionPoints.append(Point(rightIntersection[0], patch.vertices[vi][1]))
-									elif patch.vertices[vi][0] >= rightIntersection[0] and patch.vertices[vi][1] <= lowerRightY:
-										intersectionPoints.append(Point(rightIntersection[0], lowerRightY))
-									elif patch.vertices[vi][0] >= rightIntersection[0] and patch.vertices[vi][1] >= upperRightY:
-										intersectionPoints.append(Point(rightIntersection[0], upperRightY))
-
-				#print ("intersectionPoints", intersectionPoints)
-				if len(intersectionPoints) == 4:
-					intersect = Polygon(intersectionPoints[0], intersectionPoints[1], intersectionPoints[2], intersectionPoints[3])
-				if len(intersectionPoints) == 3:
-					intersect = Polygon(intersectionPoints[0], intersectionPoints[1], intersectionPoints[2])
-
-
-
-			print "intersect", intersect
-			if intersect is not None and type(intersect) == Polygon:
+		for polygon in self.polygonRegs:
+			intersectPoly = polygon.Intersection(patchPolygon)
+			intersectPolyRing = intersectPoly.GetGeometryRef(0)
+			if intersectPolyRing is not None:
+				intersectingPoints = []
+				for pi in range(intersectPolyRing.GetPointCount()):
+					intersectingPoints.append((intersectPolyRing.GetPoint(pi)[0], intersectPolyRing.GetPoint(pi)[1]))
+				intersect = np.array(intersectingPoints)
 				_,regPoints = self.IRegConstraint(I, Vin, Vout, intersect)
 				feasiblePoints += regPoints
-		# Now construct convex hull with feasible points and add the constraint
-		feasiblePointsNp = np.zeros((len(feasiblePoints),3))
-		for fi in range(len(feasiblePointsNp)):
-			for ii in range(3):
-				feasiblePointsNp[fi][ii] = float(feasiblePoints[fi][ii])
 
-		feasiblePointsNp = np.unique(feasiblePointsNp, axis=0)
-		print ("feasiblePointsNp")
-		print (feasiblePointsNp)
+		# Now construct convex hull with feasible points and add the constraint
+		feasiblePoints = np.array(feasiblePoints)
+
+		feasiblePoints = np.unique(feasiblePoints, axis=0)
+		print ("feasiblePoints")
+		print (feasiblePoints)
 		print ("")
-		hull = ConvexHull(feasiblePointsNp)
+		hull = ConvexHull(feasiblePoints)
 		convexHullMiddle = np.zeros((3))
 		numPoints = 0
 		for simplex in hull.simplices:
 			for index in simplex:
-				convexHullMiddle += feasiblePointsNp[index]
+				convexHullMiddle += feasiblePoints[index,:]
 				numPoints += 1
 		convexHullMiddle = convexHullMiddle/(numPoints*1.0)
 		upVector = np.array([0,0,1])
 		overallConstraint = ""
 		for simplex in hull.simplices:
-			pointsFromSimplex = [None]*3
+			pointsFromSimplex = np.zeros((3,3))
 			for ii in range(3):
-				pointsFromSimplex[ii] = Point3D(feasiblePointsNp[simplex[ii]][0], feasiblePointsNp[simplex[ii]][1], feasiblePointsNp[simplex[ii]][2])
-			#print ("pointsFromSimplex", pointsFromSimplex)
-			planeFromSimplex = Plane(pointsFromSimplex[0], pointsFromSimplex[1],pointsFromSimplex[2])
-			normal = np.array(list(planeFromSimplex.normal_vector))
-			pointInPlane = np.array([planeFromSimplex.p1[0], planeFromSimplex.p1[1], planeFromSimplex.p1[2]])
+				pointsFromSimplex[ii] = feasiblePoints[simplex[ii]]
 			
+			normal = np.cross(pointsFromSimplex[1] - pointsFromSimplex[0], pointsFromSimplex[2] - pointsFromSimplex[0])
+			pointInPlane = pointsFromSimplex[0]
+			#print ("pointsFromSimplex", pointsFromSimplex)
+
 			# Determine if the middle of the convex hull is above or below
 			# the plane and add the constraint related to the plane accordingly
 			dotSign = np.dot(upVector,(convexHullMiddle - pointInPlane))
 			sign = " <= "
 			if dotSign > 0:
 				sign = " >= "
-
-			overallConstraint += "1 " + I + " + " + str(normal[0]/normal[2]) + " " + Vin +\
-				" + " + str(normal[1]/normal[2]) + " " + Vout + sign + str((normal[0]/normal[2])*pointInPlane[0] +\
-					(normal[1]/normal[2])*pointInPlane[1] + pointInPlane[2]) + "\n"
+			#print ("normal", normal)
+			#print ("pointInPlane", pointInPlane)
+			if normal[2] != 0:
+				overallConstraint += "1 " + I + " + " + str(normal[0]/normal[2]) + " " + Vin +\
+					" + " + str(normal[1]/normal[2]) + " " + Vout + sign + str((normal[0]/normal[2])*pointInPlane[0] +\
+						(normal[1]/normal[2])*pointInPlane[1] + pointInPlane[2]) + "\n"
+			else:
+				overallConstraint += str(normal[1]) +" "+ Vout + " + " + str(normal[0]) + " " + Vin +\
+					sign + str(normal[0]*pointInPlane[0] + normal[1]*pointInPlane[1] + pointInPlane[2]) + "\n"
 
 		return overallConstraint
 
 
-	# patch is a Polygon object indicating the hyperrectangle
+	# patch is a polygon with a list of vertices
 	def IRegConstraint(self, I, Vin, Vout, patch):
-		INum = [None]*len(patch.vertices)
-		firDerIn = [None]*len(patch.vertices)
-		firDerOut = [None]*len(patch.vertices)
-		secDerIn = [None]*len(patch.vertices)
-		secDerOut = [None]*len(patch.vertices)
-		points = [None]*len(patch.vertices)
+		minBounds = np.minimum(patch,0)
+		maxBounds = np.maximum(patch,0)
+		INum = [None]*patch.shape[0]
+		firDerIn = [None]*patch.shape[0]
+		firDerOut = [None]*patch.shape[0]
+		secDerIn = [None]*patch.shape[0]
+		secDerOut = [None]*patch.shape[0]
+		points = np.zeros((patch.shape[0],3))
 
-		for i in range(len(patch.vertices)):
-			[INum[i], firDerIn[i], firDerOut[i], secDerIn[i], secDerOut[i]] = self.currentFun(patch.vertices[i][0], patch.vertices[i][1])
-			points[i] = Point3D(patch.vertices[i][0], patch.vertices[i][1], INum[i])
+		for i in range(patch.shape[0]):
+			[INum[i], firDerIn[i], firDerOut[i], secDerIn[i], secDerOut[i]] = self.currentFun(patch[i,0], patch[i,1])
+			points[i,:] = [patch[i,0],patch[i,1],INum[i]]
 
-
-		#print "secDerIn ", secDerIn
-		#print "secDerOut ", secDerOut
-		'''if not((secDerIn[1] >= 1 and secDerOut[1] >= 0 and secDerIn[2] >=0 and secDerOut[2] >= 0 and secDerIn[3] >= 0 and secDerOut[3] >= 0 \
-			and secDerIn[0] >= 0 and secDerOut[0] >= 0) or (\
-			secDerIn[1] <= 0 and secDerOut[1] <= 0 and secDerIn[2] <=0 and secDerOut[2] <= 0 and secDerIn[3] <= 0 and secDerOut[3] <= 0 \
-			and secDerIn[0] <= 0 and secDerOut[0] <= 0)):
-			return None'''
 
 		overallConstraint = ""
 
@@ -339,58 +258,61 @@ class MosfetModel:
 		feasiblePlanes = []
 		# tangent constraints
 		overallConstraint += "1 " + I + " + " + str(-firDerIn[0]) + " " + Vin +\
-		" + " + str(-firDerOut[0]) + " " + Vout + tangentSign + str(-firDerIn[0]*patch.vertices[0][0] - firDerOut[0]*patch.vertices[0][1] + INum[0]) + "\n"
-		feasiblePlanes.append([Plane(Point3D(patch.vertices[0][0], patch.vertices[0][1], INum[0]),normal_vector =(firDerIn[0], firDerOut[0], -1)), tangentSign])
+		" + " + str(-firDerOut[0]) + " " + Vout + tangentSign + str(-firDerIn[0]*patch[0,0] - firDerOut[0]*patch[0,1] + INum[0]) + "\n"
+		feasiblePlanes.append([np.array([[points[0][0],points[0][1],points[0][2]],[firDerIn[0],firDerOut[0],-1]]), tangentSign])
 		
-		zeroRegion = Polygon(Point(self.Vtn,0.0), Point(1 + self.Vtp, 1 + self.Vtp - self.Vtn), Point(1 + self.Vtp, 1.0), Point(self.Vtn,self.Vtn -self.Vtp))
+		patchRing = ogr.Geometry(ogr.wkbLinearRing)
+		zeroRegion = self.polygonRegs[3]
+
 		patchVertsInsideZeroReg = True
-		for vert in patch.vertices:
-			if not(zeroRegion.encloses(vert)):
-				onLine = False
-				for side in zeroRegion.sides:
-					if side.contains(vert):
-						onLine = True
-						break
-				if not(onLine):
-					patchVertsInsideZeroReg = False
+		for pi in range(patchRing.GetPointCount()):
+			if zeroRegion.IsPointOnSurface(patchRing.GetPoint(pi)):
+				patchVertsInsideZeroReg = False
+				break
 
 		if patchVertsInsideZeroReg:
 			print ("patch inside zero region")
-			feasiblePoints = [points[0], points[1], points[2], points[3]]
+			feasiblePoints = []
+			for point in points:
+				feasiblePoints.append(point)
 			return overallConstraint, feasiblePoints
 
 
 		for i in range(1,len(INum)):
 			overallConstraint += "1 " + I + " + " + str(-firDerIn[i]) + " " + Vin +\
-			" + " + str(-firDerOut[i]) + " " + Vout + tangentSign + str(-firDerIn[i]*patch.vertices[i][0] - firDerOut[i]*patch.vertices[i][1] + INum[i]) + "\n"
-			feasiblePlanes.append([Plane(Point3D(patch.vertices[i][0], patch.vertices[i][1], INum[i]),normal_vector = (firDerIn[i], firDerOut[i], -1)), tangentSign])
+			" + " + str(-firDerOut[i]) + " " + Vout + tangentSign + str(-firDerIn[i]*patch[i,0] - firDerOut[i]*patch[i,1] + INum[i]) + "\n"
+			feasiblePlanes.append([np.array([[points[i][0],points[i][1],points[i][2]],[firDerIn[i],firDerOut[i],-1]]), tangentSign])
 
 		# secant constraints
 
 		if len(points) == 3:
-			feasiblePlanes.append([Plane(points[0], points[1], points[2]),secantSign])
-
+			normal = np.cross(points[1] - points[0], points[2] - points[0])
+			feasiblePlanes.append([np.array([[points[0][0],points[0][1],points[0][2]],[normal[0],normal[1],normal[2]]]), secantSign])
 		else:
 			possibleSecantPlanes = []
 			excludedPoints = []
-			possibleSecantPlanes.append(Plane(points[0], points[1], points[2]))
+			normal = np.cross(points[1] - points[0], points[2] - points[0])
+			possibleSecantPlanes.append(np.array([[points[0][0],points[0][1],points[0][2]],[normal[0],normal[1],normal[2]]]))
 			excludedPoints.append(points[3])
 
-			possibleSecantPlanes.append(Plane(points[0], points[1], points[3]))
+			normal = np.cross(points[1] - points[0], points[3] - points[0])
+			possibleSecantPlanes.append(np.array([[points[0][0],points[0][1],points[0][2]],[normal[0],normal[1],normal[2]]]))
 			excludedPoints.append(points[2])
 
-			possibleSecantPlanes.append(Plane(points[0], points[2], points[3]))
+			normal = np.cross(points[2] - points[0], points[3] - points[0])
+			possibleSecantPlanes.append(np.array([[points[0][0],points[0][1],points[0][2]],[normal[0],normal[1],normal[2]]]))
 			excludedPoints.append(points[1])
 
-			possibleSecantPlanes.append(Plane(points[1], points[2], points[3]))
+			normal = np.cross(points[2] - points[1], points[3] - points[1])
+			possibleSecantPlanes.append(np.array([[points[1][0],points[1][1],points[1][2]],[normal[0],normal[1],normal[2]]]))
 			excludedPoints.append(points[0])
 
 			numSecantConstraints = 0
 			for plane in possibleSecantPlanes:
 				if numSecantConstraints >= 2:
 					break
-				normal = plane.normal_vector
-				includedPt = plane.p1
+				normal = plane[1,:]
+				includedPt = plane[0,:]
 				excludedPt = excludedPoints[i]
 				# check if excluded point feasible with plane as a secant
 				IAtExcludedPt = (-normal[0]*(excludedPt[0] - includedPt[0])\
@@ -421,13 +343,13 @@ class MosfetModel:
 					#print "otherPlane", feasiblePlanes[j][0]
 					#print "otherPlane[2]", feasiblePlanes[k][0]
 					ps = [None]*3
-					ps[0] = feasiblePlanes[i][0].p1
-					ps[1] = feasiblePlanes[j][0].p1
-					ps[2] = feasiblePlanes[k][0].p1
+					ps[0] = feasiblePlanes[i][0][0,:]
+					ps[1] = feasiblePlanes[j][0][0,:]
+					ps[2] = feasiblePlanes[k][0][0,:]
 					norms = [None]*3
-					norms[0] = feasiblePlanes[i][0].normal_vector
-					norms[1] = feasiblePlanes[j][0].normal_vector
-					norms[2] = feasiblePlanes[k][0].normal_vector
+					norms[0] = feasiblePlanes[i][0][1,:]
+					norms[1] = feasiblePlanes[j][0][1,:]
+					norms[2] = feasiblePlanes[k][0][1,:]
 					AMat = np.zeros((3,3))
 					BMat = np.zeros((3))
 					for ii in range(3):
@@ -458,29 +380,21 @@ class MosfetModel:
 					#print AMat
 					#print "BMat"
 					#print BMat
-
 					try:
 						sol = np.linalg.solve(AMat,BMat)
 						if len(sol) == 3:
-							intersectingPoint = Point3D(sol[0],sol[1],sol[2])
-							intersectionPoints.append(intersectingPoint)
+							intersectionPoints.append(np.array([sol[0], sol[1], sol[2]]))
 						elif len(sol) == 2:
 							if norms[0][0] == 0:
-								intersectionPoints.append(Point3D(patch.bounds[0], sol[0], sol[1]))
-								intersectionPoints.append(Point3D(patch.bounds[2], sol[0], sol[1]))
+								intersectionPoints.append(np.array([minBounds[0], sol[0], sol[1]]))
+								intersectionPoints.append(np.array([maxBounds[0], sol[0], sol[1]]))
 							elif norms[0][1] == 0:
-								intersectionPoints.append(Point3D(sol[0], patch.bounds[1], sol[1]))
-								intersectionPoints.append(Point3D(sol[0], patch.bounds[3], sol[1]))
+								intersectionPoints.append(np.array([sol[0], minBounds[1], sol[1]]))
+								intersectionPoints.append(np.array([sol[0], maxBounds[1], sol[1]]))
 
-						#print ("feasiblePoints", feasiblePoints)
-
-						#intersectingLine = feasiblePlanes[i][0].intersection(feasiblePlanes[j][0])
-						#print "intersectingLine", intersectingLine
-						#intersectingPoint = feasiblePlanes[k][0].intersection(intersectingLine)
-						#print "intersectingPoint", intersectingPoint
 					except np.linalg.linalg.LinAlgError:
 						pass
-					#print ""
+
 
 		#print ("intersectionPoints", intersectionPoints)
 		print ("len(intersectionPoints)", len(intersectionPoints))
@@ -490,8 +404,8 @@ class MosfetModel:
 			for planeSign in feasiblePlanes:
 				plane = planeSign[0]
 				sign = planeSign[1]
-				normal = plane.normal_vector
-				planePoint = plane.p1
+				normal = plane[1,:]
+				planePoint = plane[0,:]
 				IAtPt = (-normal[0]*(point[0] - planePoint[0])\
 					-normal[1]*(point[1] - planePoint[1]))/normal[2] + planePoint[2]
 
@@ -518,7 +432,7 @@ class MosfetModel:
 	def oscNum(self,V):
 		lenV = len(V)
 		Vin = [V[i % lenV] for i in range(-1,lenV-1)]
-		Vcc = [V[(i + lenV/2) % lenV] for i in range(lenV)]
+		Vcc = [V[(i + lenV//2) % lenV] for i in range(lenV)]
 		IFwd = [self.currentFun(Vin[i], V[i])[0] for i in range(lenV)]
 		ICc = [self.currentFun(Vcc[i], V[i])[0] for i in range(lenV)]
 		return [IFwd, ICc, [(IFwd[i]*self.g_fwd + ICc[i]*self.g_cc) for i in range(lenV)]]
@@ -526,13 +440,13 @@ class MosfetModel:
 	def jacobian(self,V):
 		lenV = len(V)
 		Vin = [V[i % lenV] for i in range(-1,lenV-1)]
-		Vcc = [V[(i + lenV/2) % lenV] for i in range(lenV)]
+		Vcc = [V[(i + lenV//2) % lenV] for i in range(lenV)]
 		jac = np.zeros((lenV, lenV))
 		for i in range(lenV):
 			[Ifwd, firDerInfwd, firDerOutfwd, secDerInfwd, secDerOutfwd] = self.currentFun(Vin[i], V[i])
 			[Icc, firDerIncc, firDerOutcc, secDerIncc, secDerOutcc] = self.currentFun(Vcc[i], V[i])
 			jac[i, (i-1)%lenV] = self.g_fwd*firDerInfwd
-			jac[i, (i + lenV/2) % lenV] = self.g_cc*firDerIncc
+			jac[i, (i + lenV//2) % lenV] = self.g_cc*firDerIncc
 			jac[i, i] = self.g_fwd*firDerOutfwd + self.g_cc*firDerOutcc
 		return jac
 
@@ -581,8 +495,8 @@ class MosfetModel:
 
 			jac[i, (i-1)%lenV, 0] = self.g_fwd*minFirDerInFwd
 			jac[i, (i-1)%lenV, 1] = self.g_fwd*maxFirDerInFwd
-			jac[i, (i + lenV/2) % lenV, 0] = self.g_cc*minFirDerInCc
-			jac[i, (i + lenV/2) % lenV, 1] = self.g_cc*maxFirDerInCc
+			jac[i, (i + lenV//2) % lenV, 0] = self.g_cc*minFirDerInCc
+			jac[i, (i + lenV//2) % lenV, 1] = self.g_cc*maxFirDerInCc
 			jac[i, i, 0] = self.g_fwd*minFirDerOutFwd + self.g_cc*minFirDerOutCc
 			jac[i, i, 1] = self.g_fwd*maxFirDerOutFwd + self.g_cc*maxFirDerOutCc
 
@@ -595,17 +509,19 @@ class MosfetModel:
 		allConstraints = ""
 		for i in range(lenV):
 			fwdInd = (i-1)%lenV
-			ccInd = (i+lenV/2)%lenV
+			ccInd = (i+lenV//2)%lenV
 			
-			fwdP0, fwdP1, fwdP2, fwdP3 = map(Point, [(hyperRectangle[fwdInd][0], hyperRectangle[i][0]),\
-			(hyperRectangle[fwdInd][1], hyperRectangle[i][0]), (hyperRectangle[fwdInd][1], hyperRectangle[i][1]),\
-			(hyperRectangle[fwdInd][0], hyperRectangle[i][1])])
-			fwdPatch = Polygon(fwdP0, fwdP1, fwdP2, fwdP3)
+			fwdPatch = np.zeros((4,2))
+			fwdPatch[0,:] = [hyperRectangle[fwdInd][0], hyperRectangle[i][0]]
+			fwdPatch[1,:] = [hyperRectangle[fwdInd][1], hyperRectangle[i][0]]
+			fwdPatch[2,:] = [hyperRectangle[fwdInd][1], hyperRectangle[i][1]]
+			fwdPatch[3,:] = [hyperRectangle[fwdInd][0], hyperRectangle[i][1]]
 
-			ccP0, ccP1, ccP2, ccP3 = map(Point, [(hyperRectangle[ccInd][0], hyperRectangle[i][0]),\
-			(hyperRectangle[ccInd][1], hyperRectangle[i][0]), (hyperRectangle[ccInd][1], hyperRectangle[i][1]),\
-			(hyperRectangle[ccInd][0], hyperRectangle[i][1])])
-			ccPatch = Polygon(ccP0, ccP1, ccP2, ccP3)
+			ccPatch = np.zeros((4,2))
+			ccPatch[0,:] = [hyperRectangle[ccInd][0], hyperRectangle[i][0]]
+			ccPatch[1,:] = [hyperRectangle[ccInd][1], hyperRectangle[i][0]]
+			ccPatch[2,:] = [hyperRectangle[ccInd][1], hyperRectangle[i][1]]
+			ccPatch[3,:] = [hyperRectangle[ccInd][0], hyperRectangle[i][1]]
 			
 			fwdConstraints = self.ICrossRegConstraint(self.IsFwd[i], self.xs[fwdInd], self.xs[i], fwdPatch)
 			ccConstraints = self.ICrossRegConstraint(self.IsCc[i], self.xs[ccInd], self.xs[i], ccPatch)

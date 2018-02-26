@@ -41,27 +41,27 @@ solution.
 '''
 def ifFeasibleHyper(hyperRectangle, hyperBound,model):
 	lenV = model.numStages*2
-	print "hyperRectangle"
-	print hyperRectangle
+	print ("hyperRectangle")
+	print (hyperRectangle)
 	iterNum = 0
 	while True:
-		print "hyperRectangle "
-		print hyperRectangle
+		print ("hyperRectangle ")
+		print (hyperRectangle)
 		kResult = intervalUtils.checkExistenceOfSolutionGS(model,hyperRectangle.transpose())
 		if kResult[0]:
 			#print "LP feasible ", newHyperRectangle
 			return (True, kResult[1])
 
 		if kResult[0] == False and kResult[1] is None:
-			print "K operator not feasible"
+			print ("K operator not feasible")
 			return (False, None)
 		#print "kResult"
 		#print kResult
 		feasible, newHyperRectangle = model.linearConstraints(hyperRectangle)
 	
-		print "newHyperRectangle ", newHyperRectangle
+		print ("newHyperRectangle ", newHyperRectangle)
 		if feasible == False:
-			print "LP not feasible"
+			print ("LP not feasible")
 			return (False, None)
 
 		if np.less_equal(newHyperRectangle[:,1] - newHyperRectangle[:,0],hyperBound*np.ones((lenV))).all() or np.less_equal(np.absolute(newHyperRectangle - hyperRectangle),1e-4*np.ones((lenV,2))).all():
@@ -100,13 +100,13 @@ infeasible.
 def getFeasibleIntervalIndices(rootCombinationNode,boundMap,hyperBound, model,refinedHypers):
 
 	intervalIndices = rootCombinationNode.rootArray
-	print "intervalIndices", intervalIndices
-	print "boundMap", boundMap
+	print ("intervalIndices", intervalIndices)
+	print ("boundMap", boundMap)
 	lenV = len(intervalIndices)
 	
 	feasibility = ifFeasibleOrdering(intervalIndices, boundMap, hyperBound,model)
-	print "feasibility"
-	print feasibility
+	print ("feasibility")
+	print (feasibility)
 	if feasibility[0]:
 		refinedHypers.append(feasibility[1])
 		return
@@ -135,15 +135,15 @@ def getFeasibleIntervalIndices(rootCombinationNode,boundMap,hyperBound, model,re
 		if intervalIndices[i] is None:
 			indexOfNone = i
 			break
-	print "indexOfNone ", indexOfNone
+	print ("indexOfNone ", indexOfNone)
 	if indexOfNone is None:
 		bisectionHypers = refineHyper(intervalIndices, newBoundMap, hyperBound, model)
-		print "bisectionHypers"
-		print bisectionHypers
-		print "len(refinedHypers) before ", len(refinedHypers)
+		print ("bisectionHypers")
+		print (bisectionHypers)
+		print ("len(refinedHypers) before ", len(refinedHypers))
 		for hyper in bisectionHypers:
 			refinedHypers.append(hyper)
-		print "len(refinedHypers) after ", len(refinedHypers)
+		print ("len(refinedHypers) after ", len(refinedHypers))
 	for i in range(len(rootCombinationNode.children)):
 		getFeasibleIntervalIndices(rootCombinationNode.children[i],
 			newBoundMap, hyperBound, model, refinedHypers)
@@ -163,9 +163,9 @@ def refineHyper(ordering, boundMap, maxHyperBound, model):
 	count = 0
 	volumes = []
 
-	print "before bisecting num ", len(finalHyper)
+	print ("before bisecting num ", len(finalHyper))
 	bisectHyper(maxHyperBound, hyperRectangle, 0,model, finalHyper)
-	print "after bisecting num ", len(finalHyper)
+	print ("after bisecting num ", len(finalHyper))
 
 	return finalHyper
 
@@ -182,16 +182,16 @@ def bisectHyper(hyperBound,hyperRectangle,bisectingIndex, model,finalHypers):
 	midVal = (hyperRectangle[bisectingIndex][0] + hyperRectangle[bisectingIndex][1])/2.0
 	leftHyper[bisectingIndex][1] = midVal
 	rightHyper[bisectingIndex][0] = midVal
-	print "leftHyper"
-	print leftHyper
-	print "rightHyper"
-	print rightHyper
+	print ("leftHyper")
+	print (leftHyper)
+	print ("rightHyper")
+	print (rightHyper)
 	feasLeft = ifFeasibleHyper(leftHyper, hyperBound, model)
 	feasRight = ifFeasibleHyper(rightHyper, hyperBound, model)
-	print "feasLeft"
-	print feasLeft
-	print "feasRight"
-	print feasRight
+	print ("feasLeft")
+	print (feasLeft)
+	print ("feasRight")
+	print (feasRight)
 
 	if feasLeft[0]:
 		finalHypers.append(feasLeft[1])
@@ -261,14 +261,14 @@ def rambusOscillator(a, numStages):
 			indexChoiceArray.append(secondIndex)
 			secondIndex -= 1
 	
-	print "indexChoiceArray", indexChoiceArray
+	print ("indexChoiceArray", indexChoiceArray)
 	boundMap = []
 	for i in range(lenV):
 		#boundMap.append({0:[-1.0,0.0],1:[0.0,1.0]})
 		boundMap.append({0:[0.0,0.5],1:[0.5,1.0]})
 	#excludingBound = findExcludingBound(exampleOrdering,boundMap,model)
 	#excludingBound = 0.1
-	print "boundMap ", boundMap
+	print ("boundMap ", boundMap)
 	minBoundMap = 0
 	maxBoundMap = 1
 	rootCombinationNodes = intervalUtils.combinationWithTrees(lenV,[minBoundMap,maxBoundMap],indexChoiceArray)
@@ -326,8 +326,8 @@ def rambusOscillator(a, numStages):
 	for i in range(len(rootCombinationNodes)):
 		getFeasibleIntervalIndices(rootCombinationNodes[i],boundMap,hyperBound,model,allHypers)
 	
-	print "allHypers"
-	print allHypers
+	print ("allHypers")
+	print (allHypers)
 	sampleSols = []
 	rotatedSols = {}
 	stableSols = []
@@ -370,30 +370,30 @@ def rambusOscillator(a, numStages):
 				rotatedSols[len(sampleSols)-1] = []
 
 	for hi in range(len(sampleSols)):
-		print "equivalence class# ", hi
-		print "main member ", sampleSols[hi]
-		print "number of other members ", len(rotatedSols[hi])
-		print "other member rotationIndices: "
+		print ("equivalence class# ", hi)
+		print ("main member ", sampleSols[hi])
+		print ("number of other members ", len(rotatedSols[hi]))
+		print ("other member rotationIndices: ")
 		for mi in range(len(rotatedSols[hi])):
-			print rotatedSols[hi][mi]
-		print ""
+			print (rotatedSols[hi][mi])
+		print ("")
 
 	for hi in range(len(sampleSols)):
 		if len(rotatedSols[hi]) > lenV - 1 or (len(rotatedSols[hi]) >= 1 and rotatedSols[hi][0] == 0):
-			print "problem equivalence class# ", hi
-			print "main member ", sampleSols[hi]
-			print "num other Solutions ", len(rotatedSols[hi])
+			print ("problem equivalence class# ", hi)
+			print ("main member ", sampleSols[hi])
+			print ("num other Solutions ", len(rotatedSols[hi]))
 
-	print ""
-	print "numSolutions, ", len(allHypers)
-	print "num stable solutions ", len(stableSols)
+	print ("")
+	print ("numSolutions, ", len(allHypers))
+	print ("num stable solutions ", len(stableSols))
 	'''for si in range(len(stableSols)):
 		print stableSols[si]'''
 	#print "num unstable solutions ", len(unstableSols)
 	'''for si in range(len(unstableSols)):
 		print unstableSols[si]'''
 	endExp = time.time()
-	print "TOTAL TIME ", endExp - startExp
+	print ("TOTAL TIME ", endExp - startExp)
 
 
 '''A = matrix([ [-1.0, -1.0, 0.0, 1.0], [1.0, -1.0, -1.0, -2.0] ])

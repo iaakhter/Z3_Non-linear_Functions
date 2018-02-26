@@ -43,7 +43,7 @@ class TanhModel:
 	'''
 	def triangleConvexHullBounds(self, Vin, Vout, Vlow, Vhigh):
 		if (Vlow >= 0 and Vhigh >= 0) or (Vlow <= 0 and Vhigh <= 0):
-			print "Vlow and Vhigh are in the same quadrants"
+			print ("Vlow and Vhigh are in the same quadrants")
 			return
 		VZero = 0.0
 		tanhFunVlow = self.tanhFun(Vlow)

@@ -13,7 +13,7 @@ class combinationNode:
 
 def printCombinationNode(rootCombinationNode):
 	rootArray = rootCombinationNode.rootArray
-	print rootArray
+	print (rootArray)
 	for i in range(len(rootCombinationNode.children)):
 		printCombinationNode(rootCombinationNode.children[i])
 
@@ -268,24 +268,24 @@ def checkExistenceOfSolutionGS(model,hyperRectangle):
 		
 		if np.less_equal(gsIntersect[:,1] - gsIntersect[:,0],1e-8*np.ones((numVolts))).all() or  np.less_equal(np.absolute(gsIntersect - startBounds),1e-4*np.ones((numVolts,2))).all():
 			if constructBiggerHyper == False and np.less_equal(gsIntersect[:,1] - gsIntersect[:,0],1e-8*np.ones((numVolts))).all():
-				print "gsIntersect before"
-				print gsIntersect
+				print ("gsIntersect before")
+				print (gsIntersect)
 				constructBiggerHyper = True
 				exampleVolt = (gsIntersect[:,0] + gsIntersect[:,1])/2.0
 				soln = newton(model,exampleVolt)
-				print "soln ", soln
+				print ("soln ", soln)
 				# the new hyper must contain the solution in the middle and enclose old hyper
 				# and then we check for uniqueness of solution in the newer bigger hyperrectangle
 				if soln[0]:
 					for si in range(numVolts):
 						maxDiff = max(abs(gsIntersect[si,1] - soln[1][si]), abs(soln[1][si] - gsIntersect[si,0]))
-						print "maxDiff", maxDiff
+						print ("maxDiff", maxDiff)
 						if maxDiff < 1e-6:
 							maxDiff = 1e-6
 						#print "maxDiff ", maxDiff
 						gsIntersect[si,0] = soln[1][si] - maxDiff
 						gsIntersect[si,1] = soln[1][si] + maxDiff
-					print "bigger hyper ", gsIntersect
+					print ("bigger hyper ", gsIntersect)
 					startBounds = gsIntersect
 					
 			else:
@@ -309,7 +309,7 @@ def checkExistenceOfSolution(model,hyperRectangle):
 	iteration = 0
 	while True:
 		#print "iteration number: ", iteration
-		print "startBounds ", startBounds
+		print ("startBounds ", startBounds)
 		midPoint = (startBounds[:,0] + startBounds[:,1])/2.0
 		#midPoint = startBounds[:,0] + (startBounds[:,1] - startBounds[:,0])*0.25
 		#print "midPoint"
@@ -356,8 +356,8 @@ def checkExistenceOfSolution(model,hyperRectangle):
 		kInterval[:,0] = np.minimum(kInterval1, kInterval2)
 		kInterval[:,1] = np.maximum(kInterval1, kInterval2)
 
-		print "kInterval "
-		print kInterval
+		print ("kInterval ")
+		print (kInterval)
 
 		uniqueSoln = True
 		for i in range(numVolts):
@@ -413,7 +413,7 @@ def checkExistenceOfSolution(model,hyperRectangle):
 						#print "maxDiff ", maxDiff
 						intersect[si,0] = soln[si] - maxDiff
 						intersect[si,1] = soln[si] + maxDiff
-					print "bigger hyper ", intersect
+					print ("bigger hyper ", intersect)
 					startBounds = intersect
 					
 				else:

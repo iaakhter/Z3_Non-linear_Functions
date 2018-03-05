@@ -150,8 +150,9 @@ def newton(model,soln):
 	h = soln
 	count = 0
 	maxIter = 100
-	while np.linalg.norm(h) > 1e-8 and count < maxIter:
+	while count < maxIter and (np.linalg.norm(h) > 1e-8 or count == 0) :
 		_,_,res = model.oscNum(soln)
+		#print ("soln", soln)
 		res = -np.array(res)
 		jac = model.jacobian(soln)
 		h = np.linalg.solve(jac,res)

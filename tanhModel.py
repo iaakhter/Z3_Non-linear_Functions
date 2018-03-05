@@ -177,7 +177,7 @@ class TanhModel:
 	def oscNum(self,V):
 		lenV = len(V)
 		Vin = [V[i % lenV] for i in range(-1,lenV-1)]
-		Vcc = [V[(i + lenV/2) % lenV] for i in range(lenV)]
+		Vcc = [V[(i + lenV//2) % lenV] for i in range(lenV)]
 		VoutFwd = [self.tanhFun(Vin[i]) for i in range(lenV)]
 		VoutCc = [self.tanhFun(Vcc[i]) for i in range(lenV)]
 		return (VoutFwd, VoutCc, [((self.tanhFun(Vin[i])-V[i])*self.g_fwd
@@ -189,12 +189,12 @@ class TanhModel:
 	def jacobian(self,V):
 		lenV = len(V)
 		Vin = [V[i % lenV] for i in range(-1,lenV-1)]
-		Vcc = [V[(i + lenV/2) % lenV] for i in range(lenV)]
+		Vcc = [V[(i + lenV//2) % lenV] for i in range(lenV)]
 		jac = np.zeros((lenV, lenV))
 		for i in range(lenV):
 			jac[i,i] = -(self.g_fwd + self.g_cc)
 			jac[i,(i-1)%lenV] = self.g_fwd * self.tanhFunder(V[(i-1)%lenV])
-			jac[i,(i + lenV/2) % lenV] = self.g_cc * self.tanhFunder(V[(i + lenV/2) % lenV])
+			jac[i,(i + lenV//2) % lenV] = self.g_cc * self.tanhFunder(V[(i + lenV//2) % lenV])
 
 		return jac
 
@@ -216,14 +216,14 @@ class TanhModel:
 			else:
 				jac[i,(i-1)%lenV,0] = min(gfwdVal1,gfwdVal2)
 				jac[i,(i-1)%lenV,1] = max(gfwdVal1,gfwdVal2)
-			gccVal1 = self.g_cc * self.tanhFunder(lowerBound[(i + lenV/2) % lenV])
-			gccVal2 = self.g_cc * self.tanhFunder(upperBound[(i + lenV/2) % lenV])
-			if lowerBound[(i + lenV/2) % lenV] < 0 and upperBound[(i + lenV/2) % lenV] > 0:
-				jac[i,(i + lenV/2) % lenV,0] = min(gccVal1,gccVal2,zerocc)
-				jac[i,(i + lenV/2) % lenV,1] = max(gccVal1,gccVal2,zerocc)
+			gccVal1 = self.g_cc * self.tanhFunder(lowerBound[(i + lenV//2) % lenV])
+			gccVal2 = self.g_cc * self.tanhFunder(upperBound[(i + lenV//2) % lenV])
+			if lowerBound[(i + lenV//2) % lenV] < 0 and upperBound[(i + lenV//2) % lenV] > 0:
+				jac[i,(i + lenV//2) % lenV,0] = min(gccVal1,gccVal2,zerocc)
+				jac[i,(i + lenV//2) % lenV,1] = max(gccVal1,gccVal2,zerocc)
 			else:
-				jac[i,(i + lenV/2) % lenV,0] = min(gccVal1,gccVal2)
-				jac[i,(i + lenV/2) % lenV,1] = max(gccVal1,gccVal2)
+				jac[i,(i + lenV//2) % lenV,0] = min(gccVal1,gccVal2)
+				jac[i,(i + lenV//2) % lenV,1] = max(gccVal1,gccVal2)
 		return jac
 
 	def linearConstraints(self, hyperRectangle):
@@ -234,7 +234,7 @@ class TanhModel:
 		allConstraints = ""
 		for i in range(lenV):
 			fwdInd = (i-1)%lenV
-			ccInd = (i+lenV/2)%lenV
+			ccInd = (i+lenV//2)%lenV
 			#print "fwdInd ", fwdInd, " ccInd ", ccInd
 			#print "hyperRectangle[fwdInd][0]", hyperRectangle[fwdInd][0], "hyperRectangle[fwdInd][1]", hyperRectangle[fwdInd][1]
 			triangleClaimFwd = ""
@@ -274,7 +274,7 @@ class TanhModel:
 			Cmax = lpUtils.constructObjMatrix(maxObjConstraint,variableDict)
 			minSol = solvers.lp(Cmin,A,B)
 			maxSol = solvers.lp(Cmax,A,B)
-			if (minSol["status"] == "primal infeasible" or minSol["status"] == "dual infeasible")  and (maxSol["status"] == "primal infeasible" or maxSol["status"] == "dual infeasible"):
+			if minSol["status"] == "primal infeasible" and maxSol["status"] == "primal infeasible":
 				feasible = False
 				break
 			else:

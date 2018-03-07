@@ -136,7 +136,7 @@ class MosfetModel:
 		elif  Vin >= Vout + self.Vtn and (eqnN == None or eqnN == 3):
 			In = self.Sn*(self.Kn)*(Vin - self.Vtn - Vout/2.0)*Vout;
 			firDerInn = self.Sn*self.Kn*Vout
-			firDerOutn = -self.Sn*self.Kn*Vout
+			firDerOutn = self.Sn*self.Kn*(Vin - self.Vtn - Vout)
 			secDerInn = 0.0
 			secDerOutn = -self.Sn*self.Kn
 
@@ -158,7 +158,7 @@ class MosfetModel:
 		elif Vin - self.Vtp <= Vout and (eqnP == None or eqnP == 6):
 			Ip = self.Sp*self.Kp*((Vin - self.Vtp - self.Vdd) - (Vout - self.Vdd)/2.0)*(Vout - self.Vdd)
 			firDerInp = self.Sp*self.Kp*(Vout - self.Vdd)
-			firDerOutp = -self.Sp*self.Kp*(Vout - self.Vdd)
+			firDerOutp = self.Sp*self.Kp*((Vin - self.Vtp - self.Vdd) - (Vout - self.Vdd))
 			secDerInp = 0.0
 			secDerOutp = -self.Sp*self.Kp
 
@@ -544,16 +544,22 @@ class MosfetModel:
 		return [IFwd, ICc, [(IFwd[i]*self.g_fwd + ICc[i]*self.g_cc) for i in range(lenV)]]
 
 	def jacobian(self,V):
+		print ("Calculating jacobian")
 		lenV = len(V)
 		Vin = [V[i % lenV] for i in range(-1,lenV-1)]
 		Vcc = [V[(i + lenV//2) % lenV] for i in range(lenV)]
 		jac = np.zeros((lenV, lenV))
 		for i in range(lenV):
+			#print ("Vin[i]", Vin[i], "Vcc[i]", Vcc[i], "V[i]", V[i])
 			[Ifwd, firDerInfwd, firDerOutfwd, secDerInfwd, secDerOutfwd] = self.currentFun(Vin[i], V[i])
 			[Icc, firDerIncc, firDerOutcc, secDerIncc, secDerOutcc] = self.currentFun(Vcc[i], V[i])
+			#print ("firDerInfwd", firDerInfwd, "firDerIncc", firDerIncc)
+			#print ("firDerOutfwd", firDerOutfwd, "firDerOutcc", firDerOutcc)
 			jac[i, (i-1)%lenV] = self.g_fwd*firDerInfwd
 			jac[i, (i + lenV//2) % lenV] = self.g_cc*firDerIncc
 			jac[i, i] = self.g_fwd*firDerOutfwd + self.g_cc*firDerOutcc
+		print ("jacobian")
+		print (jac)
 		return jac
 
 	# numerical approximation where i sample jacobian in the patch by bounds

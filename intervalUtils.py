@@ -151,10 +151,14 @@ def newton(model,soln):
 	count = 0
 	maxIter = 100
 	while count < maxIter and (np.linalg.norm(h) > 1e-8 or count == 0) :
+		#print ("h", h)
 		_,_,res = model.oscNum(soln)
+		#print ("res", res)
 		#print ("soln", soln)
 		res = -np.array(res)
 		jac = model.jacobian(soln)
+		#print ("res", res)
+		#print ("jac", jac)
 		h = np.linalg.solve(jac,res)
 		soln = soln + h
 		count+=1
@@ -176,8 +180,8 @@ def checkExistenceOfSolutionGS(model,hyperRectangle):
 	iteration = 0
 	constructBiggerHyper = False
 	while True:
-		#print "iteration number: ", iteration
-		#print "startBounds ", startBounds
+		#print ("iteration number: ", iteration)
+		#print ("startBounds ", startBounds)
 		midPoint = (startBounds[:,0] + startBounds[:,1])/2.0
 		#midPoint = startBounds[:,0] + (startBounds[:,1] - startBounds[:,0])*0.25
 		#print "midPoint"
@@ -245,16 +249,16 @@ def checkExistenceOfSolutionGS(model,hyperRectangle):
 			elif np.less_equal(np.absolute(gsInterval[i,:] - startBounds[i,:]),1e-8*np.ones((2))).all():
 				gsIntersect[i] = startBounds[i]
 			else:
-				#print "problem i ", i
-				#print "gsInterval[i] ", gsInterval[i]
-				#print np.absolute(gsInterval[i,:] - startBounds[i,:])
-				#print minVal <= maxVal
+				#print ("problem i ", i)
+				#print ("gsInterval[i] ", gsInterval[i])
+				#print (np.absolute(gsInterval[i,:] - startBounds[i,:]))
+				#print (minVal <= maxVal)
 				return (False, None)
 
-		#print "gsInterval "
-		#print gsInterval
-		#print "gsIntersect "
-		#print gsIntersect
+		#print ("gsInterval ")
+		#print (gsInterval)
+		#print ("gsIntersect ")
+		#print (gsIntersect)
 		uniqueSoln = True
 		for i in range(numVolts):
 			if gsInterval[i][0] <= startBounds[i][0] or gsInterval[i][0] >= startBounds[i][1]:

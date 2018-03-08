@@ -172,7 +172,7 @@ class MosfetModel:
 
 	# patch is a polygon
 	def ICrossRegConstraint(self,I, Vin, Vout, patch):
-		print ("crossRegionPatch", patch)
+		#print ("crossRegionPatch", patch)
 		patchRing = ogr.Geometry(ogr.wkbLinearRing)
 		for i in range(patch.shape[0] + 1):
 			patchRing.AddPoint(patch[(i+1)%patch.shape[0],0], patch[(i+1)%patch.shape[0],1])
@@ -198,11 +198,14 @@ class MosfetModel:
 			return regConstraints
 		# Now construct convex hull with feasible points and add the constraint
 		feasiblePoints = np.array(feasiblePoints)
-
+		#print ("feasiblePoints non-unique before")
+		#print (feasiblePoints)
+		if len(feasiblePoints) == 0:
+			return ""
 		feasiblePoints = np.unique(feasiblePoints, axis=0)
-		print ("convexHullPoints")
-		print (feasiblePoints)
-		print ("")
+		#print ("convexHullPoints")
+		#print (feasiblePoints)
+		#print ("")
 		hull = ConvexHull(feasiblePoints, qhull_options="En")
 		convexHullMiddle = np.zeros((3))
 		numPoints = 0
@@ -248,19 +251,7 @@ class MosfetModel:
 
 	# patch is a polygon with a list of vertices
 	def IRegConstraint(self, I, Vin, Vout, patch, polygonNumber):
-		print ("regionPatch", patch, patch.shape)
-		regionLines = []
-		for i in range(patch.shape[0]):
-			point1 = patch[i,:]
-			point2 = patch[(i+1)%patch.shape[0],:]
-			c, m = None, None
-			if point2[0] - point1[0] == 0:
-				m = float("inf")
-				c = point2[0]
-			else:
-				m = (point2[1] - point1[1])/(point2[0] - point1[0])
-				c = point1[1] - m*point1[0]
-			regionLines.append((m,c))
+		#print ("regionPatch", patch, patch.shape)
 		minBounds = np.amin(patch,0)
 		maxBounds = np.amax(patch,0)
 		#print ("minBounds", minBounds)
@@ -318,8 +309,28 @@ class MosfetModel:
 			" + " + str(-firDerOut[i]) + " " + Vout + tangentSign + str(-firDerIn[i]*patch[i,0] - firDerOut[i]*patch[i,1] + INum[i]) + "\n"
 			feasiblePlanes.append([np.array([[points[i][0],points[i][1],points[i][2]],[-firDerIn[i],-firDerOut[i],1]]), tangentSign])
 
-		# secant constraints
+		# hyperrectangle constraints
+		midPoint = np.sum(points, axis = 0)/(points.shape[0]*1.0)
+		for i in range(points.shape[0]):
+			point1 = points[i,:]
+			point2 = points[(i+1)%points.shape[0],:]
+			m = None, None
+			norms = np.zeros((3))
+			if point2[0] - point1[0] == 0:
+				m = float("inf")
+				norms[0] = 1
+			else:
+				m = (point2[1] - point1[1])/(point2[0] - point1[0])
+				norms[0] = m
+				norms[1] = 1
+			cSign = " <= "
+			d = norms[0]*point1[0] + norms[1]*point1[1] + norms[2]*point1[2]
+			dMid = norms[0]*midPoint[0] + norms[1]*midPoint[1]
+			if dMid > d:
+				cSign = " >= "
+			feasiblePlanes.append([np.array([[point1[0],point1[1],point1[2]],[norms[0],norms[1],norms[2]]]), cSign])
 
+		# secant constraints
 		if points.shape[0] == 3:
 			normal = np.cross(points[1] - points[0], points[2] - points[0])
 			feasiblePlanes.append([np.array([[points[0][0],points[0][1],points[0][2]],[normal[0],normal[1],normal[2]]]), secantSign])
@@ -365,10 +376,10 @@ class MosfetModel:
 					numSecantConstraints += 1
 					feasiblePlanes.append([plane, secantSign])
 
-		print ("numFeasiblePlanes", len(feasiblePlanes))
+		'''print ("numFeasiblePlanes", len(feasiblePlanes))
 		for plane in feasiblePlanes:
 			print ("plane", plane)
-		print ("")
+		print ("")'''
 		
 		intersectionPoints = []
 		intersectionLines = []
@@ -377,7 +388,7 @@ class MosfetModel:
 		for i in range(len(feasiblePlanes)):
 			for j in range(i+1, len(feasiblePlanes)):
 				for k in range(j+1, len(feasiblePlanes)):
-					print ("i ", i, "j", j, "k", k)
+					#print ("i ", i, "j", j, "k", k)
 					ps = [None]*3
 					ps[0] = feasiblePlanes[i][0][0,:]
 					ps[1] = feasiblePlanes[j][0][0,:]
@@ -404,104 +415,16 @@ class MosfetModel:
 						#if sol[0] >= 0.0 and sol[0] <= 1.0 and sol[1] >= 0.0 and sol[1] <= 1.0:
 						if np.linalg.cond(AMat) < 1e+15:
 							intersectionPoints.append(np.array([sol[0], sol[1], sol[2]]))
-							print ("intersectionPoint added", sol)
+							#print ("intersectionPoint added", sol)
 
 					except:
-						if norms[0][0] == 0 and norms[1][0] == 0 and norms[2][0] == 0:
-							BMat3_1 = np.copy(BMat)
-							AMat3_2 = np.delete(AMat,0,1)
-
-							for li in range(3):
-								AMat = np.delete(AMat3_2,li,0)
-								BMat = np.delete(BMat3_1,li,0)
-								try:
-									sol = np.linalg.solve(AMat, BMat)
-									minX = float("inf")
-									maxX = -float("inf")
-									for line in regionLines:
-										m = line[0]
-										c = line[1]
-										xOnLine = None
-										if m == float("inf"):
-											xOnLine = c
-										else:
-											xOnLine = (sol[0] - c)/m
-										if m != 0:
-											minX = min(minX, xOnLine)
-											maxX = max(maxX, xOnLine)
-									if minX < minBounds[0]:
-										minX = minBounds[0]
-									if maxX > maxBounds[0]:
-										maxX = maxBounds[0]
-									intersectionPoints.append(np.array([minX, sol[0], sol[1]]))
-									print ("intersectionPoint added", intersectionPoints[-1])
-									intersectionPoints.append(np.array([maxX, sol[0], sol[1]]))
-									print ("intersectionPoint added", intersectionPoints[-1])
-									intersectionLines.append({Vout:sol[0], I:sol[1]})
-									#print ("intersectionLine added", intersectionLines[-1])
-								except np.linalg.LinAlgError:
-									#print ("condition number weird ", np.linalg.cond(AMat))
-									#print ("AMat", AMat)
-									#print ("BMat", BMat)
-									pass
-
-						elif norms[0][1] == 0 and norms[1][1] == 0 and norms[2][1] == 0:
-							BMat3_1 = np.copy(BMat)
-							AMat3_2 = np.delete(AMat,1,1)
-
-							for li in range(3):
-								AMat = np.delete(AMat3_2,li,0)
-								BMat = np.delete(BMat3_1,li,0)
-								try:
-									sol = np.linalg.solve(AMat, BMat)
-									minY = float("inf")
-									maxY = -float("inf")
-									for line in regionLines:
-										m = line[0]
-										c = line[1]
-										yOnLine = None
-										if m!= float("inf"):
-											#print ("m", m, "c",c)
-											yOnLine = m*sol[0] + c
-											#print ("yOnLine", yOnLine)
-											minY = min(minY, yOnLine)
-											maxY = max(maxY, yOnLine)
-									intersectionPoints.append(np.array([sol[0], minY, sol[1]]))
-									print ("intersectionPoint added", intersectionPoints[-1])
-									intersectionPoints.append(np.array([sol[0], maxY, sol[1]]))
-									print ("intersectionPoint added", intersectionPoints[-1])
-									intersectionLines.append({Vin:sol[0], I:sol[1]})
-									#print ("intersectionLine added", intersectionLines[-1])
-								except np.linalg.LinAlgError:
-									#print ("condition number weird ", np.linalg.cond(AMat))
-									#print ("AMat", AMat)
-									#print ("BMat", BMat)
-									pass
-
-		'''for line in intersectionLines:
-			#print ("intersecting line ", line)
-			for plane in feasiblePlanes:
-				normal = plane[0][1,:]
-				pointInPlane = plane[0][0,:]
-				if Vin in line:
-					if normal[1] != 0:
-						d = normal[0]*pointInPlane[0] + normal[1]*pointInPlane[1] + normal[2]*pointInPlane[2]
-						varSol = (d - normal[2]*line[I] - normal[0]*line[Vin])/normal[1]
-						intersectionPoints.append(np.array([line[Vin], varSol, line[I]]))
-						#print ("intersectionPoint added", intersectionPoints[-1])
-
-				if Vout in line:
-					if normal[0] != 0:
-						d = normal[0]*pointInPlane[0] + normal[1]*pointInPlane[1] + normal[2]*pointInPlane[2]
-						varSol = (d - normal[2]*line[I] - normal[1]*line[Vout])/normal[0]
-						intersectionPoints.append(np.array([varSol, line[Vout], line[I]]))
-						#print ("intersectionPoint added", intersectionPoints[-1])'''
+						pass
 
 		#print ("intersectionPoints", intersectionPoints)
 		#print ("len(intersectionPoints)", len(intersectionPoints))
 		feasiblePoints = []
 		for point in intersectionPoints:
-			print ("intersectionPoint", point)
+			#print ("intersectionPoint", point)
 			pointFeasible = True
 			for planeSign in feasiblePlanes:
 				plane = planeSign[0]
@@ -510,17 +433,18 @@ class MosfetModel:
 				planePoint = plane[0,:]
 
 				d = normal[0]*planePoint[0] + normal[1]*planePoint[1] + normal[2]*planePoint[2]
-				IAtPt = (d - normal[0]*point[0] - normal[1]*point[1])/normal[2]
-				print ("sign", sign)
-				print ("point[2]", point[2], "IAtPt", IAtPt)
-				if abs(point[2] - IAtPt) > 1e-8:
+				dPt = normal[0]*point[0] + normal[1]*point[1] + normal[2]*point[2]
+				#IAtPt = (d - normal[0]*point[0] - normal[1]*point[1])/normal[2]
+				#print ("sign", sign)
+				#print ("point[2]", point[2], "IAtPt", IAtPt)
+				if abs(d - dPt) > 1e-8:
 					if sign == " <= ":
-						if point[2] > IAtPt:
+						if dPt > d:
 							pointFeasible = False
 							break
 
 					if sign == " >= ":
-						if point[2] < IAtPt:
+						if dPt < d:
 							pointFeasible = False
 							break
 			if pointFeasible:
@@ -544,7 +468,7 @@ class MosfetModel:
 		return [IFwd, ICc, [(IFwd[i]*self.g_fwd + ICc[i]*self.g_cc) for i in range(lenV)]]
 
 	def jacobian(self,V):
-		print ("Calculating jacobian")
+		#print ("Calculating jacobian")
 		lenV = len(V)
 		Vin = [V[i % lenV] for i in range(-1,lenV-1)]
 		Vcc = [V[(i + lenV//2) % lenV] for i in range(lenV)]
@@ -558,8 +482,8 @@ class MosfetModel:
 			jac[i, (i-1)%lenV] = self.g_fwd*firDerInfwd
 			jac[i, (i + lenV//2) % lenV] = self.g_cc*firDerIncc
 			jac[i, i] = self.g_fwd*firDerOutfwd + self.g_cc*firDerOutcc
-		print ("jacobian")
-		print (jac)
+		#print ("jacobian")
+		#print (jac)
 		return jac
 
 	# numerical approximation where i sample jacobian in the patch by bounds
@@ -572,38 +496,38 @@ class MosfetModel:
 		for i in range(lenV):
 			lowOut = lowerBound[i]
 			highOut = upperBound[i]
-			rangeOut = highOut - lowOut
-			outArray = np.arange(lowOut, highOut, rangeOut/100.0)
 
-			minFirDerInFwd, maxFirDerInFwd = float("inf"), -float("inf")
-			minFirDerOutFwd, maxFirDerOutFwd = float("inf"), -float("inf")
-			
 			lowFwd = lowerBound[(i-1)%lenV]
 			highFwd = upperBound[(i-1)%lenV]
-			rangeFwd = highFwd - lowFwd
-			fwdArray = np.arange(lowFwd, highFwd, rangeFwd/100.0)
-			for fwdIn in range(len(fwdArray)):
-				for outIn in range(len(outArray)):
-					[Ifwd, firDerInfwd, firDerOutfwd, secDerInfwd, secDerOutfwd] = self.currentFun(fwdArray[fwdIn], outArray[outIn])
-					minFirDerInFwd = min(minFirDerInFwd, firDerInfwd)
-					maxFirDerInFwd = max(maxFirDerInFwd, firDerInfwd)
-					minFirDerOutFwd = min(minFirDerOutFwd, firDerOutfwd)
-					maxFirDerOutFwd = max(maxFirDerOutFwd, firDerOutfwd)
 
-			minFirDerInCc, maxFirDerInCc = float("inf"), -float("inf")
-			minFirDerOutCc, maxFirDerOutCc = float("inf"), -float("inf")
+			firDerInFwd = np.zeros((4))
+			firDerOutFwd = np.zeros((4))
+
+			[Ifwd, firDerInFwd[0], firDerOutFwd[0], secDerInfwd, secDerOutfwd] = self.currentFun(lowFwd, lowOut)
+			[Ifwd, firDerInFwd[1], firDerOutFwd[1], secDerInfwd, secDerOutfwd] = self.currentFun(lowFwd, highOut)
+			[Ifwd, firDerInFwd[2], firDerOutFwd[2], secDerInfwd, secDerOutfwd] = self.currentFun(highFwd, lowOut)
+			[Ifwd, firDerInFwd[3], firDerOutFwd[3], secDerInfwd, secDerOutfwd] = self.currentFun(highFwd, highOut)
+
+			lowCc = lowerBound[(i + lenV//2) % lenV]
+			highCc = upperBound[(i + lenV//2) % lenV]
+
+			firDerInCc = np.zeros((4))
+			firDerOutCc = np.zeros((4))
+
+			[Icc, firDerInCc[0], firDerOutCc[0], secDerIncc, secDerOutcc] = self.currentFun(lowCc, lowOut)
+			[Icc, firDerInCc[1], firDerOutCc[1], secDerIncc, secDerOutcc] = self.currentFun(lowCc, highOut)
+			[Icc, firDerInCc[2], firDerOutCc[2], secDerIncc, secDerOutcc] = self.currentFun(highCc, lowOut)
+			[Icc, firDerInCc[3], firDerOutCc[3], secDerIncc, secDerOutcc] = self.currentFun(highCc, highOut)
 			
-			lowCc = lowerBound[(i-1)%lenV]
-			highCc = upperBound[(i-1)%lenV]
-			rangeCc = highCc - lowCc
-			ccArray = np.arange(lowCc, highCc, rangeCc/100.0)
-			for ccIn in range(len(ccArray)):
-				for outIn in range(len(outArray)):
-					[Icc, firDerIncc, firDerOutcc, secDerIncc, secDerOutcc] = self.currentFun(ccArray[ccIn], outArray[outIn])
-					minFirDerInCc = min(minFirDerInCc, firDerIncc)
-					maxFirDerInCc = max(maxFirDerInCc, firDerIncc)
-					minFirDerOutCc = min(minFirDerOutCc, firDerOutcc)
-					maxFirDerOutCc = max(maxFirDerOutCc, firDerOutcc)
+			minFirDerInFwd = np.amin(firDerInFwd)
+			maxFirDerInFwd = np.amax(firDerInFwd)
+			minFirDerOutFwd = np.amin(firDerOutFwd)
+			maxFirDerOutFwd = np.amax(firDerOutFwd)
+
+			minFirDerInCc = np.amin(firDerInCc)
+			maxFirDerInCc = np.amax(firDerInCc)
+			minFirDerOutCc = np.amin(firDerOutCc)
+			maxFirDerOutCc = np.amax(firDerOutCc)
 
 			jac[i, (i-1)%lenV, 0] = self.g_fwd*minFirDerInFwd
 			jac[i, (i-1)%lenV, 1] = self.g_fwd*maxFirDerInFwd
@@ -612,9 +536,13 @@ class MosfetModel:
 			jac[i, i, 0] = self.g_fwd*minFirDerOutFwd + self.g_cc*minFirDerOutCc
 			jac[i, i, 1] = self.g_fwd*maxFirDerOutFwd + self.g_cc*maxFirDerOutCc
 
+		#print ("jac")
+		#print (jac)
 		return jac
 
 	def linearConstraints(self, hyperRectangle):
+		#print ("linearConstraints hyperRectangle")
+		#print (hyperRectangle)
 		solvers.options["show_progress"] = False
 		allConstraints = ""
 		lenV = self.numStages*2
@@ -676,9 +604,15 @@ class MosfetModel:
 				break
 			else:
 				if minSol["status"] == "optimal":
-					newHyperRectangle[i,0] = minSol['x'][variableDict[self.xs[i]]] - 1e-6
+					try:
+						newHyperRectangle[i,0] = minSol['x'][variableDict[self.xs[i]]] - 1e-6
+					except KeyError:
+						pass
 				if maxSol["status"] == "optimal":
-					newHyperRectangle[i,1] = maxSol['x'][variableDict[self.xs[i]]] + 1e-6
+					try:
+						newHyperRectangle[i,1] = maxSol['x'][variableDict[self.xs[i]]] + 1e-6
+					except KeyError:
+						pass
 
 		return [feasible, newHyperRectangle]
 

@@ -172,14 +172,14 @@ class MosfetModel:
 
 	# patch is a polygon
 	def ICrossRegConstraint(self,I, Vin, Vout, patch):
-		#print ("crossRegionPatch", patch)
+		print ("crossRegionPatch", patch)
 		patchRing = ogr.Geometry(ogr.wkbLinearRing)
 		for i in range(patch.shape[0] + 1):
 			patchRing.AddPoint(patch[(i+1)%patch.shape[0],0], patch[(i+1)%patch.shape[0],1])
 		patchPolygon = ogr.Geometry(ogr.wkbPolygon)
 		patchPolygon.AddGeometry(patchRing)
 		
-		feasiblePoints = []
+		feasiblePoints = None
 		numIntersections = 0
 		regConstraints = None
 		for i in range(len(self.polygonRegs)):
@@ -192,20 +192,26 @@ class MosfetModel:
 					intersectingPoints.append((intersectPolyRing.GetPoint(pi)[0], intersectPolyRing.GetPoint(pi)[1]))
 				intersect = np.array(intersectingPoints)
 				regConstraints,regPoints = self.IRegConstraint(I, Vin, Vout, intersect,i)
-				feasiblePoints += regPoints
+				if feasiblePoints is None:
+					if len(regPoints) >= 1:
+						feasiblePoints = regPoints
+				else:
+					if len(regPoints) >= 1:
+						#print ("feasiblePoints", feasiblePoints)
+						feasiblePoints = np.vstack([feasiblePoints,regPoints])
 				numIntersections += 1
 		if numIntersections == 1:
 			return regConstraints
 		# Now construct convex hull with feasible points and add the constraint
-		feasiblePoints = np.array(feasiblePoints)
+		#feasiblePoints = np.array(feasiblePoints)
 		#print ("feasiblePoints non-unique before")
 		#print (feasiblePoints)
 		if len(feasiblePoints) == 0:
 			return ""
 		feasiblePoints = np.unique(feasiblePoints, axis=0)
-		#print ("convexHullPoints")
-		#print (feasiblePoints)
-		#print ("")
+		print ("crossRegion Feasible Points")
+		print (feasiblePoints)
+		print ("")
 		hull = ConvexHull(feasiblePoints, qhull_options="En")
 		convexHullMiddle = np.zeros((3))
 		numPoints = 0
@@ -214,16 +220,16 @@ class MosfetModel:
 				convexHullMiddle += feasiblePoints[index,:]
 				numPoints += 1
 		convexHullMiddle = convexHullMiddle/(numPoints*1.0)
-		#print ("convexHullMiddle", convexHullMiddle)
+		print ("convexHullMiddle", convexHullMiddle)
 		overallConstraint = ""
 		for si in range(len(hull.simplices)):
 			simplex = hull.simplices[si]
-			#print ("simplex", simplex)
+			print ("simplex", simplex)
 			pointsFromSimplex = np.zeros((3,3))
 			for ii in range(3):
 				pointsFromSimplex[ii] = feasiblePoints[simplex[ii]]
 			
-			#print ("pointsFromSimplex", pointsFromSimplex)
+			print ("pointsFromSimplex", pointsFromSimplex)
 			normal = np.cross(pointsFromSimplex[1] - pointsFromSimplex[0], pointsFromSimplex[2] - pointsFromSimplex[0])
 			pointInPlane = pointsFromSimplex[0]
 			#print ("pointsFromSimplex", pointsFromSimplex)
@@ -236,22 +242,24 @@ class MosfetModel:
 			if middleD > d:
 				sign = " >= "
 
-			#print ("sign", sign)
-			#print ("normal", normal)
-			#print ("pointInPlane", pointInPlane)
-		
+			print ("normal", normal)
+			print ("pointInPlane", pointInPlane)
+			print ("sign", sign)
+			print ("")
+			
+			#if np.greater_equal(np.absolute(normal),np.ones(normal.shape)*1e-5).any():
 			overallConstraint += str(normal[2])+" " + I + " + " + str(normal[0]) + " " + Vin +\
 				" + " + str(normal[1]) + " " + Vout + sign + str(d) + "\n"
 			
-		#print ("overallConstraint")
-		#print (overallConstraint)
+		print ("overallConstraint")
+		print (overallConstraint)
 
 		return overallConstraint
 
 
 	# patch is a polygon with a list of vertices
 	def IRegConstraint(self, I, Vin, Vout, patch, polygonNumber):
-		#print ("regionPatch", patch, patch.shape)
+		print ("regionPatch", patch, patch.shape)
 		minBounds = np.amin(patch,0)
 		maxBounds = np.amax(patch,0)
 		#print ("minBounds", minBounds)
@@ -321,7 +329,7 @@ class MosfetModel:
 				norms[0] = 1
 			else:
 				m = (point2[1] - point1[1])/(point2[0] - point1[0])
-				norms[0] = m
+				norms[0] = -m
 				norms[1] = 1
 			cSign = " <= "
 			d = norms[0]*point1[0] + norms[1]*point1[1] + norms[2]*point1[2]
@@ -333,56 +341,45 @@ class MosfetModel:
 		# secant constraints
 		if points.shape[0] == 3:
 			normal = np.cross(points[1] - points[0], points[2] - points[0])
-			feasiblePlanes.append([np.array([[points[0][0],points[0][1],points[0][2]],[normal[0],normal[1],normal[2]]]), secantSign])
+			if normal[2] < 0:
+				normal = -normal
+			includedPt = points[0]
+			d = normal[0]*includedPt[0] + normal[1]*includedPt[1] + normal[2]*includedPt[2]
+			
+			feasiblePlanes.append([np.array([[includedPt[0],includedPt[1],includedPt[2]],[normal[0],normal[1],normal[2]]]), secantSign])
+			overallConstraint += str(normal[2])+ " " + I + " + " + str(normal[0]) + " " + Vin +\
+				" + " + str(normal[1]) + " " + Vout + secantSign + str(d) + "\n"
 		else:
-			possibleSecantPlanes = []
-			excludedPoints = []
-			normal = np.cross(points[1] - points[0], points[2] - points[0])
-			possibleSecantPlanes.append(np.array([[points[0][0],points[0][1],points[0][2]],[normal[0],normal[1],normal[2]]]))
-			excludedPoints.append(points[3])
-
-			normal = np.cross(points[1] - points[0], points[3] - points[0])
-			possibleSecantPlanes.append(np.array([[points[0][0],points[0][1],points[0][2]],[normal[0],normal[1],normal[2]]]))
-			excludedPoints.append(points[2])
-
-			normal = np.cross(points[2] - points[0], points[3] - points[0])
-			possibleSecantPlanes.append(np.array([[points[0][0],points[0][1],points[0][2]],[normal[0],normal[1],normal[2]]]))
-			excludedPoints.append(points[1])
-
-			normal = np.cross(points[2] - points[1], points[3] - points[1])
-			possibleSecantPlanes.append(np.array([[points[1][0],points[1][1],points[1][2]],[normal[0],normal[1],normal[2]]]))
-			excludedPoints.append(points[0])
-
-			numSecantConstraints = 0
-			for i in range(len(possibleSecantPlanes)):
-				if numSecantConstraints > 2:
-					break
-				plane = possibleSecantPlanes[i]
-				normal = plane[1,:]
+			for i in range(points.shape[0]):
+				for j in range(i+1, points.shape[0]):
+					for k in range(j+1, points.shape[0]):
+						normal = np.cross(points[k] - points[i], points[j] - points[i])
+						if normal[2] < 0:
+							normal = -normal
+						includedPt = points[i]
+						d = normal[0]*includedPt[0] + normal[1]*includedPt[1] + normal[2]*includedPt[2]
+						planeFeasible = True
+						for pi in range(points.shape[0]):
+							excludedPt = points[pi]
+							dExcluded = normal[0]*excludedPt[0] + normal[1]*excludedPt[1] + normal[2]*excludedPt[2]
 				
-				includedPt = plane[0,:]
-				excludedPt = excludedPoints[i]
-				
-				# check if excluded point feasible with plane as a secant
-				d = normal[0]*includedPt[0] + normal[1]*includedPt[1] + normal[2]*includedPt[2]
-				IAtExcludedPt = (d - normal[0]*excludedPt[0] - normal[1]*excludedPt[1])/normal[2]
-				feasible = IAtExcludedPt <= includedPt[2]
-				if secantSign == " >= ":
-					feasible = IAtExcludedPt >= includedPt[2]
-				if feasible:
-					overallConstraint += str(normal[2])+ " " + I + " + " + str(normal[0]) + " " + Vin +\
-					" + " + str(normal[1]) + " " + Vout + secantSign + str(normal[0]*includedPt[0] +\
-						normal[1]*includedPt[1] + normal[2]*includedPt[2]) + "\n"
-					numSecantConstraints += 1
-					feasiblePlanes.append([plane, secantSign])
+							feasible = dExcluded <= d
+							if secantSign == " >= ":
+								feasible = dExcluded >= d
+							if not(feasible):
+								planeFeasible = False
+								break
+						if planeFeasible:
+							overallConstraint += str(normal[2])+ " " + I + " + " + str(normal[0]) + " " + Vin +\
+								" + " + str(normal[1]) + " " + Vout + secantSign + str(d) + "\n"
+							feasiblePlanes.append([np.array([[includedPt[0],includedPt[1],includedPt[2]],[normal[0],normal[1],normal[2]]]), secantSign])
 
-		'''print ("numFeasiblePlanes", len(feasiblePlanes))
+		print ("numFeasiblePlanes", len(feasiblePlanes))
 		for plane in feasiblePlanes:
 			print ("plane", plane)
-		print ("")'''
+		print ("")
 		
 		intersectionPoints = []
-		intersectionLines = []
 		# find intersection of all possible combinations of feasible planes
 		# store points that are satisfied by all constraints
 		for i in range(len(feasiblePlanes)):
@@ -413,10 +410,9 @@ class MosfetModel:
 						#print ("sol", sol)
 		
 						#if sol[0] >= 0.0 and sol[0] <= 1.0 and sol[1] >= 0.0 and sol[1] <= 1.0:
-						if np.linalg.cond(AMat) < 1e+15:
-							intersectionPoints.append(np.array([sol[0], sol[1], sol[2]]))
-							#print ("intersectionPoint added", sol)
-
+						intersectionPoints.append(np.array([sol[0], sol[1], sol[2]]))
+						#print ("i ", i, "j", j, "k", k)
+						#print ("intersectionPoint added", sol)
 					except:
 						pass
 
@@ -437,22 +433,32 @@ class MosfetModel:
 				#IAtPt = (d - normal[0]*point[0] - normal[1]*point[1])/normal[2]
 				#print ("sign", sign)
 				#print ("point[2]", point[2], "IAtPt", IAtPt)
-				if abs(d - dPt) > 1e-8:
-					if sign == " <= ":
-						if dPt > d:
-							pointFeasible = False
-							break
+				if sign == " <= ":
+					if dPt > d:
+						pointFeasible = False
+						'''print ("intersectionPointNotFeasible", point)
+						print ("normal", normal)
+						print ("planePoint", planePoint)
+						print ("sign ", sign)'''
+						break
 
-					if sign == " >= ":
-						if dPt < d:
-							pointFeasible = False
-							break
+				if sign == " >= ":
+					if dPt < d:
+						pointFeasible = False
+						'''print ("intersectionPointNotFeasible", point)
+						print ("normal", normal)
+						print ("planePoint", planePoint)
+						print ("sign ", sign)'''
+						break
 			if pointFeasible:
-				#print ("feasible")
+				#print ("feasible", point)
 				feasiblePoints.append([point[0], point[1], point[2]])
 
-		#print ("feasiblePoints")
-		#print (feasiblePoints)
+		feasiblePoints = np.array(feasiblePoints)
+		if len(feasiblePoints) >= 1:
+			feasiblePoints = np.unique(feasiblePoints, axis = 0)
+		print ("regionFeasiblePoints")
+		print (feasiblePoints)
 		#print ("len(feasiblePoints)", len(feasiblePoints))
 
 		return overallConstraint, feasiblePoints
@@ -547,7 +553,7 @@ class MosfetModel:
 		allConstraints = ""
 		lenV = self.numStages*2
 		allConstraints = ""
-		for i in range(lenV):
+		for i in range(1,2):
 			fwdInd = (i-1)%lenV
 			ccInd = (i+lenV//2)%lenV
 			#print ("i", i, "fwdInd", fwdInd, "ccInd", ccInd)
@@ -574,29 +580,39 @@ class MosfetModel:
 			allConstraints += str(self.g_fwd) + " " + self.IsFwd[i] + " + " + str(self.g_cc) + " " + self.IsCc[i] + " >= 0.0\n"
 			allConstraints += str(self.g_fwd) + " " + self.IsFwd[i] + " + " + str(self.g_cc) + " " + self.IsCc[i] + " <= 0.0\n"
 
-		#allConstraints = "2 x + 3 y >= 5\n"
-		#allConstraints += "2 x + 3 y <= -5\n"
-		'''allConstraintList = allConstraints.splitlines()
+	
+		allConstraintList = allConstraints.splitlines()
 		allConstraints = ""
 		for i in range(len(allConstraintList)):
-			if i!=25:
+			#if i > 33 or i < 28:
+			if i == 4 or i == 15 or i == 23:
 				allConstraints += allConstraintList[i] + "\n"
-		print ("numConstraints ", len(allConstraintList))'''
-		#print ("allConstraints")
-		#print (allConstraints)
+		allConstraints += "1 x0 >= 0.83009430" + "\n"
+		allConstraints += "1 x0 <= 0.83009432" + "\n"
+		allConstraints += "1 x1 >= 0.16990568" + "\n"
+		allConstraints += "1 x1 <= 0.16990570" + "\n"
+		allConstraints += "1 x2 >= 0.83009430" + "\n"
+		allConstraints += "1 x2 <= 0.83009432" + "\n"
+		allConstraints += "1 x3 >= 0.16990568" + "\n"
+		allConstraints += "1 x3 <= 0.16990570" + "\n"
+		print ("numConstraints ", len(allConstraintList))
+		print ("allConstraints")
+		print (allConstraints)
 		variableDict, A, B = lpUtils.constructCoeffMatrices(allConstraints)
+		#print ("Amat", A)
+		#print ("Bmat", B)
 		newHyperRectangle = np.copy(hyperRectangle)
 		feasible = True
-		for i in range(lenV):
-			#print "min max ", i
+		for i in range(1,2):
+			print ("min max ", i)
 			minObjConstraint = "min 1 " + self.xs[i]
 			maxObjConstraint = "max 1 " + self.xs[i]
 			Cmin = lpUtils.constructObjMatrix(minObjConstraint,variableDict)
 			Cmax = lpUtils.constructObjMatrix(maxObjConstraint,variableDict)
 			minSol = solvers.lp(Cmin,A,B)
 			maxSol = solvers.lp(Cmax,A,B)
-			#print ("minSol Status", minSol["status"])
-			#print ("maxSol Status", maxSol["status"])
+			print ("minSol Status", minSol["status"])
+			print ("maxSol Status", maxSol["status"])
 			#print ("minSol", minSol["x"])
 			#print ("maxSol", maxSol["x"])
 			if (minSol["status"] == "primal infeasible"  and maxSol["status"] == "primal infeasible"):
@@ -613,6 +629,11 @@ class MosfetModel:
 						newHyperRectangle[i,1] = maxSol['x'][variableDict[self.xs[i]]] + 1e-6
 					except KeyError:
 						pass
+			#print ("newVals", newHyperRectangle[i,:])
+			if newHyperRectangle[i,1] < newHyperRectangle[i,0] or newHyperRectangle[i,0] < 0.0 or newHyperRectangle[i,1] > 1.0:
+				print ("old hyper", hyperRectangle[i,:])
+				newHyperRectangle[i,:] = hyperRectangle[i,:]
+				print ("new hyper", newHyperRectangle[i,:])
 
 		return [feasible, newHyperRectangle]
 

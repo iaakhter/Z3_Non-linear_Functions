@@ -48,6 +48,8 @@ def ifFeasibleHyper(hyperRectangle, hyperBound,model):
 		print ("hyperRectangle ")
 		print (hyperRectangle)
 		kResult = intervalUtils.checkExistenceOfSolutionGS(model,hyperRectangle.transpose())
+		#print ("kResult")
+		#print (kResult)
 		if kResult[0]:
 			#print "LP feasible ", newHyperRectangle
 			return (True, kResult[1])
@@ -57,6 +59,8 @@ def ifFeasibleHyper(hyperRectangle, hyperBound,model):
 			return (False, None)
 		#print "kResult"
 		#print kResult
+		print ("hyperRectangle ")
+		print (hyperRectangle)
 		feasible, newHyperRectangle = model.linearConstraints(hyperRectangle)
 	
 		print ("newHyperRectangle ", newHyperRectangle)
@@ -64,11 +68,20 @@ def ifFeasibleHyper(hyperRectangle, hyperBound,model):
 			print ("LP not feasible")
 			return (False, None)
 
+		for i in range(lenV):
+			if newHyperRectangle[i,0] < hyperRectangle[i,0]:
+				newHyperRectangle[i,0] = hyperRectangle[i,0]
+			if newHyperRectangle[i,1] > hyperRectangle[i,1]:
+				newHyperRectangle[i,1] = hyperRectangle[i,1]
+			 
+
 		if np.less_equal(newHyperRectangle[:,1] - newHyperRectangle[:,0],hyperBound*np.ones((lenV))).all() or np.less_equal(np.absolute(newHyperRectangle - hyperRectangle),1e-4*np.ones((lenV,2))).all():
 			if kResult[0] == False and kResult[1] is not None:
 				return (False, kResult[1])
 		hyperRectangle = newHyperRectangle
 		iterNum+=1
+		#print ("here?")
+		#return
 	
 
 '''
@@ -123,9 +136,17 @@ def getFeasibleIntervalIndices(rootCombinationNode,boundMap,hyperBound, model,re
 		if intervalIndices[i] is None:
 			newBoundMap[i][0][0] = lowBound
 			newBoundMap[i][1][1] = upperBound
-			if lowBound < 0 and upperBound > 0:
+			'''if lowBound < 0.5 and upperBound > 0.5 and upperBound < 0.6:
 				newBoundMap[i][0][1] = (lowBound + upperBound)/2.0
 				newBoundMap[i][1][0] = (lowBound + upperBound)/2.0
+			elif (lowBound <= 0.5 and upperBound <= 0.5) or (lowBound >= 0.5 and upperBound >= 0.5):
+				newBoundMap[i][0][1] = (lowBound + upperBound)/2.0
+				newBoundMap[i][1][0] = (lowBound + upperBound)/2.0
+			else:
+				newBoundMap[i][0][1] = 0.6
+				newBoundMap[i][1][0] = 0.6'''
+			newBoundMap[i][0][1] = (lowBound + upperBound)/2.0
+			newBoundMap[i][1][0] = (lowBound + upperBound)/2.0
 		else:
 			newBoundMap[i][0] = [lowBound, upperBound]
 			newBoundMap[i][1] = [lowBound, upperBound]
@@ -239,11 +260,11 @@ def determineStability(equilibrium,model):
 	return True
 
 def rambusOscillator(a, numStages):
-	#model = tanhModel.TanhModel(modelParam = a, g_cc = 4.0, g_fwd = 1.0, numStages=numStages)
+	#model = tanhModel.TanhModel(modelParam = a, g_cc = 0.5, g_fwd = 1.0, numStages=numStages)
 	
 	#modelParam = [Vtp, Vtn, Vdd, Kn, Sn]
 	modelParam = [-0.25, 0.25, 1.0, 1.0, 1.0]
-	model = mosfetModel.MosfetModel(modelParam = modelParam, g_cc = 0.5, g_fwd = 1.0, numStages = numStages)
+	model = mosfetModel.MosfetModel(modelParam = modelParam, g_cc = 4.0, g_fwd = 1.0, numStages = numStages)
 	
 	startExp = time.time()
 	lenV = numStages*2
@@ -264,7 +285,7 @@ def rambusOscillator(a, numStages):
 	print ("indexChoiceArray", indexChoiceArray)
 	boundMap = []
 	for i in range(lenV):
-		#boundMap.append({0:[-1.0,0.0],1:[0.0,1.0]})
+		#boundMap.append({0:[-1.0,0.1],1:[0.1,1.0]})
 		boundMap.append({0:[0.0,0.5],1:[0.5,1.0]})
 	#excludingBound = findExcludingBound(exampleOrdering,boundMap,model)
 	#excludingBound = 0.1
@@ -276,45 +297,25 @@ def rambusOscillator(a, numStages):
 	'''bisectionHypers = refineHyper(a, params, xs, ys, zs, [None, None, None, None], boundMap, hyperBound)
 	print "bisectionHypers"
 	print bisectionHypers'''
-	# Shows that feasible which is correct
-	'''hyperRectangle = np.zeros((lenV,2))
-	hyperRectangle[0,:] = [ 0.0999, 0.59705205]
-	hyperRectangle[1,:] = [-0.99900698, -0.89009302]
-	hyperRectangle[2,:] = [-0.59629298, -0.59579687]
-	hyperRectangle[3,:] = [ 0.9987962, 0.99899924]
-	hyperRectangle[4,:] = [-1.00000894, -0.99980893]
-	hyperRectangle[5,:] = [-0.5959967, -0.59579669]
-	hyperRectangle[6,:] = [-0.59705205, -0.17062409]
-	hyperRectangle[7,:] = [ 0.7843508, 0.99900698]
-	hyperRectangle[8,:] = [ 0.59579687, 0.59654831]
-	hyperRectangle[9,:] = [-0.99900186, -0.99879619]
-	hyperRectangle[10,:] = [ 0.99980893, 1.00000894]
-	hyperRectangle[11,:] = [ 0.59579669, 0.5959967 ]'''
 
-	####### PROBLEM!!!!!!!!!
-	# shows that not feasible which is not correct
 	'''hyperRectangle = np.zeros((lenV,2))
-	hyperRectangle[0,:] = [ 0.0999, 0.59705205]
-	hyperRectangle[1,:] = [-0.99900698, -0.89009302]
-	hyperRectangle[2,:] = [-0.59597932, -0.59579687]
-	hyperRectangle[3,:] = [ 0.99889507, 0.99889704]
-	hyperRectangle[4,:] = [-0.99990894, -0.99990894]
-	hyperRectangle[5,:] = [-0.59589669, -0.59589669]
-	hyperRectangle[6,:] = [-0.59705205, -0.38383807]
-	hyperRectangle[7,:] = [ 0.84244429, 0.99900698]
-	hyperRectangle[8,:] = [ 0.59579687, 0.59599072]
-	hyperRectangle[9,:] = [-0.99889715, -0.99889486]
-	hyperRectangle[10,:] = [ 0.99990894, 0.99990894]
-	hyperRectangle[11,:] = [ 0.59589669, 0.59589669]
+	hyperRectangle[0,:] = [0.0, 0.3]
+	hyperRectangle[1,:] = [0.6, 1.0]
+	hyperRectangle[2,:] = [0.6233348, 0.88285783]
+	hyperRectangle[3,:] = [0.0, 0.3]
+	hyperRectangle[4,:] = [0.6, 1.0]
+	hyperRectangle[5,:] = [0.0, 0.6]
+	hyperRectangle[6,:] = [0.10523252, 0.37844998]
+	hyperRectangle[7,:] = [0.6, 1.0]
 
-	feasibility = ifFeasibleHyper(a,params,xs,ys,zs,hyperRectangle, hyperBound)
-	print feasibility
-	#exampleSoln = (hyperRectangle[:,0] + hyperRectangle[:,1])/2.0'''
-	'''exampleSoln = np.array([0.59695205, -0.99890698, -0.59589688, 0.99889619,
-	 -0.99990894, -0.59589669, -0.59695205, 0.99890698, 0.59589688, -0.99889619,
-	 0.99990894, 0.59589669])
-	finalSoln = intervalUtils.newton(a,params,exampleSoln, oscNum, getJacobian)
-	print "finalSoln", finalSoln'''
+	feasibility = ifFeasibleHyper(hyperRectangle, hyperBound,model)
+	#feasibility = intervalUtils.checkExistenceOfSolutionGS(model,hyperRectangle.transpose())
+	print (feasibility)'''
+	'''#exampleSoln = (hyperRectangle[:,0] + hyperRectangle[:,1])/2.0
+	exampleSoln = np.array([0.83, 0.17, 0.83, 0.17])
+	finalSoln = intervalUtils.newton(model,exampleSoln)
+	print ("finalSoln", finalSoln)'''
+	#print (model.currentFun(0.90732064, 0.09267936))
 	'''ordering = [0,1,1,0,1,0,0,1]
 	hypers = refineHyper(a, params, xs, ys, zs, ordering, boundMap, hyperBound)
 	print "hypers"
@@ -411,5 +412,5 @@ triangleConstraint2 = triangleBounds(-5.0,"x1","y1",0.0,0.5)
 print objConstraint + triangleConstraint1 + triangleConstraint2
 variableDict, A, B = constructCoeffMatrices(triangleConstraint1 + triangleConstraint2)
 C = constructObjMatrix(objConstraint,variableDict)'''
-rambusOscillator(-5.0,2)
+rambusOscillator(-5.0,4)
 

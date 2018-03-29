@@ -360,7 +360,13 @@ def z3Version(a, numStages):
 
 			#s.pop()
 			print ("sol found before", sol)
+			
+			# See if the solution given by Z3 leads to an 
+			# actual solution
 			finalSoln = intervalUtils.newton(model,sol)
+			# If an actual solution can be reached construct
+			# biggest possible hyperrectangle and ask Z3 to ignore
+			# it
 			if finalSoln[0]:
 				alreadyFound = False
 				for exSol in solutionsFoundSoFar:
@@ -391,6 +397,8 @@ def z3Version(a, numStages):
 				intervalMap[i].append(sol[i])
 				intervalMap[i].sort()'''
 
+			# The set of hyperrectangles to be used in addition
+			# of constraints for the next iteration
 			for i in range(lenV):
 				intervals = intervalMap[i]
 				for ii in range(len(intervals)-1):
@@ -407,6 +415,9 @@ def z3Version(a, numStages):
 			print ("hyperRectangle1", hyperRectangle1)
 			print ("hyperRectangle2", hyperRectangle2)
 			print ("ignoring solution")
+			
+			# Construct biggest possible hyperrectangle around
+			# solution proposed by Z3 that has no actual solution
 			hyperWithoutSoln = np.zeros((lenV,2))
 			diff = 0.2
 			while True:
@@ -417,6 +428,7 @@ def z3Version(a, numStages):
 				if diff > 0.0001 and (kResult[0] or (kResult[1] is not None)):
 					diff = diff/2.0;
 				elif diff <= 0.0001:
+					print ("ignore solution by z3")
 					ignoringSolConstraint = model.ignoreSolInZ3(sol)
 					s.add(ignoringSolConstraint)
 					break
@@ -438,6 +450,10 @@ def z3Version(a, numStages):
 		else:
 			break
 
+	
+	'''
+	CHECK FOR STABILITY OF SOLUTIONS FOUND
+	'''
 	sampleSols = []
 	rotatedSols = {}
 	stableSols = []

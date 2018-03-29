@@ -1,11 +1,13 @@
 import numpy as np
-import matplotlib.pyplot as plt
 import time
 import copy
 import intervalUtils
 import tanhModel
 import mosfetModel
+from treelib import Node, Tree
+from z3 import *
 
+hyperNum = 0
 
 def ifFeasibleOrdering(ordering,boundMap, hyperBound, model):
 	lenV = model.numStages*2
@@ -45,8 +47,8 @@ def ifFeasibleHyper(hyperRectangle, hyperBound,model):
 	print (hyperRectangle)
 	iterNum = 0
 	while True:
-		print ("hyperRectangle ")
-		print (hyperRectangle)
+		#print ("hyperRectangle ")
+		#print (hyperRectangle)
 		kResult = intervalUtils.checkExistenceOfSolutionGS(model,hyperRectangle.transpose())
 		#print ("kResult")
 		#print (kResult)
@@ -59,11 +61,11 @@ def ifFeasibleHyper(hyperRectangle, hyperBound,model):
 			return (False, None)
 		#print "kResult"
 		#print kResult
-		print ("hyperRectangle ")
-		print (hyperRectangle)
+		#print ("hyperRectangle ")
+		#print (hyperRectangle)
 		feasible, newHyperRectangle = model.linearConstraints(hyperRectangle)
 	
-		print ("newHyperRectangle ", newHyperRectangle)
+		#print ("newHyperRectangle ", newHyperRectangle)
 		if feasible == False:
 			print ("LP not feasible")
 			return (False, None)
@@ -109,24 +111,49 @@ infeasible.
 	a valid interval array, according to the bound map of {0:[-1.0, -0.1], 1:[0.1,1.0]}
 	For -1.0 <= xs[0] <= -0.1 and 0.1 <= xs[1] <= 1.0 and so on, the problem
 	has a feasible solution 
+
+@param parentTree, parent, level to keep track of search tree
 '''
-def getFeasibleIntervalIndices(rootCombinationNode,boundMap,hyperBound, model,refinedHypers):
+def getFeasibleIntervalIndices(rootCombinationNode,boundMap,hyperBound, model,refinedHypers, parentTree, parent, level = 0):
+	global hyperNum
+	hyperId = str(hyperNum)
+	hyperNum += 1
 
 	intervalIndices = rootCombinationNode.rootArray
 	print ("intervalIndices", intervalIndices)
 	print ("boundMap", boundMap)
 	lenV = len(intervalIndices)
 	
-	feasibility = ifFeasibleOrdering(intervalIndices, boundMap, hyperBound,model)
-	print ("feasibility")
+	#feasibility = ifFeasibleOrdering(intervalIndices, boundMap, hyperBound,model)
+	hyperRectangle = np.zeros((lenV,2))
+	for i in range(lenV):
+		if(intervalIndices[i] is not None):
+			hyperRectangle[i][0] = boundMap[i][intervalIndices[i]][0]
+			hyperRectangle[i][1] = boundMap[i][intervalIndices[i]][1]
+		else:
+			hyperRectangle[i][0] = boundMap[i][0][0]
+			hyperRectangle[i][1] = boundMap[i][1][1]
+	
+	origHyperChild = np.copy(hyperRectangle)
+	feasibility = ifFeasibleHyper(hyperRectangle,hyperBound,model)
+
+	print ("feasibility at level", level)
 	print (feasibility)
+
+	hyper_feasHyperString = np.array_str(origHyperChild) + "\n"
 	if feasibility[0]:
 		refinedHypers.append(feasibility[1])
+		hyper_feasHyperString += " TRUE\n" + np.array_str(feasibility[1]) + "\n"
+		parentTree.create_node(hyper_feasHyperString, hyperId, parent = parent)
 		return
 
-	# Generate a conflict interval array if constraints are infeasible
 	if feasibility[0] == False and feasibility[1] is None:
+		hyper_feasHyperString += " FALSE\n" + " NONE\n"
+		parentTree.create_node(hyper_feasHyperString, hyperId, parent = parent)
 		return
+
+	hyper_feasHyperString += " ****\n" + np.array_str(feasibility[1]) + "\n"
+	parentTree.create_node(hyper_feasHyperString, hyperId, parent = parent)
 
 	newBoundMap = copy.deepcopy(boundMap)
 	hyperRectangle = feasibility[1]
@@ -158,7 +185,7 @@ def getFeasibleIntervalIndices(rootCombinationNode,boundMap,hyperBound, model,re
 			break
 	print ("indexOfNone ", indexOfNone)
 	if indexOfNone is None:
-		bisectionHypers = refineHyper(intervalIndices, newBoundMap, hyperBound, model)
+		bisectionHypers = refineHyper(intervalIndices, newBoundMap, hyperBound, model, parentTree, hyperId, level+1)
 		print ("bisectionHypers")
 		print (bisectionHypers)
 		print ("len(refinedHypers) before ", len(refinedHypers))
@@ -167,9 +194,9 @@ def getFeasibleIntervalIndices(rootCombinationNode,boundMap,hyperBound, model,re
 		print ("len(refinedHypers) after ", len(refinedHypers))
 	for i in range(len(rootCombinationNode.children)):
 		getFeasibleIntervalIndices(rootCombinationNode.children[i],
-			newBoundMap, hyperBound, model, refinedHypers)
+			newBoundMap, hyperBound, model, refinedHypers, parentTree, hyperId, level+1)
 
-def refineHyper(ordering, boundMap, maxHyperBound, model):
+def refineHyper(ordering, boundMap, maxHyperBound, model, parentTree, parent, level):
 	lenV = model.numStages*2
 	hyperRectangle = np.zeros((lenV,2))
 	excludingRegConstraint = ""
@@ -185,12 +212,13 @@ def refineHyper(ordering, boundMap, maxHyperBound, model):
 	volumes = []
 
 	print ("before bisecting num ", len(finalHyper))
-	bisectHyper(maxHyperBound, hyperRectangle, 0,model, finalHyper)
+	bisectHyper(maxHyperBound, hyperRectangle, 0,model, finalHyper, parentTree, parent, level)
 	print ("after bisecting num ", len(finalHyper))
 
 	return finalHyper
 
-def bisectHyper(hyperBound,hyperRectangle,bisectingIndex, model,finalHypers):
+def bisectHyper(hyperBound,hyperRectangle,bisectingIndex, model,finalHypers, parentTree, parent, level):
+	global hyperNum
 	#print "hyperRectangle"
 	#print hyperRectangle
 	lenV = hyperRectangle.shape[0]
@@ -202,10 +230,17 @@ def bisectHyper(hyperBound,hyperRectangle,bisectingIndex, model,finalHypers):
 	rightHyper = copy.deepcopy(hyperRectangle)
 	midVal = (hyperRectangle[bisectingIndex][0] + hyperRectangle[bisectingIndex][1])/2.0
 	leftHyper[bisectingIndex][1] = midVal
+	leftHyper_feasHyperString = np.array_str(leftHyper) + "\n"
+	leftHyperId = str(hyperNum)
+	hyperNum += 1
+
 	rightHyper[bisectingIndex][0] = midVal
-	print ("leftHyper")
+	rightHyper_feasHyperString = np.array_str(rightHyper) + "\n"
+	rightHyperId = str(hyperNum)
+	hyperNum += 1
+	print ("leftHyper at level", level)
 	print (leftHyper)
-	print ("rightHyper")
+	print ("rightHyper at level", level)
 	print (rightHyper)
 	feasLeft = ifFeasibleHyper(leftHyper, hyperBound, model)
 	feasRight = ifFeasibleHyper(rightHyper, hyperBound, model)
@@ -214,16 +249,31 @@ def bisectHyper(hyperBound,hyperRectangle,bisectingIndex, model,finalHypers):
 	print ("feasRight")
 	print (feasRight)
 
+
 	if feasLeft[0]:
 		finalHypers.append(feasLeft[1])
-	if feasLeft[0] == False and feasLeft[1] is not None:
-		bisectHyper(hyperBound,feasLeft[1],bisectingIndex+1,model,finalHypers)
+		leftHyper_feasHyperString += " TRUE\n" + np.array_str(feasLeft[1]) + "\n"
+		parentTree.create_node(leftHyper_feasHyperString, leftHyperId, parent = parent)
+	elif feasLeft[0] == False and feasLeft[1] is not None:
+		leftHyper_feasHyperString += " ****\n" + np.array_str(feasLeft[1]) + "\n"
+		parentTree.create_node(leftHyper_feasHyperString, leftHyperId, parent = parent)
+		bisectHyper(hyperBound,feasLeft[1],bisectingIndex+1,model,finalHypers, parentTree, leftHyperId, level+1)
+	else:
+		leftHyper_feasHyperString += " FALSE\n" + " NONE\n"
+		parentTree.create_node(leftHyper_feasHyperString, leftHyperId, parent = parent)
 
 	
 	if feasRight[0]:
 		finalHypers.append(feasRight[1])
-	if feasRight[0] == False and feasRight[1] is not None:
-		bisectHyper(hyperBound,feasRight[1],bisectingIndex+1,model,finalHypers)
+		rightHyper_feasHyperString += " TRUE\n" + np.array_str(feasRight[1]) + "\n"
+		parentTree.create_node(rightHyper_feasHyperString, rightHyperId, parent = parent)
+	elif feasRight[0] == False and feasRight[1] is not None:
+		rightHyper_feasHyperString += " ****\n" + np.array_str(feasRight[1]) + "\n"
+		parentTree.create_node(rightHyper_feasHyperString, rightHyperId, parent = parent)
+		bisectHyper(hyperBound,feasRight[1],bisectingIndex+1,model,finalHypers, parentTree, rightHyperId, level+1)
+	else:
+		rightHyper_feasHyperString += " FALSE\n" + " NONE\n"
+		parentTree.create_node(rightHyper_feasHyperString, rightHyperId, parent = parent)
 
 def findExcludingBound(ordering,boundMap, model, maxDiff = 0.2):
 	lenV = model.numStages*2
@@ -259,12 +309,212 @@ def determineStability(equilibrium,model):
 		return False
 	return True
 
+def z3Version(a, numStages):
+	start = time.time()
+	model = tanhModel.TanhModel(modelParam = a, g_cc = 0.5, g_fwd = 1.0, numStages = numStages, useZ3 = True)
+	lenV = numStages*2
+	hyperRectangle1 = np.zeros((lenV,2))
+	hyperRectangle2 = np.zeros((lenV,2))
+	intervalMap = {}
+	for i in range(lenV):
+		hyperRectangle1[i,:] = [-1.0,0.0]
+		hyperRectangle2[i,:] = [0.0,1.0]
+		intervalMap[i] = [-1.0,0.0,1.0]
+	s = Solver()
+
+	domainConstraint = model.addDomainConstraint()
+	s.add(domainConstraint)
+	
+	allHypers = []
+	solutionsFoundSoFar = []
+	while True:
+		constraintList1 = model.linearConstraints(hyperRectangle1)
+		constraint1 = And(*[constraintList1[ci] for ci in range(len(constraintList1))])
+		constraintList2 = model.linearConstraints(hyperRectangle2)
+		constraint2 = And(*[constraintList2[ci] for ci in range(len(constraintList2))])
+		s.add(constraint1)
+		s.add(constraint2)
+		#s.push()
+		'''for im in range(len(intervalMap[0])-1):
+			hyperRectangle = np.zeros((lenV,2))
+			for ii in range(lenV):
+				hyperRectangle[ii,0] = intervalMap[ii][im]
+				hyperRectangle[ii,1] = intervalMap[ii][im+1]
+			constraintList = model.linearConstraints(hyperRectangle)
+			constraint = And(*[constraintList[ci] for ci in range(len(constraintList))])
+			s.add(constraint)'''
+
+		ch = s.check()
+		print ("ch", ch)
+		if ch == sat:
+			m = s.model()
+			sol = np.zeros((lenV))
+			for d in m.decls():
+				dName = str(d.name())
+				firstLetter = dName[0]
+				if(dName[0]=="x" and dName[1]=="_"):
+					index = int(dName[len(dName) - 1])
+					val = float(Fraction(str(m[d])))
+					#print "index: ", index, " val: ", val
+					sol[index] = val
+
+			#s.pop()
+			print ("sol found before", sol)
+			finalSoln = intervalUtils.newton(model,sol)
+			if finalSoln[0]:
+				alreadyFound = False
+				for exSol in solutionsFoundSoFar:
+					diff = np.absolute(finalSoln[1] - exSol)
+					if np.less_equal(diff, np.ones(diff.shape)*1e-15).all():
+						alreadyFound = True
+						break
+				if not(alreadyFound):
+					solutionsFoundSoFar.append(finalSoln[1])
+					hyperWithUniqueSoln = np.zeros((lenV,2))
+					diff = 0.2
+					while True:
+						#print ("diff", diff)
+						hyperWithUniqueSoln[:,0] = finalSoln[1] - diff
+						hyperWithUniqueSoln[:,1] = finalSoln[1] + diff
+						kResult = intervalUtils.checkExistenceOfSolutionGS(model,hyperWithUniqueSoln.transpose())
+						if kResult[0] == False and kResult[1] is not None:
+							diff = diff/2.0;
+						else:
+							print ("found unique hyper", hyperWithUniqueSoln)
+							allHypers.append(hyperWithUniqueSoln)
+							ignoringConstraint = model.ignoreHyperInZ3(hyperWithUniqueSoln)
+							#print ("ignorintConstraint", ignoringConstraint)
+							s.add(ignoringConstraint)
+							break
+
+			'''for i in range(lenV):
+				intervalMap[i].append(sol[i])
+				intervalMap[i].sort()'''
+
+			for i in range(lenV):
+				intervals = intervalMap[i]
+				for ii in range(len(intervals)-1):
+					if sol[i] >= intervals[ii] and sol[i] <= intervals[ii+1]:
+						hyperRectangle1[i][0] = intervals[ii]
+						hyperRectangle1[i][1] = sol[i]
+						hyperRectangle2[i][0] = sol[i]
+						hyperRectangle2[i][1] = intervals[ii+1]
+				intervalMap[i].append(sol[i])
+				intervalMap[i] = list(set(intervalMap[i]))
+				intervalMap[i].sort()
+			#ignoringSolConstraint = model.ignoreSolInZ3(sol)
+			#s.add(ignoringSolConstraint)
+			print ("hyperRectangle1", hyperRectangle1)
+			print ("hyperRectangle2", hyperRectangle2)
+			print ("ignoring solution")
+			hyperWithoutSoln = np.zeros((lenV,2))
+			diff = 0.2
+			while True:
+				hyperWithoutSoln[:,0] = sol - diff
+				hyperWithoutSoln[:,1] = sol + diff
+				kResult = intervalUtils.checkExistenceOfSolutionGS(model,hyperWithoutSoln.transpose())
+				#print ("kResult", kResult)
+				if diff > 0.0001 and (kResult[0] or (kResult[1] is not None)):
+					diff = diff/2.0;
+				elif diff <= 0.0001:
+					ignoringSolConstraint = model.ignoreSolInZ3(sol)
+					s.add(ignoringSolConstraint)
+					break
+				else:
+					print ("found hyper with no solution", hyperWithoutSoln)
+					ignoringConstraint = model.ignoreHyperInZ3(hyperWithoutSoln)
+					#print ("ignorintConstraint", ignoringConstraint)
+					s.add(ignoringConstraint)
+					break
+				'''else:
+					ignoringSolConstraint = model.ignoreSolInZ3(sol)
+					s.add(ignoringSolConstraint)
+					break'''
+
+			#print ("hyperRectangle1", hyperRectangle1)
+			#print ("hyperRectangle2", hyperRectangle2)
+			print ("sol found", sol)
+
+		else:
+			break
+
+	sampleSols = []
+	rotatedSols = {}
+	stableSols = []
+	unstableSols = []
+	allSols = []
+	for hyper in allHypers:
+		exampleSoln = (hyper[:,0] + hyper[:,1])/2.0
+		finalSoln = intervalUtils.newton(model,exampleSoln)
+		#print "exampleSoln ", exampleSoln
+		#print "finalSoln ", finalSoln
+		stable = determineStability(finalSoln[1],model)
+		if stable:
+			stableSols.append(finalSoln[1])
+		else:
+			unstableSols.append(finalSoln[1])
+		allSols.append(finalSoln[1])
+		
+		# Classify the solutions into equivalence classes
+		if len(sampleSols) == 0:
+			sampleSols.append(finalSoln[1])
+			rotatedSols[0] = []
+		else:
+			foundSample = False
+			for si in range(len(sampleSols)):
+				sample = sampleSols[si]
+				for ii in range(lenV):
+					if abs(finalSoln[1][0] - sample[ii]) < 1e-8:
+						rotatedSample = np.zeros_like(finalSoln[1])
+						for ri in range(lenV):
+							rotatedSample[ri] = sample[(ii+ri)%lenV]
+						if np.less_equal(np.absolute(rotatedSample - finalSoln[1]), np.ones((lenV))*1e-8 ).all():
+							foundSample = True
+							rotatedSols[si].append(ii)
+							break
+				if foundSample:
+					break
+
+			if foundSample == False:
+				sampleSols.append(finalSoln[1])
+				rotatedSols[len(sampleSols)-1] = []
+
+	for hi in range(len(sampleSols)):
+		print ("equivalence class# ", hi)
+		print ("main member ", sampleSols[hi])
+		print ("number of other members ", len(rotatedSols[hi]))
+		print ("other member rotationIndices: ")
+		for mi in range(len(rotatedSols[hi])):
+			print (rotatedSols[hi][mi])
+		print ("")
+
+	for hi in range(len(sampleSols)):
+		if len(rotatedSols[hi]) > lenV - 1 or (len(rotatedSols[hi]) >= 1 and rotatedSols[hi][0] == 0):
+			print ("problem equivalence class# ", hi)
+			print ("main member ", sampleSols[hi])
+			print ("num other Solutions ", len(rotatedSols[hi]))
+
+	print ("")
+	print ("numSolutions, ", len(allHypers))
+	print ("num stable solutions ", len(stableSols))
+	'''for si in range(len(stableSols)):
+		print stableSols[si]'''
+	#print "num unstable solutions ", len(unstableSols)
+	'''for si in range(len(unstableSols)):
+		print unstableSols[si]'''
+	end = time.time()
+	print ("time taken", end - start)
+
+
 def rambusOscillator(a, numStages):
-	#model = tanhModel.TanhModel(modelParam = a, g_cc = 0.5, g_fwd = 1.0, numStages=numStages)
+	global hyperNum
+	hyperNum = 0
+
+	model = tanhModel.TanhModel(modelParam = a, g_cc = 0.5, g_fwd = 1.0, numStages=numStages)
 	
 	#modelParam = [Vtp, Vtn, Vdd, Kn, Sn]
-	modelParam = [-0.25, 0.25, 1.0, 1.0, 1.0]
-	model = mosfetModel.MosfetModel(modelParam = modelParam, g_cc = 4.0, g_fwd = 1.0, numStages = numStages)
+	#modelParam = [-0.25, 0.25, 1.0, 1.0, 1.0]
+	#model = mosfetModel.MosfetModel(modelParam = modelParam, g_cc = 4.0, g_fwd = 1.0, numStages = numStages)
 	
 	startExp = time.time()
 	lenV = numStages*2
@@ -284,9 +534,12 @@ def rambusOscillator(a, numStages):
 	
 	print ("indexChoiceArray", indexChoiceArray)
 	boundMap = []
+	parentHyper = []
 	for i in range(lenV):
-		#boundMap.append({0:[-1.0,0.1],1:[0.1,1.0]})
-		boundMap.append({0:[0.0,0.5],1:[0.5,1.0]})
+		boundMap.append({0:[-1.0,0.0],1:[0.0,1.0]})
+		#boundMap.append({0:[0.0,0.5],1:[0.5,1.0]})
+		parentHyper.append([-1.0, 1.0])
+	parentHyper = np.array(parentHyper)
 	#excludingBound = findExcludingBound(exampleOrdering,boundMap,model)
 	#excludingBound = 0.1
 	print ("boundMap ", boundMap)
@@ -323,9 +576,14 @@ def rambusOscillator(a, numStages):
 	exampleSoln = (hypers[0][:,0] + hypers[0][:,1])/2.0
 	finalSoln = intervalUtils.newton(a,params,exampleSoln, oscNum, getJacobian)
 	print "finalSoln ", finalSoln'''
+	parentTree = Tree()
+	hyper_feasHyperString = np.array_str(parentHyper) + "\n ****\n" + np.array_str(parentHyper) + "\n"
+	hyperId = str(hyperNum)
+	hyperNum += 1
+	parentTree.create_node(hyper_feasHyperString, hyperId)
 	allHypers = []
 	for i in range(len(rootCombinationNodes)):
-		getFeasibleIntervalIndices(rootCombinationNodes[i],boundMap,hyperBound,model,allHypers)
+		getFeasibleIntervalIndices(rootCombinationNodes[i],boundMap,hyperBound,model,allHypers, parentTree, hyperId)
 	
 	print ("allHypers")
 	print (allHypers)
@@ -395,6 +653,7 @@ def rambusOscillator(a, numStages):
 		print unstableSols[si]'''
 	endExp = time.time()
 	print ("TOTAL TIME ", endExp - startExp)
+	#parentTree.show(line_type="ascii-em")
 
 
 '''A = matrix([ [-1.0, -1.0, 0.0, 1.0], [1.0, -1.0, -1.0, -2.0] ])
@@ -412,5 +671,6 @@ triangleConstraint2 = triangleBounds(-5.0,"x1","y1",0.0,0.5)
 print objConstraint + triangleConstraint1 + triangleConstraint2
 variableDict, A, B = constructCoeffMatrices(triangleConstraint1 + triangleConstraint2)
 C = constructObjMatrix(objConstraint,variableDict)'''
-rambusOscillator(-5.0,4)
+#rambusOscillator(-5.0,2)
+z3Version(-5.0,4)
 

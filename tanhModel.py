@@ -1,10 +1,12 @@
 import numpy as np
 import lpUtils
 from cvxopt import matrix,solvers
+from z3 import *
 
 class TanhModel:
-	def __init__(self, modelParam, g_cc, g_fwd, numStages):
+	def __init__(self, modelParam, g_cc, g_fwd, numStages, useZ3 = False):
 		# gradient of tanh -- y = tanh(modelParam*x)
+		self.useZ3 = useZ3
 		self.modelParam = modelParam
 		self.g_cc = g_cc
 		self.g_fwd = g_fwd
@@ -12,10 +14,15 @@ class TanhModel:
 		self.xs = []
 		self.ys = []
 		self.zs = []
-		for i in range(numStages*2):
-			self.xs.append("x" + str(i))
-			self.ys.append("y" + str(i))
-			self.zs.append("z" + str(i))
+		if not(useZ3):
+			for i in range(numStages*2):
+				self.xs.append("x" + str(i))
+				self.ys.append("y" + str(i))
+				self.zs.append("z" + str(i))
+		else:
+			self.xs = RealVector("x", numStages*2)
+			self.ys = RealVector("y", numStages*2)
+			self.zs = RealVector("z", numStages*2)
 
 	'''
 	takes in non-symbolic python values
@@ -74,8 +81,10 @@ class TanhModel:
 			rightIntersectX = (cZero - cHigh)/(dHigh - dZero)
 			rightIntersectY = dHigh*rightIntersectX + cHigh
 
-		overallConstraint = "1 " + Vin + " >= " + str(Vlow) + "\n"
-		overallConstraint += "1 " + Vin + " <= " + str(Vhigh) + "\n"
+		overallConstraint = ""
+		if type(Vin) == str is None:
+			overallConstraint = "1 " + Vin + " >= " + str(Vlow) + "\n"
+			overallConstraint += "1 " + Vin + " <= " + str(Vhigh) + "\n"
 
 		# Construct constraints from the convex hull of (Vlow, tanhFunVlow),
 		# (leftIntersectX, leftIntersectY), (0,0), (rightIntersectX, rightIntersectY),
@@ -111,22 +120,52 @@ class TanhModel:
 			grad = (points[ii][1] - points[i][1])/(points[ii][0] - points[i][0])
 			c = points[i][1] - grad*points[i][0]
 			if points[i] == (Vlow, tanhFunVlow) and points[ii] == (rightIntersectX, rightIntersectY):
-				overallConstraint += "1 "+Vout + " + " +str(-grad) + " " + Vin + " >= "+str(c) + "\n"
+				if type(Vin) == str:
+					overallConstraint += "1 "+Vout + " + " +str(-grad) + " " + Vin + " >= "+str(c) + "\n"
+				else:
+					return And(Implies(And(Vin >= Vlow, Vin <= Vhigh), Vout - grad*Vin >= c),
+								Implies(Vin >= 0, Vout <= 0),
+								Implies(Vin <= 0, Vout >= 0))
+			
 			elif points[i] == (rightIntersectX, rightIntersectY) and points[ii] == (Vhigh, tanhFunVhigh):
-				overallConstraint += "1 "+Vout + " + " +str(-grad) + " " + Vin + " >= "+str(c) + "\n"
+				if type(Vin) == str:
+					overallConstraint += "1 "+Vout + " + " +str(-grad) + " " + Vin + " >= "+str(c) + "\n"
+				else:
+					return And(Implies(And(Vin >= Vlow, Vin <= Vhigh), Vout - grad*Vin >= c),
+								Implies(Vin >= 0, Vout <= 0),
+								Implies(Vin <= 0, Vout >= 0))
+			
 			elif points[i] == (Vhigh, tanhFunVhigh) and points[ii] == (leftIntersectX, leftIntersectY):
-				overallConstraint += "1 "+Vout + " + " +str(-grad) + " " + Vin + " <= "+str(c) + "\n"
+				if type(Vin) == str:	
+					overallConstraint += "1 "+Vout + " + " +str(-grad) + " " + Vin + " <= "+str(c) + "\n"
+				else:
+					return And(Implies(And(Vin >= Vlow, Vin <= Vhigh), Vout - grad*Vin <= c),
+								Implies(Vin >= 0, Vout <= 0),
+								Implies(Vin <= 0, Vout >= 0))
+			
 			elif points[i] == (leftIntersectX, leftIntersectY) and points[ii] == (Vlow, tanhFunVlow):
-				#print "grad", grad, "c", c
-				#print "dLow", dLow, "cLow", cLow
-				overallConstraint += "1 "+Vout + " + " +str(-grad) + " " + Vin + " <= "+str(c) + "\n"
+				if type(Vin) == str:
+					overallConstraint += "1 "+Vout + " + " +str(-grad) + " " + Vin + " <= "+str(c) + "\n"
+				else:
+					return And(Implies(And(Vin >= Vlow, Vin <= Vhigh), Vout - grad*Vin <= c),
+								Implies(Vin >= 0, Vout <= 0),
+								Implies(Vin <= 0, Vout >= 0))
 
 			elif points[i] == (Vhigh, tanhFunVhigh) and points[ii] == (Vlow, tanhFunVlow):
-				overallConstraint += "1 "+Vout + " + " +str(-grad) + " " + Vin + " <= "+str(c) + "\n"
+				if type(Vin) == str:
+					overallConstraint += "1 "+Vout + " + " +str(-grad) + " " + Vin + " <= "+str(c) + "\n"
+				else:
+					return And(Implies(And(Vin >= Vlow, Vin <= Vhigh), Vout - grad*Vin <= c),
+								Implies(Vin >= 0, Vout <= 0),
+								Implies(Vin <= 0, Vout >= 0))
 
 			elif points[i] == (Vlow, tanhFunVlow) and points[ii] == (Vhigh, tanhFunVhigh):
-				#print "coming here?"
-				overallConstraint += "1 "+Vout + " + " +str(-grad) + " " + Vin + " >= "+str(c) + "\n"
+				if type(Vin) == str:	
+					overallConstraint += "1 "+Vout + " + " +str(-grad) + " " + Vin + " >= "+str(c) + "\n"
+				else:
+					return And(Implies(And(Vin >= Vlow, Vin <= Vhigh), Vout - grad*Vin >= c),
+								Implies(Vin >= 0, Vout <= 0),
+								Implies(Vin <= 0, Vout >= 0))
 
 		#print "overallConstraint", overallConstraint
 		return overallConstraint
@@ -145,8 +184,10 @@ class TanhModel:
 		cHigh = tanhFunVhigh - dHigh*Vhigh
 		cThird = tanhFunVlow - dThird*Vlow
 
-		overallConstraint = "1 " + Vin + " >= " + str(Vlow) + "\n"
-		overallConstraint += "1 " + Vin + " <= " + str(Vhigh) + "\n"
+		overallConstraint = None
+		if type(Vin) == str:
+			overallConstraint = "1 " + Vin + " >= " + str(Vlow) + "\n"
+			overallConstraint += "1 " + Vin + " <= " + str(Vhigh) + "\n"
 
 		#print "dLow ", dLow, "dHigh ", dHigh, "dThird ", dThird
 		#print "cLow ", cLow, "cHigh ", cHigh, "cThird ", 
@@ -155,24 +196,57 @@ class TanhModel:
 
 		if self.modelParam > 0:
 			if Vlow >= 0 and Vhigh >=0:
-				return overallConstraint + "1 "+ Vout + " + " +str(-dThird) + " " + Vin + " >= "+str(cThird)+"\n" +\
-				"1 "+Vout + " + " +str(-dLow) + " " + Vin + " <= "+str(cLow)+"\n" +\
-				"1 "+Vout + " + " +str(-dHigh) + " " + Vin + " <= "+str(cHigh) + "\n"
+				if not(self.useZ3):
+					return overallConstraint + "1 "+ Vout + " + " +str(-dThird) + " " + Vin + " >= "+str(cThird)+"\n" +\
+					"1 "+Vout + " + " +str(-dLow) + " " + Vin + " <= "+str(cLow)+"\n" +\
+					"1 "+Vout + " + " +str(-dHigh) + " " + Vin + " <= "+str(cHigh) + "\n"
+				else:
+					return And(Implies(And(Vin >= Vlow, Vin <=Vhigh),
+										And(Vout - dThird*Vin >= cThird,
+											Vout - dLow*Vin <= cLow,
+											Vout - dHigh*Vin <= cHigh)),
+								Implies(Vin >= 0, Vout >= 0),
+								Implies(Vin >= 0, Vout >= 0))
 
 			elif Vlow <=0 and Vhigh <=0:
-				return overallConstraint + "1 "+ Vout + " + " +str(-dThird) + " " + Vin + " <= "+str(cThird)+"\n" +\
-				"1 "+Vout + " + " +str(-dLow) + " " + Vin + " >= "+str(cLow)+"\n" +\
-				"1 "+Vout + " + " +str(-dHigh) + " " + Vin + " >= "+str(cHigh) + "\n"
+				if not(self.useZ3):
+					return overallConstraint + "1 "+ Vout + " + " +str(-dThird) + " " + Vin + " <= "+str(cThird)+"\n" +\
+					"1 "+Vout + " + " +str(-dLow) + " " + Vin + " >= "+str(cLow)+"\n" +\
+					"1 "+Vout + " + " +str(-dHigh) + " " + Vin + " >= "+str(cHigh) + "\n"
+				else:
+					return And(Implies(And(Vin >= Vlow, Vin <=Vhigh),
+										And(Vout - dThird*Vin <= cThird,
+											Vout - dLow*Vin >= cLow,
+											Vout - dHigh*Vin >= cHigh)),
+								Implies(Vin >= 0, Vout >= 0),
+								Implies(Vin <= 0, Vout <= 0))
 
 		elif self.modelParam< 0:
 			if Vlow <= 0 and Vhigh <=0:
-				return overallConstraint + "1 "+Vout + " + " +str(-dThird) + " " + Vin + " >= "+str(cThird)+"\n" +\
-				"1 "+Vout + " + " +str(-dLow) + " " + Vin + " <= "+str(cLow)+"\n" +\
-				"1 "+Vout + " + " +str(-dHigh) + " " + Vin + " <= "+str(cHigh) + "\n"
+				if not(self.useZ3):
+					return overallConstraint + "1 "+Vout + " + " +str(-dThird) + " " + Vin + " >= "+str(cThird)+"\n" +\
+					"1 "+Vout + " + " +str(-dLow) + " " + Vin + " <= "+str(cLow)+"\n" +\
+					"1 "+Vout + " + " +str(-dHigh) + " " + Vin + " <= "+str(cHigh) + "\n"
+				else:
+					return And(Implies(And(Vin >= Vlow, Vin <=Vhigh),
+										And(Vout - dThird*Vin >= cThird,
+											Vout - dLow*Vin <= cLow,
+											Vout - dHigh*Vin <= cHigh)),
+								Implies(Vin <= 0, Vout >= 0),
+								Implies(Vin >= 0, Vout <= 0))
+
 			elif Vlow >=0 and Vhigh >=0:
-				return overallConstraint + "1 "+Vout + " + " +str(-dThird) + " " + Vin + " <= "+str(cThird)+"\n" +\
-				"1 "+Vout + " + " +str(-dLow) + " " + Vin + " >= "+str(cLow)+"\n" +\
-				"1 "+Vout + " + " +str(-dHigh) + " " + Vin + " >= "+str(cHigh) + "\n"
+				if not(self.useZ3):
+					return overallConstraint + "1 "+Vout + " + " +str(-dThird) + " " + Vin + " <= "+str(cThird)+"\n" +\
+					"1 "+Vout + " + " +str(-dLow) + " " + Vin + " >= "+str(cLow)+"\n" +\
+					"1 "+Vout + " + " +str(-dHigh) + " " + Vin + " >= "+str(cHigh) + "\n"
+				else:
+					return And(Implies(And(Vin >= Vlow, Vin <=Vhigh),
+										And(Vout - dThird*Vin <= cThird,
+											Vout - dLow*Vin >= cLow,
+											Vout - dHigh*Vin >= cHigh)),
+								Implies(Vin <= 0, Vout >= 0),
+								Implies(Vin >= 0, Vout <= 0))
 				
 	def oscNum(self,V):
 		lenV = len(V)
@@ -226,64 +300,102 @@ class TanhModel:
 				jac[i,(i + lenV//2) % lenV,1] = max(gccVal1,gccVal2)
 		return jac
 
+	def ignoreHyperInZ3(self, hyperRectangle):
+		lenV = hyperRectangle.shape[0]
+		constraint = (Or(*[Or(self.xs[i] < hyperRectangle[i][0], 
+							self.xs[i] > hyperRectangle[i][1]) for i in range(lenV)]))
+		return constraint
+
+	def ignoreSolInZ3(self, sol):
+		lenV = len(sol)
+		constraint = (Or(*[self.xs[i] != sol[i] for i in range(lenV)]))
+		return constraint
+
+	def addDomainConstraint(self):
+		lenV = self.numStages*2
+		constraint1 = And(*[And(self.xs[i] >= -1.0,
+							self.xs[i] <= 1.0) for i in range(lenV)])
+		constraint2 = And(*[self.g_fwd*self.ys[i] + (-self.g_fwd - self.g_cc)*self.xs[i] + self.g_cc*self.zs[i] == 0 
+			for i in range(lenV)])
+		constraint = And(constraint1, constraint2)
+		return constraint
+
+
 	def linearConstraints(self, hyperRectangle):
 		solvers.options["show_progress"] = False
 		allConstraints = ""
 		lenV = self.numStages*2
 
 		allConstraints = ""
+		constraintList = []
 		for i in range(lenV):
 			fwdInd = (i-1)%lenV
 			ccInd = (i+lenV//2)%lenV
 			#print "fwdInd ", fwdInd, " ccInd ", ccInd
 			#print "hyperRectangle[fwdInd][0]", hyperRectangle[fwdInd][0], "hyperRectangle[fwdInd][1]", hyperRectangle[fwdInd][1]
-			triangleClaimFwd = ""
-			if hyperRectangle[fwdInd,0] < 0 and hyperRectangle[fwdInd,1] > 0:
-				triangleClaimFwd += self.triangleConvexHullBounds(self.xs[fwdInd],self.ys[i],hyperRectangle[fwdInd,0],hyperRectangle[fwdInd,1])
-			else:
-				triangleClaimFwd += self.triangleBounds(self.xs[fwdInd],self.ys[i],hyperRectangle[fwdInd,0],hyperRectangle[fwdInd,1])
-			allConstraints += triangleClaimFwd
+			
+			if not(self.useZ3):
+				triangleClaimFwd = ""
+				if hyperRectangle[fwdInd,0] < 0 and hyperRectangle[fwdInd,1] > 0:
+					triangleClaimFwd += self.triangleConvexHullBounds(self.xs[fwdInd],self.ys[i],hyperRectangle[fwdInd,0],hyperRectangle[fwdInd,1])
+				else:
+					triangleClaimFwd += self.triangleBounds(self.xs[fwdInd],self.ys[i],hyperRectangle[fwdInd,0],hyperRectangle[fwdInd,1])
+				allConstraints += triangleClaimFwd
 
-			triangleClaimCc = ""
-			if hyperRectangle[ccInd,0] < 0 and hyperRectangle[ccInd,1] > 0:
-				triangleClaimCc += self.triangleConvexHullBounds(self.xs[ccInd],self.zs[i],hyperRectangle[ccInd,0],hyperRectangle[ccInd,1])
+				triangleClaimCc = ""
+				if hyperRectangle[ccInd,0] < 0 and hyperRectangle[ccInd,1] > 0:
+					triangleClaimCc += self.triangleConvexHullBounds(self.xs[ccInd],self.zs[i],hyperRectangle[ccInd,0],hyperRectangle[ccInd,1])
+				else:
+					triangleClaimCc += self.triangleBounds(self.xs[ccInd],self.zs[i],hyperRectangle[ccInd,0],hyperRectangle[ccInd,1])
+				allConstraints += triangleClaimCc
+					
+				allConstraints += str(self.g_fwd) + " " + self.ys[i] + " + " + str(-self.g_fwd-self.g_cc) + \
+				" " + self.xs[i] + " + " + str(self.g_cc) + " "  + self.zs[i] + " >= 0.0\n"
+				allConstraints += str(self.g_fwd) + " " + self.ys[i] + " + " + str(-self.g_fwd-self.g_cc) + \
+				" " + self.xs[i] + " + " + str(self.g_cc) + " "  + self.zs[i] + " <= 0.0\n"
 			else:
-				triangleClaimCc += self.triangleBounds(self.xs[ccInd],self.zs[i],hyperRectangle[ccInd,0],hyperRectangle[ccInd,1])
-			allConstraints += triangleClaimCc
 				
-			allConstraints += str(self.g_fwd) + " " + self.ys[i] + " + " + str(-self.g_fwd-self.g_cc) + \
-			" " + self.xs[i] + " + " + str(self.g_cc) + " "  + self.zs[i] + " >= 0.0\n"
-			allConstraints += str(self.g_fwd) + " " + self.ys[i] + " + " + str(-self.g_fwd-self.g_cc) + \
-			" " + self.xs[i] + " + " + str(self.g_cc) + " "  + self.zs[i] + " <= 0.0\n"
+				if hyperRectangle[fwdInd,0] < 0 and hyperRectangle[fwdInd,1] > 0:
+					constraintList.append(self.triangleConvexHullBounds(self.xs[fwdInd],self.ys[i],hyperRectangle[fwdInd,0],hyperRectangle[fwdInd,1]))
+				else:
+					constraintList.append(self.triangleBounds(self.xs[fwdInd],self.ys[i],hyperRectangle[fwdInd,0],hyperRectangle[fwdInd,1]))
 
-		'''allConstraintList = allConstraints.splitlines()
-		allConstraints = ""
-		for i in range(len(allConstraintList)):
-			allConstraints += allConstraintList[i] + "\n"
-		print "numConstraints ", len(allConstraintList)
-		print "allConstraints"
-		print allConstraints'''
-		variableDict, A, B = lpUtils.constructCoeffMatrices(allConstraints)
-		newHyperRectangle = np.copy(hyperRectangle)
-		feasible = True
-		for i in range(lenV):
-			#print "min max ", i
-			minObjConstraint = "min 1 " + self.xs[i]
-			maxObjConstraint = "max 1 " + self.xs[i]
-			Cmin = lpUtils.constructObjMatrix(minObjConstraint,variableDict)
-			Cmax = lpUtils.constructObjMatrix(maxObjConstraint,variableDict)
-			minSol = solvers.lp(Cmin,A,B)
-			maxSol = solvers.lp(Cmax,A,B)
-			if minSol["status"] == "primal infeasible" and maxSol["status"] == "primal infeasible":
-				feasible = False
-				break
-			else:
-				if minSol["status"] == "optimal":
-					newHyperRectangle[i,0] = minSol['x'][variableDict[self.xs[i]]] - 1e-6
-				if maxSol["status"] == "optimal":
-					newHyperRectangle[i,1] = maxSol['x'][variableDict[self.xs[i]]] + 1e-6
+				if hyperRectangle[ccInd,0] < 0 and hyperRectangle[ccInd,1] > 0:
+					constraintList.append(self.triangleConvexHullBounds(self.xs[ccInd],self.zs[i],hyperRectangle[ccInd,0],hyperRectangle[ccInd,1]))
+				else:
+					constraintList.append(self.triangleBounds(self.xs[ccInd],self.zs[i],hyperRectangle[ccInd,0],hyperRectangle[ccInd,1]))
 
-		return [feasible, newHyperRectangle]
+		if not(self.useZ3):
+			'''allConstraintList = allConstraints.splitlines()
+			allConstraints = ""
+			for i in range(len(allConstraintList)):
+				allConstraints += allConstraintList[i] + "\n"
+			print "numConstraints ", len(allConstraintList)
+			print "allConstraints"
+			print allConstraints'''
+			variableDict, A, B = lpUtils.constructCoeffMatrices(allConstraints)
+			newHyperRectangle = np.copy(hyperRectangle)
+			feasible = True
+			for i in range(lenV):
+				#print "min max ", i
+				minObjConstraint = "min 1 " + self.xs[i]
+				maxObjConstraint = "max 1 " + self.xs[i]
+				Cmin = lpUtils.constructObjMatrix(minObjConstraint,variableDict)
+				Cmax = lpUtils.constructObjMatrix(maxObjConstraint,variableDict)
+				minSol = solvers.lp(Cmin,A,B)
+				maxSol = solvers.lp(Cmax,A,B)
+				if minSol["status"] == "primal infeasible" and maxSol["status"] == "primal infeasible":
+					feasible = False
+					break
+				else:
+					if minSol["status"] == "optimal":
+						newHyperRectangle[i,0] = minSol['x'][variableDict[self.xs[i]]] - 1e-6
+					if maxSol["status"] == "optimal":
+						newHyperRectangle[i,1] = maxSol['x'][variableDict[self.xs[i]]] + 1e-6
+
+			return [feasible, newHyperRectangle]
+		else:
+			return constraintList
 
 
 

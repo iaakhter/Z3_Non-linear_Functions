@@ -309,44 +309,77 @@ def determineStability(equilibrium,model):
 		return False
 	return True
 
+def findAndIgnoreNewtonSoln(model, minVal, maxVal, numTrials = 10):
+	lenV = model.numStages*2
+	allHypers = []
+	solutionsFoundSoFar = []
+	for n in range(numTrials):
+		trialSoln = np.random.uniform(minVal, maxVal, (lenV))
+		finalSoln = intervalUtils.newton(model,trialSoln)
+		if finalSoln[0]:
+			alreadyFound = False
+			for exSol in solutionsFoundSoFar:
+				diff = np.absolute(finalSoln[1] - exSol)
+				if np.less_equal(diff, np.ones(diff.shape)*1e-15).all():
+					alreadyFound = True
+					break
+			if not(alreadyFound):
+				solutionsFoundSoFar.append(finalSoln[1])
+				hyperWithUniqueSoln = np.zeros((lenV,2))
+				diff = np.ones((lenV))*0.4
+				startingIndex = 0
+				while True:
+					#print ("diff", diff)
+					hyperWithUniqueSoln[:,0] = finalSoln[1] - diff
+					hyperWithUniqueSoln[:,1] = finalSoln[1] + diff
+					kResult = intervalUtils.checkExistenceOfSolutionGS(model,hyperWithUniqueSoln.transpose())
+					if kResult[0] == False and kResult[1] is not None:
+						diff[startingIndex] = diff[startingIndex]/2.0
+						startingIndex = (startingIndex + 1)%lenV
+					else:
+						print ("Preprocess: found unique hyper", hyperWithUniqueSoln)
+						allHypers.append(hyperWithUniqueSoln)
+						model.ignoreHyperInZ3(hyperWithUniqueSoln)
+						#model.linearConstraints(hyperWithUniqueSoln)
+						break
+	return (allHypers, solutionsFoundSoFar)
+
+
 def z3Version(a, numStages):
 	start = time.time()
-	model = tanhModel.TanhModel(modelParam = a, g_cc = 0.5, g_fwd = 1.0, numStages = numStages, useZ3 = True)
+	s = Solver()
+	model = tanhModel.TanhModel(modelParam = a, g_cc = 0.5, g_fwd = 1.0, numStages = numStages, solver = s)
 	lenV = numStages*2
 	hyperRectangle1 = np.zeros((lenV,2))
 	hyperRectangle2 = np.zeros((lenV,2))
 	intervalMap = {}
+	
 	for i in range(lenV):
 		hyperRectangle1[i,:] = [-1.0,0.0]
 		hyperRectangle2[i,:] = [0.0,1.0]
 		intervalMap[i] = [-1.0,0.0,1.0]
-	s = Solver()
 
-	domainConstraint = model.addDomainConstraint()
-	s.add(domainConstraint)
+	model.addDomainConstraint()
 	
-	allHypers = []
-	solutionsFoundSoFar = []
+	allHypers,solutionsFoundSoFar = findAndIgnoreNewtonSoln(model, -1.0, 1.0, numTrials = numStages*100)
+	#allHypers = []
+	#solutionsFoundSoFar = []
+	startingIndex = 0
+	addConstraint = False
+	countUnsat = 0
+
 	while True:
-		constraintList1 = model.linearConstraints(hyperRectangle1)
-		constraint1 = And(*[constraintList1[ci] for ci in range(len(constraintList1))])
-		constraintList2 = model.linearConstraints(hyperRectangle2)
-		constraint2 = And(*[constraintList2[ci] for ci in range(len(constraintList2))])
-		s.add(constraint1)
-		s.add(constraint2)
+		model.linearConstraints(hyperRectangle1)
+		model.linearConstraints(hyperRectangle2)
+
 		#s.push()
-		'''for im in range(len(intervalMap[0])-1):
-			hyperRectangle = np.zeros((lenV,2))
-			for ii in range(lenV):
-				hyperRectangle[ii,0] = intervalMap[ii][im]
-				hyperRectangle[ii,1] = intervalMap[ii][im+1]
-			constraintList = model.linearConstraints(hyperRectangle)
-			constraint = And(*[constraintList[ci] for ci in range(len(constraintList))])
-			s.add(constraint)'''
+		#if addConstraint:
+		#	model.thisOrThatHyperConstraint(hyperRectangle1, hyperRectangle2)
 
 		ch = s.check()
 		print ("ch", ch)
 		if ch == sat:
+			countUnsat = 0
 			m = s.model()
 			sol = np.zeros((lenV))
 			for d in m.decls():
@@ -358,9 +391,8 @@ def z3Version(a, numStages):
 					#print "index: ", index, " val: ", val
 					sol[index] = val
 
-			#s.pop()
 			print ("sol found before", sol)
-			
+			#s.pop()
 			# See if the solution given by Z3 leads to an 
 			# actual solution
 			finalSoln = intervalUtils.newton(model,sol)
@@ -377,28 +409,27 @@ def z3Version(a, numStages):
 				if not(alreadyFound):
 					solutionsFoundSoFar.append(finalSoln[1])
 					hyperWithUniqueSoln = np.zeros((lenV,2))
-					diff = 0.2
+					diff = np.ones((lenV))*0.4
+					startingIndex = 0
 					while True:
 						#print ("diff", diff)
 						hyperWithUniqueSoln[:,0] = finalSoln[1] - diff
 						hyperWithUniqueSoln[:,1] = finalSoln[1] + diff
 						kResult = intervalUtils.checkExistenceOfSolutionGS(model,hyperWithUniqueSoln.transpose())
 						if kResult[0] == False and kResult[1] is not None:
-							diff = diff/2.0;
+							diff[startingIndex] = diff[startingIndex]/2.0
+							startingIndex = (startingIndex + 1)%lenV
 						else:
 							print ("found unique hyper", hyperWithUniqueSoln)
 							allHypers.append(hyperWithUniqueSoln)
-							ignoringConstraint = model.ignoreHyperInZ3(hyperWithUniqueSoln)
-							#print ("ignorintConstraint", ignoringConstraint)
-							s.add(ignoringConstraint)
+							model.ignoreHyperInZ3(hyperWithUniqueSoln)
+							#model.linearConstraints(hyperWithUniqueSoln)
 							break
-
-			'''for i in range(lenV):
-				intervalMap[i].append(sol[i])
-				intervalMap[i].sort()'''
 
 			# The set of hyperrectangles to be used in addition
 			# of constraints for the next iteration
+			#hyperRectangle1 = np.zeros((lenV,2))
+			#hyperRectangle2 = np.zeros((lenV,2))
 			for i in range(lenV):
 				intervals = intervalMap[i]
 				for ii in range(len(intervals)-1):
@@ -410,8 +441,6 @@ def z3Version(a, numStages):
 				intervalMap[i].append(sol[i])
 				intervalMap[i] = list(set(intervalMap[i]))
 				intervalMap[i].sort()
-			#ignoringSolConstraint = model.ignoreSolInZ3(sol)
-			#s.add(ignoringSolConstraint)
 			print ("hyperRectangle1", hyperRectangle1)
 			print ("hyperRectangle2", hyperRectangle2)
 			print ("ignoring solution")
@@ -419,35 +448,43 @@ def z3Version(a, numStages):
 			# Construct biggest possible hyperrectangle around
 			# solution proposed by Z3 that has no actual solution
 			hyperWithoutSoln = np.zeros((lenV,2))
-			diff = 0.2
+			diff = np.ones((lenV))*0.4
+			startingIndex = 0
 			while True:
+				#print ("diff", diff)
 				hyperWithoutSoln[:,0] = sol - diff
 				hyperWithoutSoln[:,1] = sol + diff
 				kResult = intervalUtils.checkExistenceOfSolutionGS(model,hyperWithoutSoln.transpose())
 				#print ("kResult", kResult)
-				if diff > 0.0001 and (kResult[0] or (kResult[1] is not None)):
-					diff = diff/2.0;
-				elif diff <= 0.0001:
+				if diff[startingIndex] > 0.0001 and (kResult[0] or (kResult[1] is not None)):
+					diff[startingIndex] = diff[startingIndex]/2.0
+					startingIndex = (startingIndex + 1)%lenV
+				elif (diff <= 0.0001).all():
 					print ("ignore solution by z3")
-					ignoringSolConstraint = model.ignoreSolInZ3(sol)
-					s.add(ignoringSolConstraint)
+					model.ignoreSolInZ3(sol)
 					break
 				else:
 					print ("found hyper with no solution", hyperWithoutSoln)
-					ignoringConstraint = model.ignoreHyperInZ3(hyperWithoutSoln)
-					#print ("ignorintConstraint", ignoringConstraint)
-					s.add(ignoringConstraint)
+					model.ignoreHyperInZ3(hyperWithoutSoln)
+					#model.linearConstraints(hyperWithoutSoln)
 					break
-				'''else:
-					ignoringSolConstraint = model.ignoreSolInZ3(sol)
-					s.add(ignoringSolConstraint)
-					break'''
 
 			#print ("hyperRectangle1", hyperRectangle1)
 			#print ("hyperRectangle2", hyperRectangle2)
 			print ("sol found", sol)
+			addConstraint = True
 
 		else:
+			'''s.pop()
+			overallHyper = np.zeros((lenV,2))
+			overallHyper[:,0] = hyperRectangle1[:,0]
+			overallHyper[:,1] = hyperRectangle2[:,1]
+			print ("ignoring overallHyper")
+			print (overallHyper)
+			model.ignoreHyperInZ3(overallHyper)
+			countUnsat += 1
+			addConstraint = False
+			if countUnsat >= 2:'''
 			break
 
 	
@@ -526,11 +563,12 @@ def rambusOscillator(a, numStages):
 	global hyperNum
 	hyperNum = 0
 
-	model = tanhModel.TanhModel(modelParam = a, g_cc = 0.5, g_fwd = 1.0, numStages=numStages)
+	#model = tanhModel.TanhModel(modelParam = a, g_cc = 0.5, g_fwd = 1.0, numStages=numStages)
 	
 	#modelParam = [Vtp, Vtn, Vdd, Kn, Sn]
 	#modelParam = [-0.25, 0.25, 1.0, 1.0, 1.0]
-	#model = mosfetModel.MosfetModel(modelParam = modelParam, g_cc = 4.0, g_fwd = 1.0, numStages = numStages)
+	modelParam = [-0.4, 0.4, 1.8, 1.5, 8/3.0]
+	model = mosfetModel.MosfetModel(modelParam = modelParam, g_cc = 0.5, g_fwd = 1.0, numStages = numStages)
 	
 	startExp = time.time()
 	lenV = numStages*2
@@ -552,8 +590,8 @@ def rambusOscillator(a, numStages):
 	boundMap = []
 	parentHyper = []
 	for i in range(lenV):
-		boundMap.append({0:[-1.0,0.0],1:[0.0,1.0]})
-		#boundMap.append({0:[0.0,0.5],1:[0.5,1.0]})
+		#boundMap.append({0:[-1.0,0.0],1:[0.0,1.0]})
+		boundMap.append({0:[0.0,0.5],1:[0.5,2.0]})
 		parentHyper.append([-1.0, 1.0])
 	parentHyper = np.array(parentHyper)
 	#excludingBound = findExcludingBound(exampleOrdering,boundMap,model)
@@ -687,6 +725,6 @@ triangleConstraint2 = triangleBounds(-5.0,"x1","y1",0.0,0.5)
 print objConstraint + triangleConstraint1 + triangleConstraint2
 variableDict, A, B = constructCoeffMatrices(triangleConstraint1 + triangleConstraint2)
 C = constructObjMatrix(objConstraint,variableDict)'''
-#rambusOscillator(-5.0,2)
-z3Version(-5.0,4)
+rambusOscillator(-5.0,4)
+#z3Version(-5.0,2)
 

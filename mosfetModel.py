@@ -13,7 +13,8 @@ class MosfetModel:
 		self.Vdd = modelParam[2]
 		self.Kn = modelParam[3]
 		self.Sn = modelParam[4]
-		self.Kp = -self.Kn/2.0
+		#self.Kp = -self.Kn/2.0
+		self.Kp = -self.Kn/3.0
 		self.Sp = self.Sn*2.0
 		self.g_cc = g_cc
 		self.g_fwd = g_fwd
@@ -32,79 +33,49 @@ class MosfetModel:
 		self.secDerSigns = [None]*7
 		rings = [None]*7
 		self.polygonRegs = [None]*7
-		rings[0] = ogr.Geometry(ogr.wkbLinearRing)
-		rings[0].AddPoint(0.0,0.0)
-		rings[0].AddPoint(self.Vtn, 0.0)
-		rings[0].AddPoint(self.Vtn, self.Vtn - self.Vtp)
-		rings[0].AddPoint(0.0,-self.Vtp)
-		rings[0].AddPoint(0.0, 0.0)
-		self.polygonRegs[0] = ogr.Geometry(ogr.wkbPolygon)
-		self.polygonRegs[0].AddGeometry(rings[0])
-		self.secDerSigns[0] = "pos"
+		Is = [None]*7
+		secDerIns = [None]*7
+		secDerOuts = [None]*7
+		secDerInOuts = [None]*7
+		regPts = [[(0.0, 0.0),(self.Vtn, 0.0), (self.Vtn, self.Vtn - self.Vtp), (0.0, -self.Vtp)],
+					[(0.0, -self.Vtp), (self.Vtn, self.Vtn - self.Vtp), (self.Vtn, self.Vdd), (0.0,self.Vdd)],
+					[(self.Vtn,0.0), (self.Vdd + self.Vtp, 0.0), (self.Vdd + self.Vtp, self.Vdd + self.Vtp - self.Vtn)],
+					[(self.Vtn,0.0), (self.Vdd + self.Vtp, self.Vdd + self.Vtp - self.Vtn), (self.Vdd + self.Vtp, self.Vdd), (self.Vtn,self.Vtn -self.Vtp)],
+					[(self.Vtn,self.Vtn -self.Vtp), (self.Vdd + self.Vtp, self.Vdd), (self.Vtn, self.Vdd)],
+					[(self.Vdd + self.Vtp,0.0), (self.Vdd, 0.0), (self.Vdd, self.Vdd - self.Vtn), (self.Vdd + self.Vtp, self.Vdd + self.Vtp - self.Vtn)],
+					[(self.Vdd + self.Vtp,self.Vdd + self.Vtp - self.Vtn), (self.Vdd, self.Vdd - self.Vtn), (self.Vdd, self.Vdd), (self.Vdd + self.Vtp, self.Vdd)]]
 
-		rings[1] = ogr.Geometry(ogr.wkbLinearRing)
-		rings[1].AddPoint(0.0,-self.Vtp)
-		rings[1].AddPoint(self.Vtn, self.Vtn - self.Vtp)
-		rings[1].AddPoint(self.Vtn, 1.0)
-		rings[1].AddPoint(0.0,1.0)
-		rings[1].AddPoint(0.0,-self.Vtp)
-		self.polygonRegs[1] = ogr.Geometry(ogr.wkbPolygon)
-		self.polygonRegs[1].AddGeometry(rings[1])
-		self.secDerSigns[1] = "neg"
+		for pi in range(len(regPts)):
+			#print ("region number", pi)
+			pts = regPts[pi]
+			rings[pi] = ogr.Geometry(ogr.wkbLinearRing)
+			for pp in range(len(pts)+1):
+				x = pts[pp%len(pts)][0]
+				y = pts[pp%len(pts)][1]
+				#print ("point", x, y)
+				rings[pi].AddPoint(x,y)
+			self.polygonRegs[pi] = ogr.Geometry(ogr.wkbPolygon)
+			self.polygonRegs[pi].AddGeometry(rings[pi])
 
-		rings[2] = ogr.Geometry(ogr.wkbLinearRing)
-		rings[2].AddPoint(self.Vtn,0.0)
-		rings[2].AddPoint(1 + self.Vtp, 0.0)
-		rings[2].AddPoint(1 + self.Vtp, 1 + self.Vtp - self.Vtn)
-		rings[2].AddPoint(self.Vtn,0.0)
-		self.polygonRegs[2] = ogr.Geometry(ogr.wkbPolygon)
-		self.polygonRegs[2].AddGeometry(rings[2])
-		self.secDerSigns[2] = "pos"
+			[Is[pi], firDerIn, firDerOut, secDerIns[pi], secDerOuts[pi], secDerInOuts[pi]] = self.currentFun(pts[0][0], pts[0][1], pi)
+			if secDerIns[pi] == 0 and secDerOuts[pi] == 0:
+				self.secDerSigns[pi] = "zer"
 
-		rings[3] = ogr.Geometry(ogr.wkbLinearRing)
-		rings[3].AddPoint(self.Vtn,0.0)
-		rings[3].AddPoint(1 + self.Vtp, 1 + self.Vtp - self.Vtn)
-		rings[3].AddPoint(1 + self.Vtp, 1.0)
-		rings[3].AddPoint(self.Vtn,self.Vtn -self.Vtp)
-		rings[3].AddPoint(self.Vtn,0.0)
-		self.polygonRegs[3] = ogr.Geometry(ogr.wkbPolygon)
-		self.polygonRegs[3].AddGeometry(rings[3])
-		self.secDerSigns[3] = "zer"
+			elif secDerInOuts[pi] == 0 and secDerIns[pi] >= 0 and secDerOuts[pi] >= 0:
+				self.secDerSigns[pi] = "pos"
 
-		rings[4] = ogr.Geometry(ogr.wkbLinearRing)
-		rings[4].AddPoint(self.Vtn,self.Vtn -self.Vtp)
-		rings[4].AddPoint(1 + self.Vtp, 1.0)
-		rings[4].AddPoint(self.Vtn, 1.0)
-		rings[4].AddPoint(self.Vtn,self.Vtn -self.Vtp)
-		self.polygonRegs[4] = ogr.Geometry(ogr.wkbPolygon)
-		self.polygonRegs[4].AddGeometry(rings[4])
-		self.secDerSigns[4] = "neg"
+			elif secDerInOuts[pi] == 0 and secDerIns[pi] <= 0 and secDerOuts[pi] <= 0:
+				self.secDerSigns[pi] = "neg"
 
-		rings[5] = ogr.Geometry(ogr.wkbLinearRing)
-		rings[5].AddPoint(1 + self.Vtp,0.0)
-		rings[5].AddPoint(1.0, 0.0)
-		rings[5].AddPoint(1.0, 1 - self.Vtn)
-		rings[5].AddPoint(1 + self.Vtp, 1 + self.Vtp - self.Vtn)
-		rings[5].AddPoint(1 + self.Vtp,0.0)
-		self.polygonRegs[5] = ogr.Geometry(ogr.wkbPolygon)
-		self.polygonRegs[5].AddGeometry(rings[5])
-		self.secDerSigns[5] = "pos"
-
-		rings[6] = ogr.Geometry(ogr.wkbLinearRing)
-		rings[6].AddPoint(1 + self.Vtp,1 + self.Vtp - self.Vtn)
-		rings[6].AddPoint(1.0, 1 - self.Vtn)
-		rings[6].AddPoint(1.0, 1.0)
-		rings[6].AddPoint(1 + self.Vtp, 1)
-		rings[6].AddPoint(1 + self.Vtp,1 + self.Vtp - self.Vtn)
-		self.polygonRegs[6] = ogr.Geometry(ogr.wkbPolygon)
-		self.polygonRegs[6].AddGeometry(rings[6])
-		self.secDerSigns[6] = "neg"
-
+			else:
+				self.secDerSigns[pi] = "sad"
+			#print ("sign ", self.secDerSigns[pi])
 
 	def currentFun(self, Vin, Vout, regionNumber = None):
 		In = 0.0
 		firDerInn, firDerOutn = 0.0, 0.0
 		secDerInn, secDerOutn = 0.0, 0.0
+		secDerInOutn = 0.0
 		eqnN, eqnP = None, None
 		if regionNumber == 0:
 			eqnN, eqnP  = 1, 5
@@ -127,40 +98,47 @@ class MosfetModel:
 			firDerOutn = 0.0
 			secDerInn = 0.0
 			secDerOutn = 0.0
+			secDerInOutn = 0.0
 		elif self.Vtn <= Vin and Vin <=Vout + self.Vtn and (eqnN == None or eqnN == 2):
 			In = self.Sn*(self.Kn/2.0)*(Vin - self.Vtn)*(Vin - self.Vtn)
 			firDerInn = self.Sn*self.Kn*(Vin - self.Vtn)
 			firDerOutn = 0.0
 			secDerInn = self.Sn*self.Kn
 			secDerOutn = 0.0
+			secDerInOutn = 0.0
 		elif  Vin >= Vout + self.Vtn and (eqnN == None or eqnN == 3):
 			In = self.Sn*(self.Kn)*(Vin - self.Vtn - Vout/2.0)*Vout;
 			firDerInn = self.Sn*self.Kn*Vout
 			firDerOutn = self.Sn*self.Kn*(Vin - self.Vtn - Vout)
 			secDerInn = 0.0
 			secDerOutn = -self.Sn*self.Kn
+			secDerInOutn = self.Sn*self.Kn
 
 		Ip = 0.0
 		firDerInp, firDerOutp = 0.0, 0.0
 		secDerInp, secDerOutp = 0.0, 0.0
+		secDerInOutp = 0.0
 		if Vin - self.Vtp >= self.Vdd and (eqnP == None or eqnP == 4):
 			Ip = 0.0
 			firDerInp = 0.0
 			firDerOutp = 0.0
 			secDerInp = 0.0
 			secDerOutp = 0.0
+			secDerInOutp = 0.0
 		elif Vout <= Vin - self.Vtp and Vin - self.Vtp <= self.Vdd and (eqnP == None or eqnP == 5):
 			Ip = self.Sp*(self.Kp/2.0)*(Vin - self.Vtp - self.Vdd)*(Vin - self.Vtp - self.Vdd)
 			firDerInp = self.Sp*self.Kp*(Vin - self.Vtp - self.Vdd)
 			firDerOutp = 0.0
 			secDerInp = self.Sp*self.Kp
 			secDerOutp = 0.0
+			secDerInOutp = 0.0
 		elif Vin - self.Vtp <= Vout and (eqnP == None or eqnP == 6):
 			Ip = self.Sp*self.Kp*((Vin - self.Vtp - self.Vdd) - (Vout - self.Vdd)/2.0)*(Vout - self.Vdd)
 			firDerInp = self.Sp*self.Kp*(Vout - self.Vdd)
 			firDerOutp = self.Sp*self.Kp*((Vin - self.Vtp - self.Vdd) - (Vout - self.Vdd))
 			secDerInp = 0.0
 			secDerOutp = -self.Sp*self.Kp
+			secDerInOutp = self.Sp*self.Kp
 
 		I = -(In + Ip)
 		firDerIn = -(firDerInn + firDerInp)
@@ -168,7 +146,8 @@ class MosfetModel:
 
 		secDerIn = -(secDerInn + secDerInp)
 		secDerOut = -(secDerOutn + secDerOutp)
-		return [I, firDerIn, firDerOut, secDerIn, secDerOut]
+		secDerInOut = -(secDerInOutn + secDerInOutp)
+		return [I, firDerIn, firDerOut, secDerIn, secDerOut, secDerInOut]
 
 	def intersectSurfPlaneFunDer(self, Vin, Vout, plane, regionNumber):
 		if regionNumber == 0 or regionNumber == 3 or regionNumber == 6:
@@ -415,7 +394,7 @@ class MosfetModel:
 		points = np.zeros((patch.shape[0],3))
 
 		for i in range(patch.shape[0]):
-			[INum[i], firDerIn[i], firDerOut[i], secDerIn[i], secDerOut[i]] = self.currentFun(patch[i,0], patch[i,1],polygonNumber)
+			[INum[i], firDerIn[i], firDerOut[i], secDerIn[i], secDerOut[i], secDerInOut] = self.currentFun(patch[i,0], patch[i,1],polygonNumber)
 			points[i,:] = [patch[i,0],patch[i,1],INum[i]]
 
 		overallConstraint = ""
@@ -511,7 +490,7 @@ class MosfetModel:
 		print ("")'''
 		feasiblePoints = []
 
-		if polygonNumber == 0 or polygonNumber == 3 or polygonNumber == 6:
+		if self.secDerSigns[polygonNumber] != "sad":
 			# find intersection of all possible combinations of feasible planes
 			# store points that are satisfied by all constraints
 			intersectionPoints = []
@@ -627,8 +606,8 @@ class MosfetModel:
 		jac = np.zeros((lenV, lenV))
 		for i in range(lenV):
 			#print ("Vin[i]", Vin[i], "Vcc[i]", Vcc[i], "V[i]", V[i])
-			[Ifwd, firDerInfwd, firDerOutfwd, secDerInfwd, secDerOutfwd] = self.currentFun(Vin[i], V[i])
-			[Icc, firDerIncc, firDerOutcc, secDerIncc, secDerOutcc] = self.currentFun(Vcc[i], V[i])
+			[Ifwd, firDerInfwd, firDerOutfwd, secDerInfwd, secDerOutfwd, secDerInOutfwd] = self.currentFun(Vin[i], V[i])
+			[Icc, firDerIncc, firDerOutcc, secDerIncc, secDerOutcc, secDerInOutCc] = self.currentFun(Vcc[i], V[i])
 			#print ("firDerInfwd", firDerInfwd, "firDerIncc", firDerIncc)
 			#print ("firDerOutfwd", firDerOutfwd, "firDerOutcc", firDerOutcc)
 			jac[i, (i-1)%lenV] = self.g_fwd*firDerInfwd
@@ -655,10 +634,10 @@ class MosfetModel:
 			firDerInFwd = np.zeros((4))
 			firDerOutFwd = np.zeros((4))
 
-			[Ifwd, firDerInFwd[0], firDerOutFwd[0], secDerInfwd, secDerOutfwd] = self.currentFun(lowFwd, lowOut)
-			[Ifwd, firDerInFwd[1], firDerOutFwd[1], secDerInfwd, secDerOutfwd] = self.currentFun(lowFwd, highOut)
-			[Ifwd, firDerInFwd[2], firDerOutFwd[2], secDerInfwd, secDerOutfwd] = self.currentFun(highFwd, lowOut)
-			[Ifwd, firDerInFwd[3], firDerOutFwd[3], secDerInfwd, secDerOutfwd] = self.currentFun(highFwd, highOut)
+			[Ifwd, firDerInFwd[0], firDerOutFwd[0], secDerInfwd, secDerOutfwd, secDerInOutfwd] = self.currentFun(lowFwd, lowOut)
+			[Ifwd, firDerInFwd[1], firDerOutFwd[1], secDerInfwd, secDerOutfwd, secDerInOutfwd] = self.currentFun(lowFwd, highOut)
+			[Ifwd, firDerInFwd[2], firDerOutFwd[2], secDerInfwd, secDerOutfwd, secDerInOutfwd] = self.currentFun(highFwd, lowOut)
+			[Ifwd, firDerInFwd[3], firDerOutFwd[3], secDerInfwd, secDerOutfwd, secDerInOutfwd] = self.currentFun(highFwd, highOut)
 
 			lowCc = lowerBound[(i + lenV//2) % lenV]
 			highCc = upperBound[(i + lenV//2) % lenV]
@@ -666,10 +645,10 @@ class MosfetModel:
 			firDerInCc = np.zeros((4))
 			firDerOutCc = np.zeros((4))
 
-			[Icc, firDerInCc[0], firDerOutCc[0], secDerIncc, secDerOutcc] = self.currentFun(lowCc, lowOut)
-			[Icc, firDerInCc[1], firDerOutCc[1], secDerIncc, secDerOutcc] = self.currentFun(lowCc, highOut)
-			[Icc, firDerInCc[2], firDerOutCc[2], secDerIncc, secDerOutcc] = self.currentFun(highCc, lowOut)
-			[Icc, firDerInCc[3], firDerOutCc[3], secDerIncc, secDerOutcc] = self.currentFun(highCc, highOut)
+			[Icc, firDerInCc[0], firDerOutCc[0], secDerIncc, secDerOutcc, secDerInOutCc] = self.currentFun(lowCc, lowOut)
+			[Icc, firDerInCc[1], firDerOutCc[1], secDerIncc, secDerOutcc, secDerInOutCc] = self.currentFun(lowCc, highOut)
+			[Icc, firDerInCc[2], firDerOutCc[2], secDerIncc, secDerOutcc, secDerInOutCc] = self.currentFun(highCc, lowOut)
+			[Icc, firDerInCc[3], firDerOutCc[3], secDerIncc, secDerOutcc, secDerInOutCc] = self.currentFun(highCc, highOut)
 			
 			minFirDerInFwd = np.amin(firDerInFwd)
 			maxFirDerInFwd = np.amax(firDerInFwd)

@@ -4,9 +4,9 @@ from cvxopt import matrix,solvers
 from z3 import *
 
 class TanhModel:
-	def __init__(self, modelParam, g_cc, g_fwd, numStages, useZ3 = False):
+	def __init__(self, modelParam, g_cc, g_fwd, numStages, solver = None):
 		# gradient of tanh -- y = tanh(modelParam*x)
-		self.useZ3 = useZ3
+		self.solver = solver
 		self.modelParam = modelParam
 		self.g_cc = g_cc
 		self.g_fwd = g_fwd
@@ -14,7 +14,7 @@ class TanhModel:
 		self.xs = []
 		self.ys = []
 		self.zs = []
-		if not(useZ3):
+		if solver is None:
 			for i in range(numStages*2):
 				self.xs.append("x" + str(i))
 				self.ys.append("y" + str(i))
@@ -23,6 +23,10 @@ class TanhModel:
 			self.xs = RealVector("x", numStages*2)
 			self.ys = RealVector("y", numStages*2)
 			self.zs = RealVector("z", numStages*2)
+
+		self.boundMap = []
+		for i in range(numStages*2):
+			self.boundMap.append({0:[-1.0,0.0],1:[0.0,1.0]})
 
 	'''
 	takes in non-symbolic python values
@@ -123,49 +127,49 @@ class TanhModel:
 				if type(Vin) == str:
 					overallConstraint += "1 "+Vout + " + " +str(-grad) + " " + Vin + " >= "+str(c) + "\n"
 				else:
-					return And(Implies(And(Vin >= Vlow, Vin <= Vhigh), Vout - grad*Vin >= c),
-								Implies(Vin >= 0, Vout <= 0),
-								Implies(Vin <= 0, Vout >= 0))
+					self.solver.add(Implies(And(Vin >= Vlow, Vin <= Vhigh), Vout - grad*Vin >= c))
+					self.solver.add(Implies(Vin >= 0, Vout <= 0))
+					self.solver.add(Implies(Vin <= 0, Vout >= 0))
 			
 			elif points[i] == (rightIntersectX, rightIntersectY) and points[ii] == (Vhigh, tanhFunVhigh):
 				if type(Vin) == str:
 					overallConstraint += "1 "+Vout + " + " +str(-grad) + " " + Vin + " >= "+str(c) + "\n"
 				else:
-					return And(Implies(And(Vin >= Vlow, Vin <= Vhigh), Vout - grad*Vin >= c),
-								Implies(Vin >= 0, Vout <= 0),
-								Implies(Vin <= 0, Vout >= 0))
+					self.solver.add(Implies(And(Vin >= Vlow, Vin <= Vhigh), Vout - grad*Vin >= c))
+					self.solver.add(Implies(Vin >= 0, Vout <= 0))
+					self.solver.add(Implies(Vin <= 0, Vout >= 0))
 			
 			elif points[i] == (Vhigh, tanhFunVhigh) and points[ii] == (leftIntersectX, leftIntersectY):
 				if type(Vin) == str:	
 					overallConstraint += "1 "+Vout + " + " +str(-grad) + " " + Vin + " <= "+str(c) + "\n"
 				else:
-					return And(Implies(And(Vin >= Vlow, Vin <= Vhigh), Vout - grad*Vin <= c),
-								Implies(Vin >= 0, Vout <= 0),
-								Implies(Vin <= 0, Vout >= 0))
+					self.solver.add(Implies(And(Vin >= Vlow, Vin <= Vhigh), Vout - grad*Vin <= c))
+					self.solver.add(Implies(Vin >= 0, Vout <= 0))
+					self.solver.add(Implies(Vin <= 0, Vout >= 0))
 			
 			elif points[i] == (leftIntersectX, leftIntersectY) and points[ii] == (Vlow, tanhFunVlow):
 				if type(Vin) == str:
 					overallConstraint += "1 "+Vout + " + " +str(-grad) + " " + Vin + " <= "+str(c) + "\n"
 				else:
-					return And(Implies(And(Vin >= Vlow, Vin <= Vhigh), Vout - grad*Vin <= c),
-								Implies(Vin >= 0, Vout <= 0),
-								Implies(Vin <= 0, Vout >= 0))
+					self.solver.add(Implies(And(Vin >= Vlow, Vin <= Vhigh), Vout - grad*Vin <= c))
+					self.solver.add(Implies(Vin >= 0, Vout <= 0))
+					self.solver.add(Implies(Vin <= 0, Vout >= 0))
 
 			elif points[i] == (Vhigh, tanhFunVhigh) and points[ii] == (Vlow, tanhFunVlow):
 				if type(Vin) == str:
 					overallConstraint += "1 "+Vout + " + " +str(-grad) + " " + Vin + " <= "+str(c) + "\n"
 				else:
-					return And(Implies(And(Vin >= Vlow, Vin <= Vhigh), Vout - grad*Vin <= c),
-								Implies(Vin >= 0, Vout <= 0),
-								Implies(Vin <= 0, Vout >= 0))
+					self.solver.add(Implies(And(Vin >= Vlow, Vin <= Vhigh), Vout - grad*Vin <= c))
+					self.solver.add(Implies(Vin >= 0, Vout <= 0))
+					self.solver.add(Implies(Vin <= 0, Vout >= 0))
 
 			elif points[i] == (Vlow, tanhFunVlow) and points[ii] == (Vhigh, tanhFunVhigh):
 				if type(Vin) == str:	
 					overallConstraint += "1 "+Vout + " + " +str(-grad) + " " + Vin + " >= "+str(c) + "\n"
 				else:
-					return And(Implies(And(Vin >= Vlow, Vin <= Vhigh), Vout - grad*Vin >= c),
-								Implies(Vin >= 0, Vout <= 0),
-								Implies(Vin <= 0, Vout >= 0))
+					self.solver.add(Implies(And(Vin >= Vlow, Vin <= Vhigh), Vout - grad*Vin >= c))
+					self.solver.add(Implies(Vin >= 0, Vout <= 0))
+					self.solver.add(Implies(Vin <= 0, Vout >= 0))
 
 		#print "overallConstraint", overallConstraint
 		return overallConstraint
@@ -196,57 +200,57 @@ class TanhModel:
 
 		if self.modelParam > 0:
 			if Vlow >= 0 and Vhigh >=0:
-				if not(self.useZ3):
+				if self.solver is None:
 					return overallConstraint + "1 "+ Vout + " + " +str(-dThird) + " " + Vin + " >= "+str(cThird)+"\n" +\
 					"1 "+Vout + " + " +str(-dLow) + " " + Vin + " <= "+str(cLow)+"\n" +\
 					"1 "+Vout + " + " +str(-dHigh) + " " + Vin + " <= "+str(cHigh) + "\n"
 				else:
-					return And(Implies(And(Vin >= Vlow, Vin <=Vhigh),
+					self.solver.add(Implies(And(Vin >= Vlow, Vin <=Vhigh),
 										And(Vout - dThird*Vin >= cThird,
 											Vout - dLow*Vin <= cLow,
-											Vout - dHigh*Vin <= cHigh)),
-								Implies(Vin >= 0, Vout >= 0),
-								Implies(Vin >= 0, Vout >= 0))
+											Vout - dHigh*Vin <= cHigh)))
+					self.solver.add(Implies(Vin >= 0, Vout >= 0))
+					self.solver.add(Implies(Vin >= 0, Vout >= 0))
 
 			elif Vlow <=0 and Vhigh <=0:
-				if not(self.useZ3):
+				if self.solver is None:
 					return overallConstraint + "1 "+ Vout + " + " +str(-dThird) + " " + Vin + " <= "+str(cThird)+"\n" +\
 					"1 "+Vout + " + " +str(-dLow) + " " + Vin + " >= "+str(cLow)+"\n" +\
 					"1 "+Vout + " + " +str(-dHigh) + " " + Vin + " >= "+str(cHigh) + "\n"
 				else:
-					return And(Implies(And(Vin >= Vlow, Vin <=Vhigh),
+					self.solver.add(Implies(And(Vin >= Vlow, Vin <=Vhigh),
 										And(Vout - dThird*Vin <= cThird,
 											Vout - dLow*Vin >= cLow,
-											Vout - dHigh*Vin >= cHigh)),
-								Implies(Vin >= 0, Vout >= 0),
-								Implies(Vin <= 0, Vout <= 0))
+											Vout - dHigh*Vin >= cHigh)))
+					self.solver.add(Implies(Vin >= 0, Vout >= 0))
+					self.solver.add(Implies(Vin <= 0, Vout <= 0))
 
 		elif self.modelParam< 0:
 			if Vlow <= 0 and Vhigh <=0:
-				if not(self.useZ3):
+				if self.solver is None:
 					return overallConstraint + "1 "+Vout + " + " +str(-dThird) + " " + Vin + " >= "+str(cThird)+"\n" +\
 					"1 "+Vout + " + " +str(-dLow) + " " + Vin + " <= "+str(cLow)+"\n" +\
 					"1 "+Vout + " + " +str(-dHigh) + " " + Vin + " <= "+str(cHigh) + "\n"
 				else:
-					return And(Implies(And(Vin >= Vlow, Vin <=Vhigh),
+					self.solver.add(Implies(And(Vin >= Vlow, Vin <=Vhigh),
 										And(Vout - dThird*Vin >= cThird,
 											Vout - dLow*Vin <= cLow,
-											Vout - dHigh*Vin <= cHigh)),
-								Implies(Vin <= 0, Vout >= 0),
-								Implies(Vin >= 0, Vout <= 0))
+											Vout - dHigh*Vin <= cHigh)))
+					self.solver.add(Implies(Vin <= 0, Vout >= 0))
+					self.solver.add(Implies(Vin >= 0, Vout <= 0))
 
 			elif Vlow >=0 and Vhigh >=0:
-				if not(self.useZ3):
+				if self.solver is None:
 					return overallConstraint + "1 "+Vout + " + " +str(-dThird) + " " + Vin + " <= "+str(cThird)+"\n" +\
 					"1 "+Vout + " + " +str(-dLow) + " " + Vin + " >= "+str(cLow)+"\n" +\
 					"1 "+Vout + " + " +str(-dHigh) + " " + Vin + " >= "+str(cHigh) + "\n"
 				else:
-					return And(Implies(And(Vin >= Vlow, Vin <=Vhigh),
+					self.solver.add(Implies(And(Vin >= Vlow, Vin <=Vhigh),
 										And(Vout - dThird*Vin <= cThird,
 											Vout - dLow*Vin >= cLow,
-											Vout - dHigh*Vin >= cHigh)),
-								Implies(Vin <= 0, Vout >= 0),
-								Implies(Vin >= 0, Vout <= 0))
+											Vout - dHigh*Vin >= cHigh)))
+					self.solver.add(Implies(Vin <= 0, Vout >= 0))
+					self.solver.add(Implies(Vin >= 0, Vout <= 0))
 				
 	def oscNum(self,V):
 		lenV = len(V)
@@ -302,24 +306,50 @@ class TanhModel:
 
 	def ignoreHyperInZ3(self, hyperRectangle):
 		lenV = hyperRectangle.shape[0]
-		constraint = (Or(*[Or(self.xs[i] < hyperRectangle[i][0], 
-							self.xs[i] > hyperRectangle[i][1]) for i in range(lenV)]))
-		return constraint
+		constraintList = []
+		for i in range(lenV):
+			constraintList.append(self.xs[i] < hyperRectangle[i][0])
+			constraintList.append(self.xs[i] > hyperRectangle[i][1])
+		self.solver.add(Or(*constraintList))
 
 	def ignoreSolInZ3(self, sol):
 		lenV = len(sol)
-		constraint = (Or(*[self.xs[i] != sol[i] for i in range(lenV)]))
-		return constraint
+		self.solver.add(Or(*[self.xs[i] != sol[i] for i in range(lenV)]))
 
 	def addDomainConstraint(self):
 		lenV = self.numStages*2
-		constraint1 = And(*[And(self.xs[i] >= -1.0,
-							self.xs[i] <= 1.0) for i in range(lenV)])
-		constraint2 = And(*[self.g_fwd*self.ys[i] + (-self.g_fwd - self.g_cc)*self.xs[i] + self.g_cc*self.zs[i] == 0 
-			for i in range(lenV)])
-		constraint = And(constraint1, constraint2)
-		return constraint
+		for i in range(lenV):
+			self.solver.add(self.xs[i] >= -1.0)
+			self.solver.add(self.xs[i] <= 1.0)
+		'''for numStage in range(self.numStages):
+			lastStage = self.numStages - numStage-1
+			if lastStage == 0:
+				break
+			secondLastStage = lastStage - 1
+			lastStageIndex1 = lastStage
+			lastStageIndex2 = (lastStage + lenV//2) % lenV
+			secondLastStageIndex1 = secondLastStage
+			secondLastStageIndex2 = (secondLastStage + lenV//2) % lenV
+			print ("lastStageIndex1", lastStageIndex1, "lastStageIndex2", lastStageIndex2)
+			print ("secondLastStageIndex1", secondLastStageIndex1, "secondLastStageIndex2", secondLastStageIndex2)
+			self.solver.add(Implies(And(self.xs[lastStageIndex1] >= 0,  self.xs[lastStageIndex2] >= 0),
+							And(self.xs[secondLastStageIndex1] <= 0, self.xs[secondLastStageIndex2] <= 0)))
+			self.solver.add(Implies(And(self.xs[lastStageIndex1] <= 0,  self.xs[lastStageIndex2] <= 0),
+							And(self.xs[secondLastStageIndex1] >= 0, self.xs[secondLastStageIndex2] >= 0)))'''
 
+		for i in range(lenV):
+			self.solver.add(self.g_fwd*self.ys[i] + (-self.g_fwd - self.g_cc)*self.xs[i] + self.g_cc*self.zs[i] == 0 )
+
+	def pickVariableRangeConstraint(self, index, interval):
+		self.solver.add(self.xs[index] >= interval[0])
+		self.solver.add(self.xs[index] <= interval[1])
+
+	def thisOrThatHyperConstraint(self, hyper1, hyper2):
+		lenV = self.numStages*2
+		for i in range(lenV):
+			if i == self.numStages - 1 or i == lenV - 1:
+				self.solver.add(self.xs[i] >= hyper1[i][0])
+				self.solver.add(self.xs[i] <= hyper2[i][1])
 
 	def linearConstraints(self, hyperRectangle):
 		solvers.options["show_progress"] = False
@@ -327,14 +357,13 @@ class TanhModel:
 		lenV = self.numStages*2
 
 		allConstraints = ""
-		constraintList = []
 		for i in range(lenV):
 			fwdInd = (i-1)%lenV
 			ccInd = (i+lenV//2)%lenV
 			#print "fwdInd ", fwdInd, " ccInd ", ccInd
 			#print "hyperRectangle[fwdInd][0]", hyperRectangle[fwdInd][0], "hyperRectangle[fwdInd][1]", hyperRectangle[fwdInd][1]
 			
-			if not(self.useZ3):
+			if self.solver is None:
 				triangleClaimFwd = ""
 				if hyperRectangle[fwdInd,0] < 0 and hyperRectangle[fwdInd,1] > 0:
 					triangleClaimFwd += self.triangleConvexHullBounds(self.xs[fwdInd],self.ys[i],hyperRectangle[fwdInd,0],hyperRectangle[fwdInd,1])
@@ -356,16 +385,16 @@ class TanhModel:
 			else:
 				
 				if hyperRectangle[fwdInd,0] < 0 and hyperRectangle[fwdInd,1] > 0:
-					constraintList.append(self.triangleConvexHullBounds(self.xs[fwdInd],self.ys[i],hyperRectangle[fwdInd,0],hyperRectangle[fwdInd,1]))
+					self.triangleConvexHullBounds(self.xs[fwdInd],self.ys[i],hyperRectangle[fwdInd,0],hyperRectangle[fwdInd,1])
 				else:
-					constraintList.append(self.triangleBounds(self.xs[fwdInd],self.ys[i],hyperRectangle[fwdInd,0],hyperRectangle[fwdInd,1]))
+					self.triangleBounds(self.xs[fwdInd],self.ys[i],hyperRectangle[fwdInd,0],hyperRectangle[fwdInd,1])
 
 				if hyperRectangle[ccInd,0] < 0 and hyperRectangle[ccInd,1] > 0:
-					constraintList.append(self.triangleConvexHullBounds(self.xs[ccInd],self.zs[i],hyperRectangle[ccInd,0],hyperRectangle[ccInd,1]))
+					self.triangleConvexHullBounds(self.xs[ccInd],self.zs[i],hyperRectangle[ccInd,0],hyperRectangle[ccInd,1])
 				else:
-					constraintList.append(self.triangleBounds(self.xs[ccInd],self.zs[i],hyperRectangle[ccInd,0],hyperRectangle[ccInd,1]))
+					self.triangleBounds(self.xs[ccInd],self.zs[i],hyperRectangle[ccInd,0],hyperRectangle[ccInd,1])
 
-		if not(self.useZ3):
+		if self.solver is None:
 			'''allConstraintList = allConstraints.splitlines()
 			allConstraints = ""
 			for i in range(len(allConstraintList)):
@@ -394,8 +423,6 @@ class TanhModel:
 						newHyperRectangle[i,1] = maxSol['x'][variableDict[self.xs[i]]] + 1e-6
 
 			return [feasible, newHyperRectangle]
-		else:
-			return constraintList
 
 
 

@@ -27,6 +27,9 @@ class MosfetModel:
 			self.xs.append("x" + str(i))
 			self.IsFwd.append("ifwd" + str(i))
 			self.IsCc.append("icc" + str(i))
+		self.boundMap = []
+		for i in range(numStages*2):
+			self.boundMap.append({0:[0.0,self.Vdd/2.0],1:[self.Vdd/2.0,self.Vdd]})
 
 		self.constructPolygonRegions()
 

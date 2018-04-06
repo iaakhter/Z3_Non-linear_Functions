@@ -567,8 +567,9 @@ def rambusOscillator(a, numStages):
 	
 	#modelParam = [Vtp, Vtn, Vdd, Kn, Sn]
 	#modelParam = [-0.25, 0.25, 1.0, 1.0, -0.5, 1.0]
-	modelParam = [-0.4, 0.4, 1.8, 1.5, -0.5, 8/3.0]
-	model = mosfetModel.MosfetModel(modelParam = modelParam, g_cc = 0.5, g_fwd = 1.0, numStages = numStages)
+	#modelParam = [-0.4, 0.4, 1.8, 1.5, -0.5, 8/3.0]
+	modelParam = [-0.4, 0.4, 1.8, 270*1e-6, -90*1e-6, 8/3.0]
+	model = mosfetModel.MosfetModel(modelParam = modelParam, g_cc = 4.0, g_fwd = 1.0, numStages = numStages)
 	
 	startExp = time.time()
 	lenV = numStages*2
@@ -587,16 +588,16 @@ def rambusOscillator(a, numStages):
 			secondIndex -= 1
 	
 	print ("indexChoiceArray", indexChoiceArray)
-	boundMap = []
 	parentHyper = []
 	for i in range(lenV):
 		#boundMap.append({0:[-1.0,0.0],1:[0.0,1.0]})
-		boundMap.append({0:[0.0,0.5],1:[0.5,1.0]})
+		#boundMap.append({0:[0.0,0.5],1:[0.5,1.0]})
 		#boundMap.append({0:[0.0,1.0],1:[1.0,2.0]})
 		parentHyper.append([-1.0, 1.0])
 	parentHyper = np.array(parentHyper)
 	#excludingBound = findExcludingBound(exampleOrdering,boundMap,model)
 	#excludingBound = 0.1
+	boundMap = model.boundMap
 	print ("boundMap ", boundMap)
 	minBoundMap = 0
 	maxBoundMap = 1
@@ -726,6 +727,6 @@ triangleConstraint2 = triangleBounds(-5.0,"x1","y1",0.0,0.5)
 print objConstraint + triangleConstraint1 + triangleConstraint2
 variableDict, A, B = constructCoeffMatrices(triangleConstraint1 + triangleConstraint2)
 C = constructObjMatrix(objConstraint,variableDict)'''
-rambusOscillator(-5.0,2)
+rambusOscillator(-5.0,4)
 #z3Version(-5.0,2)
 

@@ -47,8 +47,8 @@ def ifFeasibleHyper(hyperRectangle, hyperBound,model):
 	print (hyperRectangle)
 	iterNum = 0
 	while True:
-		#print ("hyperRectangle ")
-		#print (hyperRectangle)
+		print ("hyperRectangle 1")
+		print (hyperRectangle)
 		kResult = intervalUtils.checkExistenceOfSolutionGS(model,hyperRectangle.transpose())
 		#print ("kResult")
 		#print (kResult)
@@ -61,11 +61,11 @@ def ifFeasibleHyper(hyperRectangle, hyperBound,model):
 			return (False, None)
 		#print "kResult"
 		#print kResult
-		#print ("hyperRectangle ")
+		#print ("hyperRectangle 2")
 		#print (hyperRectangle)
 		feasible, newHyperRectangle = model.linearConstraints(hyperRectangle)
 	
-		#print ("newHyperRectangle ", newHyperRectangle)
+		print ("newHyperRectangle ", newHyperRectangle)
 		if feasible == False:
 			print ("LP not feasible")
 			return (False, None)
@@ -566,8 +566,8 @@ def rambusOscillator(a, numStages):
 	#model = tanhModel.TanhModel(modelParam = a, g_cc = 0.5, g_fwd = 1.0, numStages=numStages)
 	
 	#modelParam = [Vtp, Vtn, Vdd, Kn, Sn]
-	#modelParam = [-0.25, 0.25, 1.0, 1.0, 1.0]
-	modelParam = [-0.4, 0.4, 1.8, 1.5, 8/3.0]
+	#modelParam = [-0.25, 0.25, 1.0, 1.0, -0.5, 1.0]
+	modelParam = [-0.4, 0.4, 1.8, 1.5, -0.5, 8/3.0]
 	model = mosfetModel.MosfetModel(modelParam = modelParam, g_cc = 0.5, g_fwd = 1.0, numStages = numStages)
 	
 	startExp = time.time()
@@ -591,7 +591,8 @@ def rambusOscillator(a, numStages):
 	parentHyper = []
 	for i in range(lenV):
 		#boundMap.append({0:[-1.0,0.0],1:[0.0,1.0]})
-		boundMap.append({0:[0.0,0.5],1:[0.5,2.0]})
+		boundMap.append({0:[0.0,0.5],1:[0.5,1.0]})
+		#boundMap.append({0:[0.0,1.0],1:[1.0,2.0]})
 		parentHyper.append([-1.0, 1.0])
 	parentHyper = np.array(parentHyper)
 	#excludingBound = findExcludingBound(exampleOrdering,boundMap,model)
@@ -606,14 +607,14 @@ def rambusOscillator(a, numStages):
 	print bisectionHypers'''
 
 	'''hyperRectangle = np.zeros((lenV,2))
-	hyperRectangle[0,:] = [0.0, 0.3]
-	hyperRectangle[1,:] = [0.6, 1.0]
-	hyperRectangle[2,:] = [0.6233348, 0.88285783]
-	hyperRectangle[3,:] = [0.0, 0.3]
-	hyperRectangle[4,:] = [0.6, 1.0]
-	hyperRectangle[5,:] = [0.0, 0.6]
-	hyperRectangle[6,:] = [0.10523252, 0.37844998]
-	hyperRectangle[7,:] = [0.6, 1.0]
+	hyperRectangle[0,:] = [0.0, 1.0]
+	hyperRectangle[1,:] = [0.0086222, 0.80945054]
+	hyperRectangle[2,:] = [0.19586171, 0.84725632]
+	hyperRectangle[3,:] = [0.49780501, 0.92575829]
+	hyperRectangle[4,:] = [0.0, 2.0]
+	hyperRectangle[5,:] = [1.0, 2.0]
+	hyperRectangle[6,:] = [0.0, 1.0]
+	hyperRectangle[7,:] = [0.53798996, 0.99248256]
 
 	feasibility = ifFeasibleHyper(hyperRectangle, hyperBound,model)
 	#feasibility = intervalUtils.checkExistenceOfSolutionGS(model,hyperRectangle.transpose())
@@ -725,6 +726,6 @@ triangleConstraint2 = triangleBounds(-5.0,"x1","y1",0.0,0.5)
 print objConstraint + triangleConstraint1 + triangleConstraint2
 variableDict, A, B = constructCoeffMatrices(triangleConstraint1 + triangleConstraint2)
 C = constructObjMatrix(objConstraint,variableDict)'''
-rambusOscillator(-5.0,4)
+rambusOscillator(-5.0,2)
 #z3Version(-5.0,2)
 

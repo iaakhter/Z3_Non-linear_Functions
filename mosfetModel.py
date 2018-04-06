@@ -12,9 +12,10 @@ class MosfetModel:
 		self.Vtn = modelParam[1]
 		self.Vdd = modelParam[2]
 		self.Kn = modelParam[3]
-		self.Sn = modelParam[4]
+		self.Kp = modelParam[4]
+		self.Sn = modelParam[5]
 		#self.Kp = -self.Kn/2.0
-		self.Kp = -self.Kn/3.0
+		#self.Kp = -self.Kn/3.0
 		self.Sp = self.Sn*2.0
 		self.g_cc = g_cc
 		self.g_fwd = g_fwd
@@ -91,22 +92,28 @@ class MosfetModel:
 			eqnN, eqnP = 3, 4
 		if regionNumber == 6:
 			eqnN, eqnP = 2, 4
+		epsilon = 1e-14
+
+		#print ("regionNumber", regionNumber, "Vout", Vout, "Vin - self.Vtp", Vin - self.Vtp, "Vdd", self.Vdd)
 		
 		if Vin <= self.Vtn and (eqnN == None or eqnN == 1):
+			#print ("eqn1")
 			In = 0.0
 			firDerInn = 0.0
 			firDerOutn = 0.0
 			secDerInn = 0.0
 			secDerOutn = 0.0
 			secDerInOutn = 0.0
-		elif self.Vtn <= Vin and Vin <=Vout + self.Vtn and (eqnN == None or eqnN == 2):
+		elif self.Vtn <= Vin and Vin <=Vout + self.Vtn + epsilon and (eqnN == None or eqnN == 2):
+			#print ("eqn2")
 			In = self.Sn*(self.Kn/2.0)*(Vin - self.Vtn)*(Vin - self.Vtn)
 			firDerInn = self.Sn*self.Kn*(Vin - self.Vtn)
 			firDerOutn = 0.0
 			secDerInn = self.Sn*self.Kn
 			secDerOutn = 0.0
 			secDerInOutn = 0.0
-		elif  Vin >= Vout + self.Vtn and (eqnN == None or eqnN == 3):
+		elif  Vin >= Vout + self.Vtn - epsilon and (eqnN == None or eqnN == 3):
+			#print ("eqn3")
 			In = self.Sn*(self.Kn)*(Vin - self.Vtn - Vout/2.0)*Vout;
 			firDerInn = self.Sn*self.Kn*Vout
 			firDerOutn = self.Sn*self.Kn*(Vin - self.Vtn - Vout)
@@ -119,20 +126,23 @@ class MosfetModel:
 		secDerInp, secDerOutp = 0.0, 0.0
 		secDerInOutp = 0.0
 		if Vin - self.Vtp >= self.Vdd and (eqnP == None or eqnP == 4):
+			#print ("eqn4")
 			Ip = 0.0
 			firDerInp = 0.0
 			firDerOutp = 0.0
 			secDerInp = 0.0
 			secDerOutp = 0.0
 			secDerInOutp = 0.0
-		elif Vout <= Vin - self.Vtp and Vin - self.Vtp <= self.Vdd and (eqnP == None or eqnP == 5):
+		elif Vout <= Vin - self.Vtp + epsilon and Vin - self.Vtp <= self.Vdd and (eqnP == None or eqnP == 5):
+			#print ("eqn5")
 			Ip = self.Sp*(self.Kp/2.0)*(Vin - self.Vtp - self.Vdd)*(Vin - self.Vtp - self.Vdd)
 			firDerInp = self.Sp*self.Kp*(Vin - self.Vtp - self.Vdd)
 			firDerOutp = 0.0
 			secDerInp = self.Sp*self.Kp
 			secDerOutp = 0.0
 			secDerInOutp = 0.0
-		elif Vin - self.Vtp <= Vout and (eqnP == None or eqnP == 6):
+		elif Vin - self.Vtp <= Vout + epsilon and (eqnP == None or eqnP == 6):
+			#print ("eqn6")
 			Ip = self.Sp*self.Kp*((Vin - self.Vtp - self.Vdd) - (Vout - self.Vdd)/2.0)*(Vout - self.Vdd)
 			firDerInp = self.Sp*self.Kp*(Vout - self.Vdd)
 			firDerOutp = self.Sp*self.Kp*((Vin - self.Vtp - self.Vdd) - (Vout - self.Vdd))
@@ -150,9 +160,9 @@ class MosfetModel:
 		return [I, firDerIn, firDerOut, secDerIn, secDerOut, secDerInOut]
 
 	def intersectSurfPlaneFunDer(self, Vin, Vout, plane, regionNumber):
-		if regionNumber == 0 or regionNumber == 3 or regionNumber == 6:
+		'''if regionNumber == 0 or regionNumber == 3 or regionNumber == 6:
 			print ("invalid region number")
-			return
+			return'''
 		planePt = plane[0,:]
 		planeNorm = plane[1,:]
 		m, d = None, None
@@ -282,18 +292,25 @@ class MosfetModel:
 		feasiblePoints = None
 		numIntersections = 0
 		regConstraints = None
+		regPoints = None
 		for i in range(len(self.polygonRegs)):
 			'''if i!=5:
 				continue'''
 			polygon = self.polygonRegs[i]
+			intersectPolyRing = None
 			intersectPoly = polygon.Intersection(patchPolygon)
-			intersectPolyRing = intersectPoly.GetGeometryRef(0)
+			if intersectPoly.GetGeometryName() != "LINESTRING":
+				#print ("Error here?", intersectPoly.GetGeometryName())
+				intersectPolyRing = intersectPoly.GetGeometryRef(0)
+				#print ("Or here?")
 			if intersectPolyRing is not None:
 				intersectingPoints = []
 				for pi in range(intersectPolyRing.GetPointCount()-1):
 					intersectingPoints.append((intersectPolyRing.GetPoint(pi)[0], intersectPolyRing.GetPoint(pi)[1]))
 				intersect = np.array(intersectingPoints)
 				regConstraints,regPoints = self.IRegConstraint(I, Vin, Vout, intersect,i)
+				#print ("regPoints")
+				#print (regPoints)
 				'''if i == 1:
 					print ("regConstraints", regConstraints)
 					print ("regPoints", regPoints)'''
@@ -395,6 +412,7 @@ class MosfetModel:
 
 		for i in range(patch.shape[0]):
 			[INum[i], firDerIn[i], firDerOut[i], secDerIn[i], secDerOut[i], secDerInOut] = self.currentFun(patch[i,0], patch[i,1],polygonNumber)
+			#print ("i ", i, "Vin", patch[i,0], "Vout", patch[i,1], "I", INum[i])
 			points[i,:] = [patch[i,0],patch[i,1],INum[i]]
 
 		overallConstraint = ""
@@ -411,7 +429,7 @@ class MosfetModel:
 		patchPolygon = ogr.Geometry(ogr.wkbPolygon)
 		patchPolygon.AddGeometry(patchRing)
 		#print ("patchPolygon", patchPolygon)
-
+		#print ("sign", self.secDerSigns[polygonNumber])
 		patchVertsInsideZeroReg = False
 		if self.secDerSigns[polygonNumber] == "zer":
 			patchVertsInsideZeroReg = True
@@ -461,20 +479,25 @@ class MosfetModel:
 		for i in range(points.shape[0]):
 			for j in range(i+1, points.shape[0]):
 				for k in range(j+1, points.shape[0]):
-					normal = np.cross(points[k] - points[i], points[j] - points[i])
+					#print ("point i", points[i,:])
+					#print ("point j", points[j,:])
+					#print ("point k", points[k,:])
+					normal = np.cross(points[k,:] - points[i,:], points[j,:] - points[i,:])
 					if normal[2] < 0:
 						normal = -normal
-					includedPt = points[i]
+					#print ("normal", normal)
+					includedPt = points[i,:]
 					d = normal[0]*includedPt[0] + normal[1]*includedPt[1] + normal[2]*includedPt[2]
 					planeFeasible = True
 					for pi in range(points.shape[0]):
-						excludedPt = points[pi]
+						excludedPt = points[pi,:]
 						dExcluded = normal[0]*excludedPt[0] + normal[1]*excludedPt[1] + normal[2]*excludedPt[2]
 						#print ("pi", pi, points[pi])
 						#print ("dExcluded", dExcluded, "d", d, secantSign)
 						feasible = dExcluded <= d
 						if secantSign == " >= ":
 							feasible = dExcluded >= d
+						#print ("d - dExcluded", abs(d - dExcluded))
 						if abs(d - dExcluded) > 1e-14:
 							if not(feasible):
 								planeFeasible = False

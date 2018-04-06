@@ -1,5 +1,6 @@
 import numpy as np
 import copy
+import random
 
 #Data structure to keep track all possible combination of interval indices
 class combinationNode:
@@ -172,7 +173,7 @@ using the Gauss-Siedel operator
 '''
 def checkExistenceOfSolutionGS(model,hyperRectangle):
 	numVolts = len(hyperRectangle[0])
-
+	#print ("start K operator", hyperRectangle)
 	startBounds = np.zeros((numVolts,2))
 	startBounds[:,0] = hyperRectangle[0,:]
 	startBounds[:,1] = hyperRectangle[1,:]
@@ -184,13 +185,28 @@ def checkExistenceOfSolutionGS(model,hyperRectangle):
 		#print ("startBounds ", startBounds)
 		midPoint = (startBounds[:,0] + startBounds[:,1])/2.0
 		#midPoint = startBounds[:,0] + (startBounds[:,1] - startBounds[:,0])*0.25
-		#print "midPoint"
-		#print midPoint
+		#print ("midPoint")
+		#print (midPoint)
 		_,_,IMidPoint = np.array(model.oscNum(midPoint))
 		jacMidPoint = model.jacobian(midPoint)
-		#print "jacMidPoint"
-		#print jacMidPoint
-		C = np.linalg.inv(jacMidPoint)
+		#print ("jacMidPoint")
+		#print (jacMidPoint)
+		C = None
+
+		while True:
+			fail = False
+			try:
+				C = np.linalg.inv(jacMidPoint)
+			except np.linalg.linalg.LinAlgError:
+				fail = True
+				randomVal = random.uniform(0.1,0.9)
+				midPoint = startBounds[:,0] + (startBounds[:,1] - startBounds[:,0])*randomVal
+				_,_,IMidPoint = np.array(model.oscNum(midPoint))
+				jacMidPoint = model.jacobian(midPoint)
+
+			if not(fail):
+				break
+
 		#print "C"
 		#print C
 		#print "condition number of C", np.linalg.cond(C)
@@ -271,27 +287,29 @@ def checkExistenceOfSolutionGS(model,hyperRectangle):
 			#print kInterval
 			return (True,gsInterval)
 		
+		#print ("constructBiggerHyper before", constructBiggerHyper)
 		if np.less_equal(gsIntersect[:,1] - gsIntersect[:,0],1e-8*np.ones((numVolts))).all() or  np.less_equal(np.absolute(gsIntersect - startBounds),1e-4*np.ones((numVolts,2))).all():
 			if constructBiggerHyper == False and np.less_equal(gsIntersect[:,1] - gsIntersect[:,0],1e-8*np.ones((numVolts))).all():
-				print ("gsIntersect before")
-				print (gsIntersect)
+				#print ("gsIntersect before")
+				#print (gsIntersect)
 				constructBiggerHyper = True
 				exampleVolt = (gsIntersect[:,0] + gsIntersect[:,1])/2.0
 				soln = newton(model,exampleVolt)
-				print ("soln ", soln)
+				#print ("soln ", soln)
 				# the new hyper must contain the solution in the middle and enclose old hyper
 				# and then we check for uniqueness of solution in the newer bigger hyperrectangle
 				if soln[0]:
 					for si in range(numVolts):
 						maxDiff = max(abs(gsIntersect[si,1] - soln[1][si]), abs(soln[1][si] - gsIntersect[si,0]))
-						print ("maxDiff", maxDiff)
-						if maxDiff < 1e-6:
-							maxDiff = 1e-6
+						#print ("maxDiff", maxDiff)
+						if maxDiff < 1e-9:
+							maxDiff = 1e-9
 						#print "maxDiff ", maxDiff
 						gsIntersect[si,0] = soln[1][si] - maxDiff
 						gsIntersect[si,1] = soln[1][si] + maxDiff
-					print ("bigger hyper ", gsIntersect)
+					#print ("bigger hyper ", gsIntersect)
 					startBounds = gsIntersect
+				#print ("after if constructBiggerHyper", constructBiggerHyper)
 					
 			else:
 				return (False,gsIntersect)

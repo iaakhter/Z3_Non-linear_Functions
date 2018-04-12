@@ -6,6 +6,7 @@ import tanhModel
 import mosfetModel
 from treelib import Node, Tree
 from z3 import *
+import rambusUtils as rUtils
 
 hyperNum = 0
 
@@ -43,12 +44,12 @@ solution.
 '''
 def ifFeasibleHyper(hyperRectangle, hyperBound,model):
 	lenV = model.numStages*2
-	print ("hyperRectangle")
-	print (hyperRectangle)
+	#print ("hyperRectangle")
+	#print (hyperRectangle)
 	iterNum = 0
 	while True:
-		print ("hyperRectangle 1")
-		print (hyperRectangle)
+		#print ("hyperRectangle 1")
+		#print (hyperRectangle)
 		kResult = intervalUtils.checkExistenceOfSolutionGS(model,hyperRectangle.transpose())
 		#print ("kResult")
 		#print (kResult)
@@ -57,7 +58,7 @@ def ifFeasibleHyper(hyperRectangle, hyperBound,model):
 			return (True, kResult[1])
 
 		if kResult[0] == False and kResult[1] is None:
-			print ("K operator not feasible")
+			#print ("K operator not feasible")
 			return (False, None)
 		#print "kResult"
 		#print kResult
@@ -65,9 +66,9 @@ def ifFeasibleHyper(hyperRectangle, hyperBound,model):
 		#print (hyperRectangle)
 		feasible, newHyperRectangle = model.linearConstraints(hyperRectangle)
 	
-		print ("newHyperRectangle ", newHyperRectangle)
+		#print ("newHyperRectangle ", newHyperRectangle)
 		if feasible == False:
-			print ("LP not feasible")
+			#print ("LP not feasible")
 			return (False, None)
 
 		for i in range(lenV):
@@ -120,8 +121,8 @@ def getFeasibleIntervalIndices(rootCombinationNode,boundMap,hyperBound, model,re
 	hyperNum += 1
 
 	intervalIndices = rootCombinationNode.rootArray
-	print ("intervalIndices", intervalIndices)
-	print ("boundMap", boundMap)
+	#print ("intervalIndices", intervalIndices)
+	#print ("boundMap", boundMap)
 	lenV = len(intervalIndices)
 	
 	#feasibility = ifFeasibleOrdering(intervalIndices, boundMap, hyperBound,model)
@@ -137,8 +138,8 @@ def getFeasibleIntervalIndices(rootCombinationNode,boundMap,hyperBound, model,re
 	origHyperChild = np.copy(hyperRectangle)
 	feasibility = ifFeasibleHyper(hyperRectangle,hyperBound,model)
 
-	print ("feasibility at level", level)
-	print (feasibility)
+	#print ("feasibility at level", level)
+	#print (feasibility)
 
 	hyper_feasHyperString = np.array_str(origHyperChild) + "\n"
 	if feasibility[0]:
@@ -183,15 +184,15 @@ def getFeasibleIntervalIndices(rootCombinationNode,boundMap,hyperBound, model,re
 		if intervalIndices[i] is None:
 			indexOfNone = i
 			break
-	print ("indexOfNone ", indexOfNone)
+	#print ("indexOfNone ", indexOfNone)
 	if indexOfNone is None:
 		bisectionHypers = refineHyper(intervalIndices, newBoundMap, hyperBound, model, parentTree, hyperId, level+1)
-		print ("bisectionHypers")
-		print (bisectionHypers)
-		print ("len(refinedHypers) before ", len(refinedHypers))
+		#print ("bisectionHypers")
+		#print (bisectionHypers)
+		#print ("len(refinedHypers) before ", len(refinedHypers))
 		for hyper in bisectionHypers:
 			refinedHypers.append(hyper)
-		print ("len(refinedHypers) after ", len(refinedHypers))
+		#print ("len(refinedHypers) after ", len(refinedHypers))
 	for i in range(len(rootCombinationNode.children)):
 		getFeasibleIntervalIndices(rootCombinationNode.children[i],
 			newBoundMap, hyperBound, model, refinedHypers, parentTree, hyperId, level+1)
@@ -211,9 +212,9 @@ def refineHyper(ordering, boundMap, maxHyperBound, model, parentTree, parent, le
 	count = 0
 	volumes = []
 
-	print ("before bisecting num ", len(finalHyper))
+	#print ("before bisecting num ", len(finalHyper))
 	bisectHyper(maxHyperBound, hyperRectangle, 0,model, finalHyper, parentTree, parent, level)
-	print ("after bisecting num ", len(finalHyper))
+	#print ("after bisecting num ", len(finalHyper))
 
 	return finalHyper
 
@@ -238,16 +239,16 @@ def bisectHyper(hyperBound,hyperRectangle,bisectingIndex, model,finalHypers, par
 	rightHyper_feasHyperString = np.array_str(rightHyper) + "\n"
 	rightHyperId = str(hyperNum)
 	hyperNum += 1
-	print ("leftHyper at level", level)
-	print (leftHyper)
-	print ("rightHyper at level", level)
-	print (rightHyper)
+	#print ("leftHyper at level", level)
+	#print (leftHyper)
+	#print ("rightHyper at level", level)
+	#print (rightHyper)
 	feasLeft = ifFeasibleHyper(leftHyper, hyperBound, model)
 	feasRight = ifFeasibleHyper(rightHyper, hyperBound, model)
-	print ("feasLeft")
-	print (feasLeft)
-	print ("feasRight")
-	print (feasRight)
+	#print ("feasLeft")
+	#print (feasLeft)
+	#print ("feasRight")
+	#print (feasRight)
 
 
 	if feasLeft[0]:
@@ -298,16 +299,6 @@ def findExcludingBound(ordering,boundMap, model, maxDiff = 0.2):
 		boundMap[i][1][0] = diff
 	return diff
 
-'''
-Return true if stable and false otherwise
-'''
-def determineStability(equilibrium,model):
-	jac = model.jacobian(equilibrium)
-	eigVals,_ = np.linalg.eig(jac)
-	maxEig = np.amax(eigVals.real)
-	if maxEig > 0:
-		return False
-	return True
 
 def findAndIgnoreNewtonSoln(model, minVal, maxVal, numTrials = 10):
 	lenV = model.numStages*2
@@ -489,48 +480,10 @@ def z3Version(a, numStages):
 
 	
 	'''
-	CHECK FOR STABILITY OF SOLUTIONS FOUND
+	CHECK FOR STABILITY OF SOLUTIONS FOUND HERE
 	'''
-	sampleSols = []
-	rotatedSols = {}
-	stableSols = []
-	unstableSols = []
-	allSols = []
-	for hyper in allHypers:
-		exampleSoln = (hyper[:,0] + hyper[:,1])/2.0
-		finalSoln = intervalUtils.newton(model,exampleSoln)
-		#print "exampleSoln ", exampleSoln
-		#print "finalSoln ", finalSoln
-		stable = determineStability(finalSoln[1],model)
-		if stable:
-			stableSols.append(finalSoln[1])
-		else:
-			unstableSols.append(finalSoln[1])
-		allSols.append(finalSoln[1])
-		
-		# Classify the solutions into equivalence classes
-		if len(sampleSols) == 0:
-			sampleSols.append(finalSoln[1])
-			rotatedSols[0] = []
-		else:
-			foundSample = False
-			for si in range(len(sampleSols)):
-				sample = sampleSols[si]
-				for ii in range(lenV):
-					if abs(finalSoln[1][0] - sample[ii]) < 1e-8:
-						rotatedSample = np.zeros_like(finalSoln[1])
-						for ri in range(lenV):
-							rotatedSample[ri] = sample[(ii+ri)%lenV]
-						if np.less_equal(np.absolute(rotatedSample - finalSoln[1]), np.ones((lenV))*1e-8 ).all():
-							foundSample = True
-							rotatedSols[si].append(ii)
-							break
-				if foundSample:
-					break
-
-			if foundSample == False:
-				sampleSols.append(finalSoln[1])
-				rotatedSols[len(sampleSols)-1] = []
+	# categorize solutions found
+	sampleSols, rotatedSols, stableSols, unstableSols = rUtils.categorizeSolutions(allHypers,model)
 
 	for hi in range(len(sampleSols)):
 		print ("equivalence class# ", hi)
@@ -565,11 +518,11 @@ def rambusOscillator(a, numStages):
 
 	#model = tanhModel.TanhModel(modelParam = a, g_cc = 0.5, g_fwd = 1.0, numStages=numStages)
 	
-	#modelParam = [Vtp, Vtn, Vdd, Kn, Sn]
-	#modelParam = [-0.25, 0.25, 1.0, 1.0, -0.5, 1.0]
+	#modelParam = [Vtp, Vtn, Vdd, Kn, Kp, Sn]
+	modelParam = [-0.25, 0.25, 1.0, 1.0, -0.5, 1.0]
 	#modelParam = [-0.4, 0.4, 1.8, 1.5, -0.5, 8/3.0]
-	modelParam = [-0.4, 0.4, 1.8, 270*1e-6, -90*1e-6, 8/3.0]
-	model = mosfetModel.MosfetModel(modelParam = modelParam, g_cc = 4.0, g_fwd = 1.0, numStages = numStages)
+	#modelParam = [-0.4, 0.4, 1.8, 270*1e-6, -90*1e-6, 8/3.0]
+	model = mosfetModel.MosfetModel(modelParam = modelParam, g_cc = 0.5, g_fwd = 1.0, numStages = numStages)
 	
 	startExp = time.time()
 	lenV = numStages*2
@@ -643,46 +596,9 @@ def rambusOscillator(a, numStages):
 	
 	print ("allHypers")
 	print (allHypers)
-	sampleSols = []
-	rotatedSols = {}
-	stableSols = []
-	unstableSols = []
-	allSols = []
-	for hyper in allHypers:
-		exampleSoln = (hyper[:,0] + hyper[:,1])/2.0
-		finalSoln = intervalUtils.newton(model,exampleSoln)
-		#print "exampleSoln ", exampleSoln
-		#print "finalSoln ", finalSoln
-		stable = determineStability(finalSoln[1],model)
-		if stable:
-			stableSols.append(finalSoln[1])
-		else:
-			unstableSols.append(finalSoln[1])
-		allSols.append(finalSoln[1])
-		
-		# Classify the solutions into equivalence classes
-		if len(sampleSols) == 0:
-			sampleSols.append(finalSoln[1])
-			rotatedSols[0] = []
-		else:
-			foundSample = False
-			for si in range(len(sampleSols)):
-				sample = sampleSols[si]
-				for ii in range(lenV):
-					if abs(finalSoln[1][0] - sample[ii]) < 1e-8:
-						rotatedSample = np.zeros_like(finalSoln[1])
-						for ri in range(lenV):
-							rotatedSample[ri] = sample[(ii+ri)%lenV]
-						if np.less_equal(np.absolute(rotatedSample - finalSoln[1]), np.ones((lenV))*1e-8 ).all():
-							foundSample = True
-							rotatedSols[si].append(ii)
-							break
-				if foundSample:
-					break
-
-			if foundSample == False:
-				sampleSols.append(finalSoln[1])
-				rotatedSols[len(sampleSols)-1] = []
+	
+	# categorize solutions found
+	sampleSols, rotatedSols, stableSols, unstableSols = rUtils.categorizeSolutions(allHypers,model)
 
 	for hi in range(len(sampleSols)):
 		print ("equivalence class# ", hi)

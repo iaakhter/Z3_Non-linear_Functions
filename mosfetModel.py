@@ -2,7 +2,6 @@ import numpy as np
 import lpUtils
 from cvxopt import matrix,solvers
 from scipy.spatial import ConvexHull
-from osgeo import ogr
 
 class MosfetModel:
 	# modelParam = [Vtp, Vtn, Vdd, Kn, Sn]
@@ -34,6 +33,10 @@ class MosfetModel:
 		self.constructPolygonRegions()
 
 	def constructPolygonRegions(self):
+		try:
+			from osgeo import ogr
+		except ImportError:
+			return
 		self.secDerSigns = [None]*7
 		rings = [None]*7
 		self.polygonRegs = [None]*7
@@ -285,6 +288,10 @@ class MosfetModel:
 
 	# patch is a polygon
 	def ICrossRegConstraint(self,I, Vin, Vout, patch):
+		try:
+			from osgeo import ogr
+		except ImportError:
+			return
 		#print ("crossRegionPatch", patch)
 		patchRing = ogr.Geometry(ogr.wkbLinearRing)
 		for i in range(patch.shape[0] + 1):
@@ -401,6 +408,10 @@ class MosfetModel:
 
 	# patch is a polygon with a list of vertices
 	def IRegConstraint(self, I, Vin, Vout, patch, polygonNumber):
+		try:
+			from osgeo import ogr
+		except ImportError:
+			return
 		#print ("regionPatch", patch, patch.shape)
 		minBounds = np.amin(patch,0)
 		maxBounds = np.amax(patch,0)

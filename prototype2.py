@@ -87,6 +87,28 @@ def ifFeasibleHyper(hyperRectangle, hyperBound,model):
 		#return
 	
 
+# check if a solution already exists in 
+# the list of solutions and if not, add it
+# to the list of solutions
+def addToSolutions(model, allHypers, solHyper):
+	exampleSoln = (solHyper[:,0] + solHyper[:,1])/2.0
+	finalSoln = intervalUtils.newton(model,exampleSoln)
+	if finalSoln[0]:
+		solExists = False
+		for existingHypers in allHypers:
+			exampleSolnInHyper = (existingHypers[:,0] + existingHypers[:,1])/2.0
+			finalSolnInHyper = intervalUtils.newton(model, exampleSolnInHyper)
+			if finalSolnInHyper[0]:
+				if np.less_equal(np.absolute(finalSolnInHyper[1] - finalSoln[1]), np.ones(finalSoln[1].shape)*1e-14).all():
+					# solution already exists
+					solExists = True
+					break
+		if not(solExists):
+			allHypers.append(solHyper)
+
+
+
+
 '''
 Find the leaves of the rootCombinationNode are feasible according
 to the broblem that we are trying to solve(in this case two-stage oscillator) 
@@ -115,7 +137,7 @@ infeasible.
 
 @param parentTree, parent, level to keep track of search tree
 '''
-def getFeasibleIntervalIndices(rootCombinationNode,boundMap,hyperBound, model,refinedHypers, parentTree, parent, level = 0):
+def getFeasibleIntervalIndices(rootCombinationNode,boundMap,hyperBound, model,refinedHypers, parentTree, parent, numSolutions, level = 0):
 	global hyperNum
 	hyperId = str(hyperNum)
 	hyperNum += 1
@@ -143,7 +165,9 @@ def getFeasibleIntervalIndices(rootCombinationNode,boundMap,hyperBound, model,re
 
 	hyper_feasHyperString = np.array_str(origHyperChild) + "\n"
 	if feasibility[0]:
-		refinedHypers.append(feasibility[1])
+		if numSolutions != "all" and len(refinedHypers) == numSolutions:
+			return
+		addToSolutions(model, refinedHypers, feasibility[1])
 		hyper_feasHyperString += " TRUE\n" + np.array_str(feasibility[1]) + "\n"
 		parentTree.create_node(hyper_feasHyperString, hyperId, parent = parent)
 		return
@@ -164,15 +188,6 @@ def getFeasibleIntervalIndices(rootCombinationNode,boundMap,hyperBound, model,re
 		if intervalIndices[i] is None:
 			newBoundMap[i][0][0] = lowBound
 			newBoundMap[i][1][1] = upperBound
-			'''if lowBound < 0.5 and upperBound > 0.5 and upperBound < 0.6:
-				newBoundMap[i][0][1] = (lowBound + upperBound)/2.0
-				newBoundMap[i][1][0] = (lowBound + upperBound)/2.0
-			elif (lowBound <= 0.5 and upperBound <= 0.5) or (lowBound >= 0.5 and upperBound >= 0.5):
-				newBoundMap[i][0][1] = (lowBound + upperBound)/2.0
-				newBoundMap[i][1][0] = (lowBound + upperBound)/2.0
-			else:
-				newBoundMap[i][0][1] = 0.6
-				newBoundMap[i][1][0] = 0.6'''
 			newBoundMap[i][0][1] = (lowBound + upperBound)/2.0
 			newBoundMap[i][1][0] = (lowBound + upperBound)/2.0
 		else:
@@ -186,18 +201,18 @@ def getFeasibleIntervalIndices(rootCombinationNode,boundMap,hyperBound, model,re
 			break
 	#print ("indexOfNone ", indexOfNone)
 	if indexOfNone is None:
-		bisectionHypers = refineHyper(intervalIndices, newBoundMap, hyperBound, model, parentTree, hyperId, level+1)
+		bisectionHypers = refineHyper(intervalIndices, newBoundMap, hyperBound, model, parentTree, hyperId, numSolutions, len(refinedHypers), level+1)
 		#print ("bisectionHypers")
 		#print (bisectionHypers)
 		#print ("len(refinedHypers) before ", len(refinedHypers))
 		for hyper in bisectionHypers:
-			refinedHypers.append(hyper)
+			addToSolutions(model, refinedHypers, hyper)
 		#print ("len(refinedHypers) after ", len(refinedHypers))
 	for i in range(len(rootCombinationNode.children)):
 		getFeasibleIntervalIndices(rootCombinationNode.children[i],
-			newBoundMap, hyperBound, model, refinedHypers, parentTree, hyperId, level+1)
+			newBoundMap, hyperBound, model, refinedHypers, parentTree, hyperId, numSolutions, level+1)
 
-def refineHyper(ordering, boundMap, maxHyperBound, model, parentTree, parent, level):
+def refineHyper(ordering, boundMap, maxHyperBound, model, parentTree, parent, numSolutions, numSolutionsFound, level):
 	lenV = model.numStages*2
 	hyperRectangle = np.zeros((lenV,2))
 	excludingRegConstraint = ""
@@ -213,12 +228,12 @@ def refineHyper(ordering, boundMap, maxHyperBound, model, parentTree, parent, le
 	volumes = []
 
 	#print ("before bisecting num ", len(finalHyper))
-	bisectHyper(maxHyperBound, hyperRectangle, 0,model, finalHyper, parentTree, parent, level)
+	bisectHyper(maxHyperBound, hyperRectangle, 0,model, finalHyper, parentTree, parent, numSolutions, numSolutionsFound, level)
 	#print ("after bisecting num ", len(finalHyper))
 
 	return finalHyper
 
-def bisectHyper(hyperBound,hyperRectangle,bisectingIndex, model,finalHypers, parentTree, parent, level):
+def bisectHyper(hyperBound,hyperRectangle,bisectingIndex, model,finalHypers, parentTree, parent, numSolutions, numSolutionsFound, level):
 	global hyperNum
 	#print "hyperRectangle"
 	#print hyperRectangle
@@ -252,26 +267,30 @@ def bisectHyper(hyperBound,hyperRectangle,bisectingIndex, model,finalHypers, par
 
 
 	if feasLeft[0]:
+		if numSolutions != "all" and numSolutionsFound + len(finalHypers) == numSolutions:
+			return
 		finalHypers.append(feasLeft[1])
 		leftHyper_feasHyperString += " TRUE\n" + np.array_str(feasLeft[1]) + "\n"
 		parentTree.create_node(leftHyper_feasHyperString, leftHyperId, parent = parent)
 	elif feasLeft[0] == False and feasLeft[1] is not None:
 		leftHyper_feasHyperString += " ****\n" + np.array_str(feasLeft[1]) + "\n"
 		parentTree.create_node(leftHyper_feasHyperString, leftHyperId, parent = parent)
-		bisectHyper(hyperBound,feasLeft[1],bisectingIndex+1,model,finalHypers, parentTree, leftHyperId, level+1)
+		bisectHyper(hyperBound,feasLeft[1],bisectingIndex+1,model,finalHypers, parentTree, leftHyperId, numSolutions, numSolutionsFound, level+1)
 	else:
 		leftHyper_feasHyperString += " FALSE\n" + " NONE\n"
 		parentTree.create_node(leftHyper_feasHyperString, leftHyperId, parent = parent)
 
 	
 	if feasRight[0]:
+		if numSolutions != "all" and numSolutionsFound + len(finalHypers) == numSolutions:
+			return
 		finalHypers.append(feasRight[1])
 		rightHyper_feasHyperString += " TRUE\n" + np.array_str(feasRight[1]) + "\n"
 		parentTree.create_node(rightHyper_feasHyperString, rightHyperId, parent = parent)
 	elif feasRight[0] == False and feasRight[1] is not None:
 		rightHyper_feasHyperString += " ****\n" + np.array_str(feasRight[1]) + "\n"
 		parentTree.create_node(rightHyper_feasHyperString, rightHyperId, parent = parent)
-		bisectHyper(hyperBound,feasRight[1],bisectingIndex+1,model,finalHypers, parentTree, rightHyperId, level+1)
+		bisectHyper(hyperBound,feasRight[1],bisectingIndex+1,model,finalHypers, parentTree, rightHyperId, numSolutions, numSolutionsFound, level+1)
 	else:
 		rightHyper_feasHyperString += " FALSE\n" + " NONE\n"
 		parentTree.create_node(rightHyper_feasHyperString, rightHyperId, parent = parent)
@@ -512,17 +531,18 @@ def z3Version(a, numStages):
 	print ("time taken", end - start)
 
 
-def rambusOscillator(a, numStages):
+def rambusOscillator(numStages, g_cc, numSolutions = "all"):
 	global hyperNum
 	hyperNum = 0
 
-	#model = tanhModel.TanhModel(modelParam = a, g_cc = 0.5, g_fwd = 1.0, numStages=numStages)
+	a = -5.0
+	model = tanhModel.TanhModel(modelParam = a, g_cc = g_cc, g_fwd = 1.0, numStages=numStages)
 	
 	#modelParam = [Vtp, Vtn, Vdd, Kn, Kp, Sn]
-	modelParam = [-0.25, 0.25, 1.0, 1.0, -0.5, 1.0]
+	#modelParam = [-0.25, 0.25, 1.0, 1.0, -0.5, 1.0]
 	#modelParam = [-0.4, 0.4, 1.8, 1.5, -0.5, 8/3.0]
-	#modelParam = [-0.4, 0.4, 1.8, 270*1e-6, -90*1e-6, 8/3.0]
-	model = mosfetModel.MosfetModel(modelParam = modelParam, g_cc = 0.5, g_fwd = 1.0, numStages = numStages)
+	modelParam = [-0.4, 0.4, 1.8, 270*1e-6, -90*1e-6, 8/3.0]
+	#model = mosfetModel.MosfetModel(modelParam = modelParam, g_cc = g_cc, g_fwd = 1.0, numStages = numStages)
 	
 	startExp = time.time()
 	lenV = numStages*2
@@ -592,7 +612,7 @@ def rambusOscillator(a, numStages):
 	parentTree.create_node(hyper_feasHyperString, hyperId)
 	allHypers = []
 	for i in range(len(rootCombinationNodes)):
-		getFeasibleIntervalIndices(rootCombinationNodes[i],boundMap,hyperBound,model,allHypers, parentTree, hyperId)
+		getFeasibleIntervalIndices(rootCombinationNodes[i],boundMap,hyperBound,model,allHypers, parentTree, hyperId, numSolutions)
 	
 	print ("allHypers")
 	print (allHypers)
@@ -643,6 +663,6 @@ triangleConstraint2 = triangleBounds(-5.0,"x1","y1",0.0,0.5)
 print objConstraint + triangleConstraint1 + triangleConstraint2
 variableDict, A, B = constructCoeffMatrices(triangleConstraint1 + triangleConstraint2)
 C = constructObjMatrix(objConstraint,variableDict)'''
-rambusOscillator(-5.0,4)
+rambusOscillator(numStages=4, g_cc = 4.0, numSolutions = "all")
 #z3Version(-5.0,2)
 

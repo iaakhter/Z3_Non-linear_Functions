@@ -108,6 +108,8 @@ def rambusOscillatorTanh(a, numStages, numSolutions = "all", g_cc = 0.5):
 		if numSolutions != "all" and len(allSolutions) == numSolutions:
 			break
 		allConstraints = []
+		
+		# Store rambus oscillator constraints
 		for i in range(lenV):
 			allConstraints.append(vs[i] >= -1)
 			allConstraints.append(vs[i] <= 1)
@@ -117,6 +119,8 @@ def rambusOscillatorTanh(a, numStages, numSolutions = "all", g_cc = 0.5):
 			allConstraints.append(vccs[i] == tanh(a*vs[ccInd]))
 			allConstraints.append(g_fwd*vfwds[i] + (-g_fwd-g_cc)*vs[i] + g_cc*vccs[i] == 0)
 
+		# Store constraints pruning search space so that
+		# old hyperrectangles are not considered
 		excludingConstraints = []
 		for solution in allSolutions:
 			singleExcludingConstraints = []
@@ -125,7 +129,9 @@ def rambusOscillatorTanh(a, numStages, numSolutions = "all", g_cc = 0.5):
 				singleExcludingConstraints.append(vs[i] >= solution[i][1])
 			excludingConstraints.append(singleExcludingConstraints)
 		
+		# Add all the rambus oscillator constraints
 		f_sat = logical_and(*allConstraints)
+		# Add constraints so that old hyperrectangles are not considered
 		if len(excludingConstraints) > 0:
 			for constraints in excludingConstraints:
 				f_sat = logical_and(f_sat, logical_or(*constraints))

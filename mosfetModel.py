@@ -31,6 +31,7 @@ class MosfetModel:
 			self.boundMap.append({0:[0.0,self.Vdd/2.0],1:[self.Vdd/2.0,self.Vdd]})
 
 		self.constructPolygonRegions()
+		self.solver = None
 
 	def constructPolygonRegions(self):
 		try:

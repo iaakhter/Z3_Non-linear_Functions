@@ -29,7 +29,7 @@ def tanhCurrent(a, VinVar, VoutVar):
 							And(VinVar <= 2.0/a, VoutVar == 1-(a*VinVar)**5)))
 	return constraints
 
-def rambusOscillatorTanh(a, numStages, g_cc = 0.5):
+def rambusOscillatorTanh(a, numStages, numSolutions = "all", g_cc = 0.5):
 	model = TanhModel(modelParam = a, g_cc = g_cc, g_fwd = 1.0, numStages=numStages)
 	start = time.time()
 	g_fwd = 1.0
@@ -41,6 +41,8 @@ def rambusOscillatorTanh(a, numStages, g_cc = 0.5):
 	s = Solver()
 	allSolutions = []
 	while True:
+		if numSolutions != "all" and len(allSolutions) == numSolutions:
+			break
 		allConstraints = []
 		for i in range(lenV):
 			allConstraints.append(vs[i] >= -1)
@@ -104,7 +106,7 @@ def rambusOscillatorTanh(a, numStages, g_cc = 0.5):
 
 
 
-def rambusOscillatorMosfet(Vtp, Vtn, Vdd, Kn, Kp, Sn, numStages, g_cc = 0.5):
+def rambusOscillatorMosfet(Vtp, Vtn, Vdd, Kn, Kp, Sn, numStages, numSolutions = "all", g_cc = 0.5):
 	start = time.time()
 	print ("Vtp", Vtp, "Vtn", Vtn, "Vdd", Vdd, "Kn", Kn, "Kp", Kp, "Sn", Sn)
 	g_fwd = 1.0
@@ -123,6 +125,8 @@ def rambusOscillatorMosfet(Vtp, Vtn, Vdd, Kn, Kp, Sn, numStages, g_cc = 0.5):
 
 	allSolutions = []
 	while True:
+		if numSolutions != "all" and len(allSolutions) == numSolutions:
+			break
 		allConstraints = []	
 		for i in range(lenV):
 			allConstraints.append(vs[i] >= boundMap[i][0][0])
@@ -187,5 +191,5 @@ def rambusOscillatorMosfet(Vtp, Vtn, Vdd, Kn, Kp, Sn, numStages, g_cc = 0.5):
 	end = time.time()
 	print ("time taken", end - start)
 
-#rambusOscillatorMosfet(Vtp = -0.25, Vtn = 0.25, Vdd = 1.0, Kn = 1.0, Kp = -0.5, Sn = 1.0, numStages = 2, g_cc = 0.5)
-rambusOscillatorTanh(a = -5.0, numStages = 2, g_cc = 0.5)
+#rambusOscillatorMosfet(Vtp = -0.25, Vtn = 0.25, Vdd = 1.0, Kn = 1.0, Kp = -0.5, Sn = 1.0, numStages = 2, numSolutions = 1, g_cc = 0.5)
+rambusOscillatorTanh(a = -5.0, numStages = 2, numSolutions = "all", g_cc = 0.5)

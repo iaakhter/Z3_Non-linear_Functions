@@ -1,5 +1,6 @@
 from dreal.symbolic import Variable, logical_and, logical_or, tanh
 from dreal.symbolic import logical_not
+from dreal.symbolic import forall
 from dreal.api import CheckSatisfiability, Minimize
 import time
 import rambusUtils as rUtils
@@ -89,8 +90,7 @@ def rambusOscillatorTanhDebug(a, numStages, hyper, g_cc = 0.5):
 			print (rotatedSols[hi][mi])
 		print ("")
 
-
-def rambusOscillatorTanh(a, numStages, g_cc = 0.5):
+def rambusOscillatorTanh(a, numStages, numSolutions = "all", g_cc = 0.5):
 	model = TanhModel(modelParam = a, g_cc = g_cc, g_fwd = 1.0, numStages=numStages)
 	start = time.time()
 	g_fwd = 1.0
@@ -105,6 +105,8 @@ def rambusOscillatorTanh(a, numStages, g_cc = 0.5):
 
 	allSolutions = []
 	while True:
+		if numSolutions != "all" and len(allSolutions) == numSolutions:
+			break
 		allConstraints = []
 		for i in range(lenV):
 			allConstraints.append(vs[i] >= -1)
@@ -203,7 +205,7 @@ def mosfetCurrent(Vtp, Vtn, Vdd, Kn, Kp, Sn, Sp, IVarN, IVarP, VinVar, VoutVar):
 	return constraints
 
 
-def rambusOscillatorMosfet(Vtp, Vtn, Vdd, Kn, Kp, Sn, numStages, g_cc = 0.5):
+def rambusOscillatorMosfet(Vtp, Vtn, Vdd, Kn, Kp, Sn, numStages, numSolutions = "all", g_cc = 0.5):
 	start = time.time()
 	print ("Vtp", Vtp, "Vtn", Vtn, "Vdd", Vdd, "Kn", Kn, "Kp", Kp, "Sn", Sn)
 	g_fwd = 1.0
@@ -226,6 +228,8 @@ def rambusOscillatorMosfet(Vtp, Vtn, Vdd, Kn, Kp, Sn, numStages, g_cc = 0.5):
 
 	allSolutions = []
 	while True:
+		if numSolutions != "all" and len(allSolutions) == numSolutions:
+			break
 		allConstraints = []	
 		for i in range(lenV):
 			allConstraints.append(vs[i] >= boundMap[i][0][0])
@@ -306,7 +310,7 @@ def rambusOscillatorMosfet(Vtp, Vtn, Vdd, Kn, Kp, Sn, numStages, g_cc = 0.5):
 	print ("time taken", end - start)
 
 
-#rambusOscillatorTanh(a = -5.0, numStages = 2, g_cc = 0.5)
+rambusOscillatorTanh(a = -5.0, numStages = 2, numSolutions = 1, g_cc = 0.5)
 
 #check if you can easily find the solution in the given hyper
 '''hyper = np.array([[-0.74, -0.72],
@@ -319,4 +323,4 @@ def rambusOscillatorMosfet(Vtp, Vtn, Vdd, Kn, Kp, Sn, numStages, g_cc = 0.5):
 	[-0.08, -0.06]])
 rambusOscillatorTanhDebug(a = -5.0, numStages = 4, hyper = hyper, g_cc = 4.0)'''
 
-rambusOscillatorMosfet(Vtp = -0.25, Vtn = 0.25, Vdd = 1.0, Kn = 1.0, Kp = -0.5, Sn = 1.0, numStages = 4, g_cc = 0.5)
+#rambusOscillatorMosfet(Vtp = -0.25, Vtn = 0.25, Vdd = 1.0, Kn = 1.0, Kp = -0.5, Sn = 1.0, numStages = 2, g_cc = 0.5)

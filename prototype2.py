@@ -4,6 +4,7 @@ import copy
 import intervalUtils
 import tanhModel
 import mosfetModel
+import schmittMosfet
 from treelib import Node, Tree
 from z3 import *
 import rambusUtils as rUtils
@@ -43,13 +44,13 @@ solution.
 	and so on.
 '''
 def ifFeasibleHyper(hyperRectangle, hyperBound,model):
-	lenV = model.numStages*2
+	lenV = hyperRectangle.shape[0]
 	#print ("hyperRectangle")
 	#print (hyperRectangle)
 	iterNum = 0
 	while True:
-		#print ("hyperRectangle 1")
-		#print (hyperRectangle)
+		print ("hyperRectangle")
+		print (hyperRectangle)
 		kResult = intervalUtils.checkExistenceOfSolutionGS(model,hyperRectangle.transpose())
 		#print ("kResult")
 		#print (kResult)
@@ -58,7 +59,7 @@ def ifFeasibleHyper(hyperRectangle, hyperBound,model):
 			return (True, kResult[1])
 
 		if kResult[0] == False and kResult[1] is None:
-			#print ("K operator not feasible")
+			print ("K operator not feasible")
 			return (False, None)
 		#print "kResult"
 		#print kResult
@@ -68,7 +69,7 @@ def ifFeasibleHyper(hyperRectangle, hyperBound,model):
 	
 		#print ("newHyperRectangle ", newHyperRectangle)
 		if feasible == False:
-			#print ("LP not feasible")
+			print ("LP not feasible")
 			return (False, None)
 
 		for i in range(lenV):
@@ -142,8 +143,8 @@ def getFeasibleIntervalIndices(rootCombinationNode,boundMap,hyperBound, model,re
 		return
 
 	intervalIndices = rootCombinationNode.rootArray
-	#print ("intervalIndices", intervalIndices)
-	#print ("boundMap", boundMap)
+	print ("intervalIndices", intervalIndices)
+	print ("boundMap", boundMap)
 	lenV = len(intervalIndices)
 	
 	#feasibility = ifFeasibleOrdering(intervalIndices, boundMap, hyperBound,model)
@@ -167,8 +168,8 @@ def getFeasibleIntervalIndices(rootCombinationNode,boundMap,hyperBound, model,re
 
 	feasibility = ifFeasibleHyper(hyperRectangle,hyperBound,model)
 
-	#print ("feasibility at level", level)
-	#print (feasibility)
+	print ("feasibility at level", level)
+	print (feasibility)
 
 	if treeVars is not None:
 		global hyperNum
@@ -222,7 +223,7 @@ def getFeasibleIntervalIndices(rootCombinationNode,boundMap,hyperBound, model,re
 			newBoundMap, hyperBound, model, refinedHypers, level+1, treeVars, numSolutions, newtonHypers)
 
 def refineHyper(ordering, boundMap, maxHyperBound, model, allHypers, level, treeVars, numSolutions, newtonHypers):
-	lenV = model.numStages*2
+	lenV = len(ordering)
 	hyperRectangle = np.zeros((lenV,2))
 	excludingRegConstraint = ""
 	for i in range(lenV):
@@ -247,8 +248,8 @@ def bisectHyper(hyperBound,hyperRectangle,bisectingIndex, model,finalHypers, lev
 		global hyperNum
 		parentTree = treeVars[0]
 		parent = treeVars[1]
-	#print "hyperRectangle"
-	#print hyperRectangle
+	print "hyperRectangle"
+	print hyperRectangle
 	lenV = hyperRectangle.shape[0]
 	intervalLength = hyperRectangle[:,1] - hyperRectangle[:,0]
 	bisectingIndex = np.argmax(intervalLength)
@@ -260,16 +261,16 @@ def bisectHyper(hyperBound,hyperRectangle,bisectingIndex, model,finalHypers, lev
 	leftHyper[bisectingIndex][1] = midVal
 
 	rightHyper[bisectingIndex][0] = midVal
-	#print ("leftHyper at level", level)
-	#print (leftHyper)
-	#print ("rightHyper at level", level)
-	#print (rightHyper)
+	print ("leftHyper at level", level)
+	print (leftHyper)
+	print ("rightHyper at level", level)
+	print (rightHyper)
 	feasLeft = ifFeasibleHyper(leftHyper, hyperBound, model)
 	feasRight = ifFeasibleHyper(rightHyper, hyperBound, model)
-	#print ("feasLeft")
-	#print (feasLeft)
-	#print ("feasRight")
-	#print (feasRight)
+	print ("feasLeft")
+	print (feasLeft)
+	print ("feasRight")
+	print (feasRight)
 
 	leftHyperAlreadyConsidered = False
 	rightHyperAlreadyConsidered = False
@@ -569,15 +570,119 @@ def z3Version(a, numStages):
 	print ("time taken", end - start)
 
 
+def schmittTrigger(treeVars = None, numSolutions = "all", newtonHypers = None):
+	inputVoltage = 1.8
+
+	#modelParam = [Vtp, Vtn, Vdd, Kn, Kp, Sn]
+	modelParam = [-0.4, 0.4, 1.8, 1.5, -0.75, 8/3.0]
+	model = schmittMosfet.SchmittMosfet(modelParam = modelParam, inputVoltage = inputVoltage)
+
+	startExp = time.time()
+	lenV = 3
+	indexChoiceArray = []
+	for i in range(lenV):
+		indexChoiceArray.append(i)
+	print ("indexChoiceArray", indexChoiceArray)
+	boundMap = model.boundMap
+	print ("boundMap ", boundMap)
+	
+	#excludingBound = findExcludingBound(exampleOrdering,boundMap,model)
+	#excludingBound = 0.1
+
+	minBoundMap = 0
+	maxBoundMap = 1
+	rootCombinationNodes = intervalUtils.combinationWithTrees(lenV,[minBoundMap,maxBoundMap],indexChoiceArray)
+	hyperBound = 0.1
+	'''bisectionHypers = refineHyper(a, params, xs, ys, zs, [None, None, None, None], boundMap, hyperBound)
+	print "bisectionHypers"
+	print bisectionHypers'''
+
+	'''hyperRectangle = np.zeros((lenV,2))
+	hyperRectangle[0,:] = [1.799999999, 1.800000001]
+	hyperRectangle[1,:] = [1.574999999, 1.575000001]
+	hyperRectangle[2,:] = [1.799999999, 1.800000001]
+
+	feasibility = ifFeasibleHyper(hyperRectangle, hyperBound,model)
+	#feasibility = intervalUtils.checkExistenceOfSolutionGS(model,hyperRectangle.transpose())
+	print (feasibility)'''
+	#exampleSoln = (hyperRectangle[:,0] + hyperRectangle[:,1])/2.0
+	'''exampleSoln = np.array([1.8, 1.4, 1.8])
+	finalSoln = intervalUtils.newton(model,exampleSoln)
+	print ("finalSoln", finalSoln)'''
+	#print (model.currentFun(0.90732064, 0.09267936))
+	'''ordering = [0,1,1,0,1,0,0,1]
+	hypers = refineHyper(a, params, xs, ys, zs, ordering, boundMap, hyperBound)
+	print "hypers"
+	print hypers
+	exampleSoln = (hypers[0][:,0] + hypers[0][:,1])/2.0
+	finalSoln = intervalUtils.newton(a,params,exampleSoln, oscNum, getJacobian)
+	print "finalSoln ", finalSoln'''
+	
+	if treeVars is not None:
+		global hyperNum
+		hyperNum = 0
+		parentHyper = []
+		for i in range(lenV):
+			parentHyper.append([boundMap[i][0][0], boundMap[i][1][1]])
+		parentHyper = np.array(parentHyper)
+		parentTree = Tree()
+		hyper_feasHyperString = np.array_str(parentHyper) + "\n ****\n" + np.array_str(parentHyper) + "\n"
+		hyperId = str(hyperNum)
+		hyperNum += 1
+		parentTree.create_node(hyper_feasHyperString, hyperId)
+		treeVars = [parentTree, hyperId]
+
+	allHypers = []
+	if newtonHypers is not None:
+		allHypers, solutionsFoundSoFar = findAndIgnoreNewtonSoln(model, boundMap[0][0][0], boundMap[0][1][1], numSolutions=numSolutions, numTrials = numStages*100)
+		newtonHypers = np.copy(allHypers)
+
+	for i in range(len(rootCombinationNodes)):
+		getFeasibleIntervalIndices(rootCombinationNodes[i],boundMap,hyperBound,model,allHypers, level = 0, treeVars=treeVars, numSolutions=numSolutions , newtonHypers=newtonHypers)
+	
+	print ("allHypers")
+	print (allHypers)
+	
+	# categorize solutions found
+	sampleSols, rotatedSols, stableSols, unstableSols = rUtils.categorizeSolutions(allHypers,model)
+
+	for hi in range(len(sampleSols)):
+		print ("equivalence class# ", hi)
+		print ("main member ", sampleSols[hi])
+		print ("number of other members ", len(rotatedSols[hi]))
+		print ("other member rotationIndices: ")
+		for mi in range(len(rotatedSols[hi])):
+			print (rotatedSols[hi][mi])
+		print ("")
+
+	for hi in range(len(sampleSols)):
+		if len(rotatedSols[hi]) > lenV - 1 or (len(rotatedSols[hi]) >= 1 and rotatedSols[hi][0] == 0):
+			print ("problem equivalence class# ", hi)
+			print ("main member ", sampleSols[hi])
+			print ("num other Solutions ", len(rotatedSols[hi]))
+
+	print ("")
+	print ("numSolutions, ", len(allHypers))
+	print ("num stable solutions ", len(stableSols))
+	'''for si in range(len(stableSols)):
+		print stableSols[si]'''
+	#print "num unstable solutions ", len(unstableSols)
+	'''for si in range(len(unstableSols)):
+		print unstableSols[si]
+	if treeVars is not None:
+		parentTree.show(line_type="ascii-em")'''
+	endExp = time.time()
+	print ("TOTAL TIME ", endExp - startExp)
+
 def rambusOscillator(numStages, g_cc, treeVars = None, numSolutions="all" , newtonHypers=None):
 	a = -5.0
-	model = tanhModel.TanhModel(modelParam = a, g_cc = g_cc, g_fwd = 1.0, numStages=numStages)
+	#model = tanhModel.TanhModel(modelParam = a, g_cc = g_cc, g_fwd = 1.0, numStages=numStages)
 	
 	#modelParam = [Vtp, Vtn, Vdd, Kn, Kp, Sn]
 	#modelParam = [-0.25, 0.25, 1.0, 1.0, -0.5, 1.0]
 	#modelParam = [-0.4, 0.4, 1.8, 1.5, -0.5, 8/3.0]
 	modelParam = [-0.4, 0.4, 1.8, 270*1e-6, -90*1e-6, 8/3.0]
-	#model = mosfetModel.MosfetModel(modelParam = modelParam, g_cc = g_cc, g_fwd = 1.0, numStages = numStages)
+	model = mosfetModel.MosfetModel(modelParam = modelParam, g_cc = g_cc, g_fwd = 1.0, numStages = numStages)
 	
 	startExp = time.time()
 	lenV = numStages*2
@@ -692,6 +797,7 @@ def rambusOscillator(numStages, g_cc, treeVars = None, numSolutions="all" , newt
 	if treeVars is not None:
 		parentTree.show(line_type="ascii-em")
 
-rambusOscillator(numStages=4, g_cc=4.0, treeVars=None, numSolutions="all" , newtonHypers=None)
+rambusOscillator(numStages=6, g_cc=4.0, treeVars=None, numSolutions="all" , newtonHypers=None)
 #z3Version(-5.0,2)
+#schmittTrigger(treeVars = None, numSolutions = "all", newtonHypers = None)
 

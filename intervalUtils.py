@@ -160,7 +160,10 @@ def newton(model,soln):
 		jac = model.jacobian(soln)
 		#print ("res", res)
 		#print ("jac", jac)
-		h = np.linalg.solve(jac,res)
+		try:
+			h = np.linalg.solve(jac,res)
+		except np.linalg.LinAlgError:
+			h = np.linalg.lstsq(jac, res)[0]
 		soln = soln + h
 		count+=1
 	if count >= maxIter and np.linalg.norm(h) > 1e-8:
@@ -192,26 +195,34 @@ def checkExistenceOfSolutionGS(model,hyperRectangle):
 		#print ("jacMidPoint")
 		#print (jacMidPoint)
 		C = None
+		numIterations = 0
 
 		while True:
 			fail = False
 			try:
-				C = np.linalg.inv(jacMidPoint)
+				C = np.linalg.pinv(jacMidPoint)
+				#print ("C", C)
 			except np.linalg.linalg.LinAlgError:
 				fail = True
 				randomVal = random.uniform(0.1,0.9)
 				midPoint = startBounds[:,0] + (startBounds[:,1] - startBounds[:,0])*randomVal
+				#print ("newMidPoint", midPoint)
 				_,_,IMidPoint = np.array(model.oscNum(midPoint))
 				jacMidPoint = model.jacobian(midPoint)
 
 			if not(fail):
 				break
+			numIterations += 1
+			'''if numIterations == 200:
+				return'''
+			#return
 
 		#print "C"
 		#print C
 		#print "condition number of C", np.linalg.cond(C)
 
 		#print "C ", C
+		#C = np.identity(numVolts)
 		I = np.identity(numVolts)
 
 		jacInterval = model.jacobianInterval(startBounds)
@@ -295,7 +306,7 @@ def checkExistenceOfSolutionGS(model,hyperRectangle):
 				constructBiggerHyper = True
 				exampleVolt = (gsIntersect[:,0] + gsIntersect[:,1])/2.0
 				soln = newton(model,exampleVolt)
-				#print ("soln ", soln)
+				print ("soln ", soln)
 				# the new hyper must contain the solution in the middle and enclose old hyper
 				# and then we check for uniqueness of solution in the newer bigger hyperrectangle
 				if soln[0]:
@@ -307,10 +318,10 @@ def checkExistenceOfSolutionGS(model,hyperRectangle):
 						#print "maxDiff ", maxDiff
 						gsIntersect[si,0] = soln[1][si] - maxDiff
 						gsIntersect[si,1] = soln[1][si] + maxDiff
-					#print ("bigger hyper ", gsIntersect)
+
+					print ("bigger hyper ", gsIntersect)
 					startBounds = gsIntersect
 				#print ("after if constructBiggerHyper", constructBiggerHyper)
-					
 			else:
 				return (False,gsIntersect)
 		else:
@@ -341,7 +352,7 @@ def checkExistenceOfSolution(model,hyperRectangle):
 		jacMidPoint = model.jacobian(midPoint)
 		#print "jacMidPoint"
 		#print jacMidPoint
-		C = np.linalg.inv(jacMidPoint)
+		C = np.linalg.pinv(jacMidPoint)
 		#print "C"
 		#print C
 		#print "condition number of C", np.linalg.cond(C)
@@ -421,7 +432,36 @@ def checkExistenceOfSolution(model,hyperRectangle):
 			#print "hyperrectangle does not contain any solution"
 			return (False,None)
 		
-		if np.less_equal(intervalLength,1e-8*np.ones((numVolts))).all() or  np.less_equal(np.absolute(intersect - startBounds),1e-4*np.ones((numVolts,2))).all():
+		
+		if np.less_equal(intersect[:,1] - intersect[:,0],1e-8*np.ones((numVolts))).all() or  np.less_equal(np.absolute(intersect - startBounds),1e-4*np.ones((numVolts,2))).all():
+			if constructBiggerHyper == False and np.less_equal(intersect[:,1] - intersect[:,0],1e-8*np.ones((numVolts))).all():
+				#print ("gsIntersect before")
+				#print (gsIntersect)
+				constructBiggerHyper = True
+				exampleVolt = (intersect[:,0] + intersect[:,1])/2.0
+				soln = newton(model,exampleVolt)
+				print ("soln ", soln)
+				# the new hyper must contain the solution in the middle and enclose old hyper
+				# and then we check for uniqueness of solution in the newer bigger hyperrectangle
+				if soln[0]:
+					for si in range(numVolts):
+						maxDiff = max(abs(intersect[si,1] - soln[1][si]), abs(soln[1][si] - intersect[si,0]))
+						#print ("maxDiff", maxDiff)
+						if maxDiff < 1e-9:
+							maxDiff = 1e-9
+						#print "maxDiff ", maxDiff
+						intersect[si,0] = soln[1][si] - maxDiff
+						intersect[si,1] = soln[1][si] + maxDiff
+
+					print ("bigger hyper ", intersect)
+					startBounds = intersect
+				#print ("after if constructBiggerHyper", constructBiggerHyper)
+			else:
+				return (False,intersect)
+		else:
+			startBounds = intersect
+
+		'''if np.less_equal(intervalLength,1e-8*np.ones((numVolts))).all() or  np.less_equal(np.absolute(intersect - startBounds),1e-4*np.ones((numVolts,2))).all():
 			# TODO: Need a better way to deal with tiny hyperrectangles
 			if constructBiggerHyper == False and np.less_equal(intervalLength, np.ones((numVolts))*1e-10 ).any():
 				constructBiggerHyper = True
@@ -447,5 +487,5 @@ def checkExistenceOfSolution(model,hyperRectangle):
 				#print "intersect ", intersect
 				return (False,intersect)
 		else:
-			startBounds = intersect
+			startBounds = intersect'''
 		iteration += 1

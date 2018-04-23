@@ -18,7 +18,6 @@ Divide solutions according to equivalence classes.
 Categorize solutions as stable or unstable
 '''
 def categorizeSolutions(allHypers,model):
-	lenV = model.numStages*2
 	sampleSols = []
 	rotatedSols = {}
 	stableSols = []
@@ -26,6 +25,7 @@ def categorizeSolutions(allHypers,model):
 	allSols = []
 	for hyper in allHypers:
 		exampleSoln = (hyper[:,0] + hyper[:,1])/2.0
+		lenV = len(exampleSoln)
 		finalSoln = intervalUtils.newton(model,exampleSoln)
 		#print "exampleSoln ", exampleSoln
 		#print "finalSoln ", finalSoln

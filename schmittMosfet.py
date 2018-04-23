@@ -3,6 +3,7 @@ import lpUtils
 from cvxopt import matrix,solvers
 from scipy.spatial import ConvexHull
 
+## Remember to add leakage terms so that jacobians are not singular
 class SchmittMosfet:
 	# modelParam = [Vtp, Vtn, Vdd, Kn, Sn]
 	def __init__(self, modelParam, inputVoltage):
@@ -29,7 +30,12 @@ class SchmittMosfet:
 		for i in range(3):
 			self.boundMap.append({0:[0.0,self.Vdd/2.0],1:[self.Vdd/2.0,self.Vdd]})
 
+		# leakage constants
+		self.gn = self.nFetMax()/self.Vdd
+		self.gp = self.pFetMax()/self.Vdd
+
 		self.constructPolygonRegions()
+
 		self.solver = None
 
 	def constructPolygonRegions(self):
@@ -119,6 +125,38 @@ class SchmittMosfet:
 		return [INum, firDerIn, firDerOut, secDerIn, secDerOut, secDerInOut]
 
 
+	def nFetMax(self):
+		InMax = 0.0		
+		src = 0.0
+		gate = self.Vdd
+		drain = self.Vdd
+		gs = gate - src
+		ds = drain - src
+		if gs <= self.Vtn:
+			InMax = 0.0;
+		elif ds >= gs - self.Vtn:
+			InMax =  0.5*self.Sn*self.Kn*(gs - self.Vtn)*(gs - self.Vtn);
+		elif ds <= gs - self.Vtn:
+			InMax = self.Sn*self.Kn*(gs - self.Vtn - ds/2.0)*ds;
+		return InMax
+
+	def pFetMax(self):
+		IpMax = 0.0
+		src = self.Vdd
+		gate = 0.0
+		drain = 0.0
+		gs = gate - src
+		ds = drain - src
+		  
+		if gs >= self.Vtp:
+			IpMax = 0.0
+		elif ds <= gs - self.Vtp:
+			IpMax =  0.5*self.Sp*self.Kp*(gs - self.Vtp)*(gs - self.Vtp)
+		elif ds >= gs - self.Vtp:
+			IpMax = self.Sp*self.Kp*(gs - self.Vtp - ds/2.0)*ds
+
+		return IpMax
+
 	def nFet(self, src, gate, drain, transistorNumber, polygonNumber = None):
 		I = 0.0
 		firDerSrc, firDerGate, firDerDrain = 0.0, 0.0, 0.0
@@ -126,6 +164,8 @@ class SchmittMosfet:
 		secDerSrcGate, secDerSrcDrain, secDerGateDrain = 0.0, 0.0, 0.0
 		gs = gate - src
 		ds = drain - src
+		origGs = gs
+		origDs = ds
 		#print ("nfet transistorNumber", transistorNumber)
 		if src > drain:
 			src, drain = drain, src
@@ -206,6 +246,30 @@ class SchmittMosfet:
 				secDerSrcDrain = 0.0
 				secDerGateDrain = self.Sn*self.Kn
 
+		gs, ds = origGs, origDs
+		InLeak = ds*(1 + (gs - self.Vtn)/self.Vdd)*(self.gn/1e-4)
+		firDerLeakSrc = (self.gn/1e-4)*((ds)*(-1.0/self.Vdd) - (1 + (gs - self.Vtn)/self.Vdd))
+		firDerLeakGate = (self.gn/1e-4)*(ds/self.Vdd)
+		firDerLeakDrain = (self.gn/1e-4)*(1 + (gs - self.Vtn)/self.Vdd)
+		secDerLeakSrc = (2/1e-4)*(self.gn/self.Vdd)
+		secDerLeakGate = 0.0
+		secDerLeakDrain = 0.0
+		secDerLeakSrcGate = (self.gn/1e-4)*(-1/self.Vdd)
+		secDerLeakSrcDrain = (self.gn/1e-4)*(-1/self.Vdd)
+		secDerLeakGateDrain = (self.gn/1e-4)*(1/self.Vdd)
+
+		#print ("I before leak", I)
+		I += InLeak
+		#print ("I after leak", I)
+		firDerSrc += firDerLeakSrc
+		firDerGate += firDerLeakGate
+		firDerDrain += firDerLeakDrain
+		secDerSrc += secDerLeakSrc
+		secDerGate += secDerLeakGate
+		secDerDrain += secDerLeakDrain
+		secDerSrcGate += secDerLeakSrcGate
+		secDerSrcDrain += secDerLeakSrcDrain
+		secDerGateDrain += secDerLeakGateDrain
 		return [I, firDerSrc, firDerGate, firDerDrain, secDerSrc, secDerGate, secDerDrain, secDerSrcGate, secDerSrcDrain, secDerGateDrain]
 
 	def pFet(self, src, gate, drain, transistorNumber, polygonNumber = None):
@@ -215,6 +279,8 @@ class SchmittMosfet:
 		secDerSrcGate, secDerSrcDrain, secDerGateDrain = 0.0, 0.0, 0.0
 		gs = gate - src
 		ds = drain - src
+
+		origGs, origDs = gs, ds
 		#print ("pfet transistorNumber", transistorNumber)
 		if src < drain:
 			src, drain = drain, src
@@ -297,6 +363,29 @@ class SchmittMosfet:
 				secDerSrcDrain = 0.0
 				secDerGateDrain = self.Sp*self.Kp
 
+		gs, ds = origGs, origDs
+		IpLeak = ds*(1 + (gs - self.Vtp)/self.Vdd)*(self.gp/1e-4)
+		firDerLeakSrc = (self.gp/1e-4)*((ds)*(-1.0/self.Vdd) - (1 + (gs - self.Vtp)/self.Vdd))
+		firDerLeakGate = (self.gp/1e-4)*(ds/self.Vdd)
+		firDerLeakDrain = (self.gp/1e-4)*(1 + (gs - self.Vtp)/self.Vdd)
+		secDerLeakSrc = (2/1e-4)*(self.gp/self.Vdd)
+		secDerLeakGate = 0.0
+		secDerLeakDrain = 0.0
+		secDerLeakSrcGate = (self.gp/1e-4)*(-1/self.Vdd)
+		secDerLeakSrcDrain = (self.gp/1e-4)*(-1/self.Vdd)
+		secDerLeakGateDrain = (self.gp/1e-4)*(1/self.Vdd)
+
+		I += IpLeak
+		firDerSrc += firDerLeakSrc
+		firDerGate += firDerLeakGate
+		firDerDrain += firDerLeakDrain
+		secDerSrc += secDerLeakSrc
+		secDerGate += secDerLeakGate
+		secDerDrain += secDerLeakDrain
+		secDerSrcGate += secDerLeakSrcGate
+		secDerSrcDrain += secDerLeakSrcDrain
+		secDerGateDrain += secDerLeakGateDrain
+		
 		#print ("firDerSrc", firDerSrc, "firDerGate", firDerGate, "firDerDrain", firDerDrain)
 		return [I, firDerSrc, firDerGate, firDerDrain, secDerSrc, secDerGate, secDerDrain, secDerSrcGate, secDerSrcDrain, secDerGateDrain]
 
@@ -318,12 +407,14 @@ class SchmittMosfet:
 		derTypes = [False, False]
 		if transistorNumber == 1 or transistorNumber == 4:
 			S, K, Vt = self.Sn, self.Kn, self.Vtn
+			g = self.gn
 			firstCutoff = Vin > Vout and Vin - Vout >= self.inputVoltage - Vout - Vt
 			secondCutoff = Vin > Vout and Vin - Vout <= self.inputVoltage - Vout - Vt
 			thirdCutoff = Vout - Vin >= self.inputVoltage - Vin - Vt
 			forthCutoff = Vout - Vin <= self.inputVoltage - Vin - Vt
 			if transistorNumber == 4:
 				S, K, Vt = self.Sp, self.Kp, self.Vtp
+				g = self.gp
 				firstCutoff = Vin < Vout and Vin - Vout <= self.inputVoltage - Vout - Vt
 				secondCutoff = Vin < Vout and Vin - Vout >= self.inputVoltage - Vout - Vt
 				thirdCutoff = Vout - Vin <= self.inputVoltage - Vin - Vt
@@ -334,40 +425,74 @@ class SchmittMosfet:
 					I += -0.5*S*K*(self.inputVoltage - Vout - Vt)*(self.inputVoltage - Vout - Vt)
 					firDers[1] += S*K*(self.inputVoltage - Vout - Vt)
 					derTypes[1] = True
+					ILeak = (g/1e-4)*(d - Vout)*(1 + (self.inputVoltage - Vt - Vout)/self.Vdd)
+					derLeak = (g/1e-4)*((d - Vout)/(-self.Vdd) - (1 + (self.inputVoltage - Vt - Vout)/self.Vdd))
+					I += ILeak
+					firDers[1] += derLeak
 				else:
 					I += -0.5*S*K*(self.inputVoltage - m*Vin - d - Vt)*(self.inputVoltage - m*Vin - d - Vt)
 					firDers[0] += m*S*K*(self.inputVoltage - m*Vin - d -Vt)
 					derTypes[0] = True
+					ILeak = (g/1e-4)*(Vin - m*Vin - d)*(1 + (self.inputVoltage - Vt - m*Vin - d)/self.Vdd)
+					derLeak = (g/1e-4)*((Vin - m*Vin - d)*(-m/self.Vdd) + (1 + (self.inputVoltage - Vt - m*Vin - d)/self.Vdd)*(1 - m))
+					I += ILeak
+					firDers[0] += derLeak
 			elif secondCutoff:
 				if m is None:
 					I += -S*K*(self.inputVoltage - Vout - Vt - (d - Vout)/2.0)*(d - Vout)
 					firDers[1] += -S*K*(-(self.inputVoltage - Vout - Vt - (d - Vout)/2.0) - 0.5*(d - Vout))
 					derTypes[1] = True
+					ILeak = (g/1e-4)*(d - Vout)*(1 + (self.inputVoltage - Vt - Vout)/self.Vdd)
+					derLeak = (g/1e-4)*((d - Vout)/(-self.Vdd) - (1 + (self.inputVoltage - Vt - Vout)/self.Vdd))
+					I += ILeak
+					firDers[1] += derLeak
 				else:
 					I += -S*K*(self.inputVoltage - m*Vin - d - Vt - (Vin - m*Vin - d)/2.0)*(Vin - m*Vin - d)
 					firDers[0] += -S*K*((1 - m)*(self.inputVoltage - m*Vin -d - Vt - (Vin - m*Vin - d)/2.0) + 
 										(-m - (1-m)/2.0)*(Vin - m*Vin - d))
 					derTypes[0] = True
+					ILeak = (g/1e-4)*(Vin - m*Vin - d)*(1 + (self.inputVoltage - Vt - m*Vin - d)/self.Vdd)
+					derLeak = (g/1e-4)*((Vin - m*Vin - d)*(-m/self.Vdd) + (1 + (self.inputVoltage - Vt - m*Vin - d)/self.Vdd)*(1 - m))
+					I += ILeak
+					firDers[0] += derLeak
 			elif thirdCutoff:
 				if m is None:
 					I += 0.5*S*K*(self.inputVoltage - d - Vt)*(self.inputVoltage - d - Vt)
+					derTypes[1] = True
+					ILeak = (g/1e-4)*(Vout - d)*(1 + (self.inputVoltage - Vt - d)/self.Vdd)
+					derLeak = (g/1e-4)*(1 + (self.inputVoltage - Vt - d)/self.Vdd)
+					I += ILeak
+					firDers[1] += derLeak
 				else:
 					I += 0.5*S*K*(self.inputVoltage - Vin - Vt)*(self.inputVoltage - Vin - Vt)
 					firDers[0] += -S*K*(self.inputVoltage - Vin - Vt)
 					derTypes[0] = True
+					ILeak = (g/1e-4)*(Vout - Vin)*(1 + (self.inputVoltage - Vt - Vin)/self.Vdd)
+					derLeak = (g/1e-4)*((m*Vin + d - Vin)*(-1/self.Vdd) + (1 + (self.inputVoltage - Vt - Vin)/self.Vdd)*(m - 1))
+					I += ILeak
+					firDers[0] += derLeak
 			elif forthCutoff:
 				if m is None:
 					I += S*K*(self.inputVoltage - d - Vt - (Vout - d)/2.0)*(Vout - d)
 					firDers[1] += S*K*((self.inputVoltage - d - Vt - (Vout - d)/2.0) - 0.5*(Vout - d)/2.0)
 					derTypes[1] = True
+					ILeak = (g/1e-4)*(Vout - d)*(1 + (self.inputVoltage - Vt - d)/self.Vdd)
+					derLeak = (g/1e-4)*(1 + (self.inputVoltage - Vt - d)/self.Vdd)
+					I += ILeak
+					firDers[1] += derLeak
 				else:
 					I += 0.5*S*K*(self.inputVoltage - Vin - Vt - (m*Vin + d - Vin)/2.0)*(m*Vin + d - Vin)
 					firDers[0] += S*K*((self.inputVoltage - Vin - Vt - (m*Vin + d - Vin)/2.0)*(m-1) + 
 										(m*Vin + d - Vin)*(-1 - 0.5*(m-1)))
 					derTypes[0] = True
+					ILeak = (g/1e-4)*(Vout - Vin)*(1 + (self.inputVoltage - Vt - Vin)/self.Vdd)
+					derLeak = (g/1e-4)*((m*Vin + d - Vin)*(-1/self.Vdd) + (1 + (self.inputVoltage - Vt - Vin)/self.Vdd)*(m - 1))
+					I += ILeak
+					firDers[0] += derLeak
 
 		if transistorNumber == 2 or transistorNumber == 5:
 			S, K, Vt = self.Sn, self.Kn, self.Vtn
+			g = self.gn
 			drain = self.Vdd
 			firstCutoff = Vin > drain and Vin - drain >= Vout - drain - Vt
 			secondCutoff = Vin > drain and Vin - drain <= Vout - drain - Vt
@@ -375,6 +500,7 @@ class SchmittMosfet:
 			forthCutoff = drain - Vin <= Vout - Vin - Vt
 			if transistorNumber == 5:
 				S, K, Vt = self.Sp, self.Kp, self.Vtp
+				g = self.gp
 				drain = 0.0
 				firstCutoff = Vin < drain and Vin - drain <= Vout - drain - Vt
 				secondCutoff = Vin < drain and Vin - drain >= Vout - drain - Vt
@@ -386,39 +512,71 @@ class SchmittMosfet:
 					I += -0.5*S*K*(Vout - d - Vt)*(Vout - d - Vt)
 					firDers[1] += -S*K*(Vout - d - Vt)
 					derTypes[1] = True 
+					ILeak = (g/1e-4)*(d - drain)*(1 + (Vout - Vt - drain)/self.Vdd)
+					derLeak = (g/1e-4)*(d - drain)*(1/self.Vdd)
+					I += ILeak
+					firDers[1] += derLeak
 				else:
-					I += -0.5*S*K*(m*Vin + d - Vin - Vt)*(m*Vin + d - Vin - Vt)
-					firDers[0] += -S*K*(m*Vin + d - Vin - Vt)*(m - 1)
+					I += -0.5*S*K*(m*Vin + d - drain - Vt)*(m*Vin + d - drain - Vt)
+					firDers[0] += -S*K*(m*Vin + d - Vdd - Vt)*(m)
 					derTypes[0] = True
+					ILeak = (g/1e-4)*(Vin - drain)*(1 + (m*Vin + d - Vt - drain)/self.Vdd)
+					derLeak = (g/1e-4)*((Vin - drain)*(m/self.Vdd) + (1 + (m*Vin + d - Vt - drain)/self.Vdd))
+					I += ILeak
+					firDers[0] += derLeak
 			elif secondCutoff:
 				if m is None:
-					I += -S*K*(Vout - d - Vt - (drain - d)/2.0)*(drain - d)
-					firDers[1] += -S*K*(drain - d)
+					I += -S*K*(Vout - drain - Vt - (d - drain)/2.0)*(d - drain)
+					firDers[1] += -S*K*(d - drain)
 					derTypes[1] = True
+					ILeak = (g/1e-4)*(d - drain)*(1 + (Vout - Vt - drain)/self.Vdd)
+					derLeak = (g/1e-4)*(d - drain)*(1/self.Vdd)
+					I += ILeak
+					firDers[1] += derLeak
 				else:
-					I += -S*K*(m*Vin + d - Vin - Vt - (drain - Vin)/2.0)*(drain - Vin)
-					firDers[0] += -S*K*(-(m*Vin + d - Vin - Vt - (drain - Vin)/2.0) + (drain - Vin)*(m - 0.5))
+					I += -S*K*(m*Vin + d - drain - Vt - (Vin - drain)/2.0)*(Vin - drain)
+					firDers[0] += -S*K*((m*Vin + d - drain - Vt - (Vin - drain)/2.0) + (Vin - drain)*(m - 0.5))
 					derTypes[0] = True
+					ILeak = (g/1e-4)*(Vin - drain)*(1 + (m*Vin + d - Vt - drain)/self.Vdd)
+					derLeak = (g/1e-4)*((Vin - drain)*(m/self.Vdd) + (1 + (m*Vin + d - Vt - drain)/self.Vdd))
+					I += ILeak
+					firDers[0] += derLeak
 
 			elif thirdCutoff:
 				if m is None:
 					I += 0.5*S*K*(Vout - d - Vt)*(Vout - d - Vt)
 					firDers[1] += S*K*(Vout - d - Vt)
 					derTypes[1] = True
+					ILeak = (g/1e-4)*(drain - d)*(1 + (Vout - Vt - d)/self.Vdd)
+					derLeak = (g/1e-4)*(drain - d)*(1/self.Vdd)
+					I += ILeak
+					derTypes[1] += derLeak
 				else:
 					I += 0.5*S*K*(m*Vin + d - Vin - Vt)*(m*Vin + d - Vin - Vt)
 					firDers[0] += -S*K*(m*Vin + d - Vin - Vt)*(m-1)
 					derTypes[0] = True
+					ILeak = (g/1e-4)*(drain - Vin)*(1 + (m*Vin + d - Vt - Vin)/self.Vdd)
+					derLeak = (g/1e-4)*((drain - Vin)*(m-1)/self.Vdd - (1 + (m*Vin + d - Vt - Vin)/self.Vdd))
+					I += ILeak
+					firDers[0] += derLeak
 			elif forthCutoff:
 				if m is None:
 					I += S*K*(Vout - d - Vt - (drain - d)/2.0)*((drain - d)/2.0)
 					firDers[1] += S*K*(drain - d)
 					derTypes[1] = True
+					ILeak = (g/1e-4)*(drain - d)*(1 + (Vout - Vt - d)/self.Vdd)
+					derLeak = (g/1e-4)*(drain - d)*(1/self.Vdd)
+					I += ILeak
+					derTypes[1] += derLeak
 				else:
 					I += 0.5*S*K*(m*Vin + d - Vin - Vt - (drain - Vin)/2.0)*(drain - Vin)
 					firDers[0] += S*K*(-(m*Vin + d - Vin - Vt - (drain - Vin)/2.0) + 
 						(drain - Vin)*(m - 0.5))
 					derTypes[0] = True
+					ILeak = (g/1e-4)*(drain - Vin)*(1 + (m*Vin + d - Vt - Vin)/self.Vdd)
+					derLeak = (g/1e-4)*((drain - Vin)*(m-1)/self.Vdd - (1 + (m*Vin + d - Vt - Vin)/self.Vdd))
+					I += ILeak
+					firDers[0] += derLeak
 
 		return [I, firDers, derTypes]
 
@@ -590,14 +748,12 @@ class SchmittMosfet:
 					intersectingPt = np.array([xPt, yPt])
 				# TODO: check if this makes sense
 				missingCoord = None
-				if planeNormal[1] == 0:
-					missingCoord = point1[0]
-				elif planeNormal[0] == 0:
+				if planeNormal[1] == 0 or planeNormal[0] == 0:
 					missingCoord = point1[0]
 				else:
 					missingCoord = (intersectingPt[0] - d)/planeNormal[0]
 				feasiblePoints.append([missingCoord,intersectingPt[0],intersectingPt[1]])
-				print ("feasiblePt added if", feasiblePoints[-1])
+				#print ("feasiblePt added if", feasiblePoints[-1])
 
 			elif not(derTypes1[1]) and not(derTypes2[1]):
 				m1, m2 = firDers1[0], firDers2[0]
@@ -615,7 +771,7 @@ class SchmittMosfet:
 				# TODO: check if this makes sense
 				missingCoord = planeNormal[0]*intersectingPt[0] + d
 				feasiblePoints.append([intersectingPt[0],missingCoord,intersectingPt[1]])
-				print ("feasiblePt added else", feasiblePoints[-1])
+				#print ("feasiblePt added else", feasiblePoints[-1])
 		return feasiblePoints
 
 
@@ -848,6 +1004,7 @@ class SchmittMosfet:
 		transCurs[3] = self.currentFun(None, V[0], 3, None)[0]
 		transCurs[4] = self.currentFun(V[2], V[0], 4, None)[0]
 		transCurs[5] = self.currentFun(V[2], V[0], 5, None)[0]
+		#print ("transCurs", transCurs)
 		nodeCurs = np.zeros((3))
 		nodeCurs[0] = -transCurs[4] - transCurs[1]
 		nodeCurs[1] = -transCurs[0] + transCurs[1] + transCurs[2]
@@ -984,7 +1141,7 @@ class SchmittMosfet:
 			try:
 				minSol = solvers.lp(Cmin,A,B)
 			except ValueError:
-				print ("weird constraints", allConstraints)
+				#print ("weird constraints", allConstraints)
 				pass
 			try:
 				maxSol = solvers.lp(Cmax,A,B)

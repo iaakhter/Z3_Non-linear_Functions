@@ -200,7 +200,7 @@ def checkExistenceOfSolutionGS(model,hyperRectangle):
 		while True:
 			fail = False
 			try:
-				C = np.linalg.pinv(jacMidPoint)
+				C = np.linalg.inv(jacMidPoint)
 				#print ("C", C)
 			except np.linalg.linalg.LinAlgError:
 				fail = True
@@ -306,7 +306,7 @@ def checkExistenceOfSolutionGS(model,hyperRectangle):
 				constructBiggerHyper = True
 				exampleVolt = (gsIntersect[:,0] + gsIntersect[:,1])/2.0
 				soln = newton(model,exampleVolt)
-				print ("soln ", soln)
+				#print ("soln ", soln)
 				# the new hyper must contain the solution in the middle and enclose old hyper
 				# and then we check for uniqueness of solution in the newer bigger hyperrectangle
 				if soln[0]:
@@ -319,7 +319,7 @@ def checkExistenceOfSolutionGS(model,hyperRectangle):
 						gsIntersect[si,0] = soln[1][si] - maxDiff
 						gsIntersect[si,1] = soln[1][si] + maxDiff
 
-					print ("bigger hyper ", gsIntersect)
+					#print ("bigger hyper ", gsIntersect)
 					startBounds = gsIntersect
 				#print ("after if constructBiggerHyper", constructBiggerHyper)
 			else:

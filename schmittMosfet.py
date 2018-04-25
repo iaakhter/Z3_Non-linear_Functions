@@ -155,7 +155,7 @@ class SchmittMosfet:
 		elif ds >= gs - self.Vtp:
 			IpMax = self.Sp*self.Kp*(gs - self.Vtp - ds/2.0)*ds
 
-		return IpMax
+		return -IpMax
 
 	def nFet(self, src, gate, drain, transistorNumber, polygonNumber = None):
 		I = 0.0
@@ -208,7 +208,17 @@ class SchmittMosfet:
 			firDerSrc, firDerGate, firDerDrain = -firDerSrc, -firDerGate, -firDerDrain
 			secDerSrc, secDerGate, secDerDrain = -secDerSrc, -secDerGate, -secDerDrain
 			secDerSrcGate, secDerSrcDrain, secDerGateDrain = -secDerSrcGate, -secDerSrcDrain, -secDerGateDrain
-
+			InLeak = -ds*(2 + (gs - self.Vtn)/self.Vdd)*(self.gn*1e-4)
+			firDerLeakSrc = -(self.gn*1e-4)*((ds)*(-1.0/self.Vdd) - (2 + (gs - self.Vtn)/self.Vdd))
+			firDerLeakGate = -(self.gn*1e-4)*(ds/self.Vdd)
+			firDerLeakDrain = -(self.gn*1e-4)*(2 + (gs - self.Vtn)/self.Vdd)
+			secDerLeakSrc = -(2*1e-4)*(self.gn/self.Vdd)
+			secDerLeakGate = 0.0
+			secDerLeakDrain = 0.0
+			secDerLeakSrcGate = -(self.gn*1e-4)*(-1/self.Vdd)
+			secDerLeakSrcDrain = -(self.gn*1e-4)*(-1/self.Vdd)
+			secDerLeakGateDrain = -(self.gn*1e-4)*(1/self.Vdd)
+		
 		else:
 			if gs <= self.Vtn and (polygonNumber == None or 
 									(transistorNumber == 1 and polygonNumber == 5) or
@@ -246,17 +256,21 @@ class SchmittMosfet:
 				secDerSrcDrain = 0.0
 				secDerGateDrain = self.Sn*self.Kn
 
-		gs, ds = origGs, origDs
-		InLeak = ds*(1 + (gs - self.Vtn)/self.Vdd)*(self.gn/1e-4)
-		firDerLeakSrc = (self.gn/1e-4)*((ds)*(-1.0/self.Vdd) - (1 + (gs - self.Vtn)/self.Vdd))
-		firDerLeakGate = (self.gn/1e-4)*(ds/self.Vdd)
-		firDerLeakDrain = (self.gn/1e-4)*(1 + (gs - self.Vtn)/self.Vdd)
-		secDerLeakSrc = (2/1e-4)*(self.gn/self.Vdd)
-		secDerLeakGate = 0.0
-		secDerLeakDrain = 0.0
-		secDerLeakSrcGate = (self.gn/1e-4)*(-1/self.Vdd)
-		secDerLeakSrcDrain = (self.gn/1e-4)*(-1/self.Vdd)
-		secDerLeakGateDrain = (self.gn/1e-4)*(1/self.Vdd)
+			#print ("transistorNumber", transistorNumber)
+			#print ("ds", ds)
+			#print ("gs", gs)
+			InLeak = ds*(2 + (gs - self.Vtn)/self.Vdd)*(self.gn*1e-4)
+			firDerLeakSrc = (self.gn*1e-4)*((ds)*(-1.0/self.Vdd) - (2 + (gs - self.Vtn)/self.Vdd))
+			firDerLeakGate = (self.gn*1e-4)*(ds/self.Vdd)
+			firDerLeakDrain = (self.gn*1e-4)*(2 + (gs - self.Vtn)/self.Vdd)
+			secDerLeakSrc = (2*1e-4)*(self.gn/self.Vdd)
+			secDerLeakGate = 0.0
+			secDerLeakDrain = 0.0
+			secDerLeakSrcGate = (self.gn*1e-4)*(-1/self.Vdd)
+			secDerLeakSrcDrain = (self.gn*1e-4)*(-1/self.Vdd)
+			secDerLeakGateDrain = (self.gn*1e-4)*(1/self.Vdd)
+			#print ("self.gn", self.gn)
+			#print ("InLeak", InLeak)
 
 		#print ("I before leak", I)
 		I += InLeak
@@ -282,10 +296,13 @@ class SchmittMosfet:
 
 		origGs, origDs = gs, ds
 		#print ("pfet transistorNumber", transistorNumber)
+		#print ("src", src, "gate", gate, "drain", drain)
 		if src < drain:
 			src, drain = drain, src
+			#print ("flipped src", src, "gate", gate, "drain", drain)
 			gs = gate - src
 			ds = drain - src
+			#print ("gs", gs, "ds", ds)
 			if gs >= self.Vtp and (polygonNumber == None or 
 									(transistorNumber == 4 and polygonNumber == 0) or 
 									(transistorNumber == 5 and polygonNumber == 0)):
@@ -321,10 +338,24 @@ class SchmittMosfet:
 				secDerSrcGate = self.Sp*self.Kp
 				secDerSrcDrain = 0.0
 				secDerGateDrain = self.Sp*self.Kp
+			#print ("firDerDrain before flippling signs", firDerDrain)
 			I = -I
 			firDerSrc, firDerGate, firDerDrain = -firDerSrc, -firDerGate, -firDerDrain
 			secDerSrc, secDerGate, secDerDrain = -secDerSrc, -secDerGate, -secDerDrain
 			secDerSrcGate, secDerSrcDrain, secDerGateDrain = -secDerSrcGate, -secDerSrcDrain, -secDerGateDrain
+			#print ("firDerDrain after flippling signs", firDerDrain)
+			IpLeak = -ds*(2 - (gs - self.Vtp)/self.Vdd)*(self.gp*1e-4)
+			firDerLeakSrc = -(self.gp*1e-4)*((ds)*(1.0/self.Vdd) - (2 - (gs - self.Vtp)/self.Vdd))
+			firDerLeakGate = -(self.gp*1e-4)*(-ds/self.Vdd)
+			firDerLeakDrain = -(self.gp*1e-4)*(2 - (gs - self.Vtp)/self.Vdd)
+			secDerLeakSrc = -(-2*1e-4)*(self.gp/self.Vdd)
+			secDerLeakGate = 0.0
+			secDerLeakDrain = 0.0
+			secDerLeakSrcGate = -(self.gp*1e-4)*(1/self.Vdd)
+			secDerLeakSrcDrain = -(self.gp*1e-4)*(1/self.Vdd)
+			secDerLeakGateDrain = -(self.gp*1e-4)*(-1/self.Vdd)
+
+		
 
 		else:
 			if gs >= self.Vtp and (polygonNumber == None or 
@@ -363,36 +394,42 @@ class SchmittMosfet:
 				secDerSrcDrain = 0.0
 				secDerGateDrain = self.Sp*self.Kp
 
-		gs, ds = origGs, origDs
-		IpLeak = ds*(1 + (gs - self.Vtp)/self.Vdd)*(self.gp/1e-4)
-		firDerLeakSrc = (self.gp/1e-4)*((ds)*(-1.0/self.Vdd) - (1 + (gs - self.Vtp)/self.Vdd))
-		firDerLeakGate = (self.gp/1e-4)*(ds/self.Vdd)
-		firDerLeakDrain = (self.gp/1e-4)*(1 + (gs - self.Vtp)/self.Vdd)
-		secDerLeakSrc = (2/1e-4)*(self.gp/self.Vdd)
-		secDerLeakGate = 0.0
-		secDerLeakDrain = 0.0
-		secDerLeakSrcGate = (self.gp/1e-4)*(-1/self.Vdd)
-		secDerLeakSrcDrain = (self.gp/1e-4)*(-1/self.Vdd)
-		secDerLeakGateDrain = (self.gp/1e-4)*(1/self.Vdd)
+			
+			IpLeak = ds*(2 - (gs - self.Vtp)/self.Vdd)*(self.gp*1e-4)
+			firDerLeakSrc = (self.gp*1e-4)*((ds)*(1.0/self.Vdd) - (2 - (gs - self.Vtp)/self.Vdd))
+			firDerLeakGate = (self.gp*1e-4)*(-ds/self.Vdd)
+			firDerLeakDrain = (self.gp*1e-4)*(2 - (gs - self.Vtp)/self.Vdd)
+			secDerLeakSrc = (-2*1e-4)*(self.gp/self.Vdd)
+			secDerLeakGate = 0.0
+			secDerLeakDrain = 0.0
+			secDerLeakSrcGate = (self.gp*1e-4)*(1/self.Vdd)
+			secDerLeakSrcDrain = (self.gp*1e-4)*(1/self.Vdd)
+			secDerLeakGateDrain = (self.gp*1e-4)*(-1/self.Vdd)
 
+		
+		#print ("secDerLeakSrc", secDerLeakSrc, "secDerLeakGate", secDerLeakGate)
+		#print ("before secDerSrc", secDerSrc, "secDerGate", secDerGate)
+		#print ("I before leak", I)
 		I += IpLeak
+		#print ("I after leak", I)
 		firDerSrc += firDerLeakSrc
 		firDerGate += firDerLeakGate
+		#print ("firDerDrain before leak", firDerDrain)
 		firDerDrain += firDerLeakDrain
+		#print ("firDerDrain after leak", firDerDrain)
 		secDerSrc += secDerLeakSrc
 		secDerGate += secDerLeakGate
 		secDerDrain += secDerLeakDrain
 		secDerSrcGate += secDerLeakSrcGate
 		secDerSrcDrain += secDerLeakSrcDrain
 		secDerGateDrain += secDerLeakGateDrain
+		#print ("after secDerSrc", secDerSrc, "secDerGate", secDerGate)
 		
 		#print ("firDerSrc", firDerSrc, "firDerGate", firDerGate, "firDerDrain", firDerDrain)
 		return [I, firDerSrc, firDerGate, firDerDrain, secDerSrc, secDerGate, secDerDrain, secDerSrcGate, secDerSrcDrain, secDerGateDrain]
 
 	def intersectSurfPlaneFunDer(self, Vin, Vout, plane, transistorNumber):
-		'''if regionNumber == 0 or regionNumber == 3 or regionNumber == 6:
-			print ("invalid region number")
-			return'''
+		#print ("intersectSurfPlaneFunDer", transistorNumber)
 		planePt = plane[0,:]
 		planeNorm = plane[1,:]
 		m, d = None, None
@@ -410,31 +447,37 @@ class SchmittMosfet:
 			g = self.gn
 			firstCutoff = Vin > Vout and Vin - Vout >= self.inputVoltage - Vout - Vt
 			secondCutoff = Vin > Vout and Vin - Vout <= self.inputVoltage - Vout - Vt
-			thirdCutoff = Vout - Vin >= self.inputVoltage - Vin - Vt
-			forthCutoff = Vout - Vin <= self.inputVoltage - Vin - Vt
+			thirdCutoff = Vin <= Vout and Vout - Vin >= self.inputVoltage - Vin - Vt
+			forthCutoff = Vin <= Vout and Vout - Vin <= self.inputVoltage - Vin - Vt
 			if transistorNumber == 4:
 				S, K, Vt = self.Sp, self.Kp, self.Vtp
 				g = self.gp
 				firstCutoff = Vin < Vout and Vin - Vout <= self.inputVoltage - Vout - Vt
 				secondCutoff = Vin < Vout and Vin - Vout >= self.inputVoltage - Vout - Vt
-				thirdCutoff = Vout - Vin <= self.inputVoltage - Vin - Vt
-				forthCutoff = Vout - Vin >= self.inputVoltage - Vin - Vt
+				thirdCutoff = Vin >= Vout and Vout - Vin <= self.inputVoltage - Vin - Vt
+				forthCutoff = Vin >= Vout and Vout - Vin >= self.inputVoltage - Vin - Vt
 			
 			if firstCutoff:
 				if m is None:
 					I += -0.5*S*K*(self.inputVoltage - Vout - Vt)*(self.inputVoltage - Vout - Vt)
 					firDers[1] += S*K*(self.inputVoltage - Vout - Vt)
 					derTypes[1] = True
-					ILeak = (g/1e-4)*(d - Vout)*(1 + (self.inputVoltage - Vt - Vout)/self.Vdd)
-					derLeak = (g/1e-4)*((d - Vout)/(-self.Vdd) - (1 + (self.inputVoltage - Vt - Vout)/self.Vdd))
+					ILeak = -(g*1e-4)*(d - Vout)*(2 + (self.inputVoltage - Vt - Vout)/self.Vdd)
+					derLeak = -(g*1e-4)*((d - Vout)/(-self.Vdd) - (2 + (self.inputVoltage - Vt - Vout)/self.Vdd))
+					if transistorNumber == 4:
+						ILeak = -(g*1e-4)*(d - Vout)*(2 - (self.inputVoltage - Vt - Vout)/self.Vdd)
+						derLeak = -(g*1e-4)*((d - Vout)/(self.Vdd) - (2 - (self.inputVoltage - Vt - Vout)/self.Vdd))
 					I += ILeak
 					firDers[1] += derLeak
 				else:
 					I += -0.5*S*K*(self.inputVoltage - m*Vin - d - Vt)*(self.inputVoltage - m*Vin - d - Vt)
 					firDers[0] += m*S*K*(self.inputVoltage - m*Vin - d -Vt)
 					derTypes[0] = True
-					ILeak = (g/1e-4)*(Vin - m*Vin - d)*(1 + (self.inputVoltage - Vt - m*Vin - d)/self.Vdd)
-					derLeak = (g/1e-4)*((Vin - m*Vin - d)*(-m/self.Vdd) + (1 + (self.inputVoltage - Vt - m*Vin - d)/self.Vdd)*(1 - m))
+					ILeak = -(g*1e-4)*(Vin - m*Vin - d)*(2 + (self.inputVoltage - Vt - m*Vin - d)/self.Vdd)
+					derLeak = -(g*1e-4)*((Vin - m*Vin - d)*(-m/self.Vdd) + (2 + (self.inputVoltage - Vt - m*Vin - d)/self.Vdd)*(1 - m))
+					if transistorNumber == 4:
+						ILeak = -(g*1e-4)*(Vin - m*Vin - d)*(2 - (self.inputVoltage - Vt - m*Vin - d)/self.Vdd)
+						derLeak = -(g*1e-4)*((Vin - m*Vin - d)*(m/self.Vdd) + (2 - (self.inputVoltage - Vt - m*Vin - d)/self.Vdd)*(1 - m))
 					I += ILeak
 					firDers[0] += derLeak
 			elif secondCutoff:
@@ -442,8 +485,11 @@ class SchmittMosfet:
 					I += -S*K*(self.inputVoltage - Vout - Vt - (d - Vout)/2.0)*(d - Vout)
 					firDers[1] += -S*K*(-(self.inputVoltage - Vout - Vt - (d - Vout)/2.0) - 0.5*(d - Vout))
 					derTypes[1] = True
-					ILeak = (g/1e-4)*(d - Vout)*(1 + (self.inputVoltage - Vt - Vout)/self.Vdd)
-					derLeak = (g/1e-4)*((d - Vout)/(-self.Vdd) - (1 + (self.inputVoltage - Vt - Vout)/self.Vdd))
+					ILeak = -(g*1e-4)*(d - Vout)*(2 + (self.inputVoltage - Vt - Vout)/self.Vdd)
+					derLeak = -(g*1e-4)*((d - Vout)/(-self.Vdd) - (2 + (self.inputVoltage - Vt - Vout)/self.Vdd))
+					if transistorNumber == 4:
+						ILeak = -(g*1e-4)*(d - Vout)*(2 - (self.inputVoltage - Vt - Vout)/self.Vdd)
+						derLeak = -(g*1e-4)*((d - Vout)/(self.Vdd) - (2 - (self.inputVoltage - Vt - Vout)/self.Vdd))
 					I += ILeak
 					firDers[1] += derLeak
 				else:
@@ -451,24 +497,33 @@ class SchmittMosfet:
 					firDers[0] += -S*K*((1 - m)*(self.inputVoltage - m*Vin -d - Vt - (Vin - m*Vin - d)/2.0) + 
 										(-m - (1-m)/2.0)*(Vin - m*Vin - d))
 					derTypes[0] = True
-					ILeak = (g/1e-4)*(Vin - m*Vin - d)*(1 + (self.inputVoltage - Vt - m*Vin - d)/self.Vdd)
-					derLeak = (g/1e-4)*((Vin - m*Vin - d)*(-m/self.Vdd) + (1 + (self.inputVoltage - Vt - m*Vin - d)/self.Vdd)*(1 - m))
+					ILeak = -(g*1e-4)*(Vin - m*Vin - d)*(2 + (self.inputVoltage - Vt - m*Vin - d)/self.Vdd)
+					derLeak = -(g*1e-4)*((Vin - m*Vin - d)*(-m/self.Vdd) + (2 + (self.inputVoltage - Vt - m*Vin - d)/self.Vdd)*(1 - m))
+					if transistorNumber == 4:
+						ILeak = -(g*1e-4)*(Vin - m*Vin - d)*(2 - (self.inputVoltage - Vt - m*Vin - d)/self.Vdd)
+						derLeak = -(g*1e-4)*((Vin - m*Vin - d)*(m/self.Vdd) + (2 - (self.inputVoltage - Vt - m*Vin - d)/self.Vdd)*(1 - m))
 					I += ILeak
 					firDers[0] += derLeak
 			elif thirdCutoff:
 				if m is None:
 					I += 0.5*S*K*(self.inputVoltage - d - Vt)*(self.inputVoltage - d - Vt)
 					derTypes[1] = True
-					ILeak = (g/1e-4)*(Vout - d)*(1 + (self.inputVoltage - Vt - d)/self.Vdd)
-					derLeak = (g/1e-4)*(1 + (self.inputVoltage - Vt - d)/self.Vdd)
+					ILeak = (g*1e-4)*(Vout - d)*(2 + (self.inputVoltage - Vt - d)/self.Vdd)
+					derLeak = (g*1e-4)*(2 + (self.inputVoltage - Vt - d)/self.Vdd)
+					if transistorNumber == 4:
+						ILeak = (g*1e-4)*(Vout - d)*(2 - (self.inputVoltage - Vt - d)/self.Vdd)
+						derLeak = (g*1e-4)*(2 - (self.inputVoltage - Vt - d)/self.Vdd)
 					I += ILeak
 					firDers[1] += derLeak
 				else:
 					I += 0.5*S*K*(self.inputVoltage - Vin - Vt)*(self.inputVoltage - Vin - Vt)
 					firDers[0] += -S*K*(self.inputVoltage - Vin - Vt)
 					derTypes[0] = True
-					ILeak = (g/1e-4)*(Vout - Vin)*(1 + (self.inputVoltage - Vt - Vin)/self.Vdd)
-					derLeak = (g/1e-4)*((m*Vin + d - Vin)*(-1/self.Vdd) + (1 + (self.inputVoltage - Vt - Vin)/self.Vdd)*(m - 1))
+					ILeak = (g*1e-4)*(m*Vin + d - Vin)*(2 + (self.inputVoltage - Vt - Vin)/self.Vdd)
+					derLeak = (g*1e-4)*((m*Vin + d - Vin)*(-1/self.Vdd) + (2 + (self.inputVoltage - Vt - Vin)/self.Vdd)*(m - 1))
+					if transistorNumber == 4:
+						ILeak = (g*1e-4)*(m*Vin + d - Vin)*(2 - (self.inputVoltage - Vt - Vin)/self.Vdd)
+						derLeak = (g*1e-4)*((m*Vin + d - Vin)*(1/self.Vdd) + (2 - (self.inputVoltage - Vt - Vin)/self.Vdd)*(m - 1))
 					I += ILeak
 					firDers[0] += derLeak
 			elif forthCutoff:
@@ -476,17 +531,23 @@ class SchmittMosfet:
 					I += S*K*(self.inputVoltage - d - Vt - (Vout - d)/2.0)*(Vout - d)
 					firDers[1] += S*K*((self.inputVoltage - d - Vt - (Vout - d)/2.0) - 0.5*(Vout - d)/2.0)
 					derTypes[1] = True
-					ILeak = (g/1e-4)*(Vout - d)*(1 + (self.inputVoltage - Vt - d)/self.Vdd)
-					derLeak = (g/1e-4)*(1 + (self.inputVoltage - Vt - d)/self.Vdd)
+					ILeak = (g*1e-4)*(Vout - d)*(2 + (self.inputVoltage - Vt - d)/self.Vdd)
+					derLeak = (g*1e-4)*(2 + (self.inputVoltage - Vt - d)/self.Vdd)
+					if transistorNumber == 4:
+						ILeak = (g*1e-4)*(Vout - d)*(2 - (self.inputVoltage - Vt - d)/self.Vdd)
+						derLeak = (g*1e-4)*(2 - (self.inputVoltage - Vt - d)/self.Vdd)
 					I += ILeak
 					firDers[1] += derLeak
 				else:
-					I += 0.5*S*K*(self.inputVoltage - Vin - Vt - (m*Vin + d - Vin)/2.0)*(m*Vin + d - Vin)
+					I += S*K*(self.inputVoltage - Vin - Vt - (m*Vin + d - Vin)/2.0)*(m*Vin + d - Vin)
 					firDers[0] += S*K*((self.inputVoltage - Vin - Vt - (m*Vin + d - Vin)/2.0)*(m-1) + 
 										(m*Vin + d - Vin)*(-1 - 0.5*(m-1)))
 					derTypes[0] = True
-					ILeak = (g/1e-4)*(Vout - Vin)*(1 + (self.inputVoltage - Vt - Vin)/self.Vdd)
-					derLeak = (g/1e-4)*((m*Vin + d - Vin)*(-1/self.Vdd) + (1 + (self.inputVoltage - Vt - Vin)/self.Vdd)*(m - 1))
+					ILeak = (g*1e-4)*(m*Vin + d - Vin)*(2 + (self.inputVoltage - Vt - Vin)/self.Vdd)
+					derLeak = (g*1e-4)*((m*Vin + d - Vin)*(-1/self.Vdd) + (2 + (self.inputVoltage - Vt - Vin)/self.Vdd)*(m - 1))
+					if transistorNumber == 4:
+						ILeak = (g*1e-4)*(m*Vin + d - Vin)*(2 - (self.inputVoltage - Vt - Vin)/self.Vdd)
+						derLeak = (g*1e-4)*((m*Vin + d - Vin)*(1/self.Vdd) + (2 - (self.inputVoltage - Vt - Vin)/self.Vdd)*(m - 1))
 					I += ILeak
 					firDers[0] += derLeak
 
@@ -512,16 +573,22 @@ class SchmittMosfet:
 					I += -0.5*S*K*(Vout - d - Vt)*(Vout - d - Vt)
 					firDers[1] += -S*K*(Vout - d - Vt)
 					derTypes[1] = True 
-					ILeak = (g/1e-4)*(d - drain)*(1 + (Vout - Vt - drain)/self.Vdd)
-					derLeak = (g/1e-4)*(d - drain)*(1/self.Vdd)
+					ILeak = -(g*1e-4)*(d - drain)*(2 + (Vout - Vt - drain)/self.Vdd)
+					derLeak = -(g*1e-4)*(d - drain)*(1/self.Vdd)
+					if transistorNumber == 5:
+						ILeak = -(g*1e-4)*(d - drain)*(2 - (Vout - Vt - drain)/self.Vdd)
+						derLeak = -(g*1e-4)*(d - drain)*(-1/self.Vdd)
 					I += ILeak
 					firDers[1] += derLeak
 				else:
 					I += -0.5*S*K*(m*Vin + d - drain - Vt)*(m*Vin + d - drain - Vt)
-					firDers[0] += -S*K*(m*Vin + d - Vdd - Vt)*(m)
+					firDers[0] += -S*K*(m*Vin + d - self.Vdd - Vt)*(m)
 					derTypes[0] = True
-					ILeak = (g/1e-4)*(Vin - drain)*(1 + (m*Vin + d - Vt - drain)/self.Vdd)
-					derLeak = (g/1e-4)*((Vin - drain)*(m/self.Vdd) + (1 + (m*Vin + d - Vt - drain)/self.Vdd))
+					ILeak = -(g*1e-4)*(Vin - drain)*(2 + (m*Vin + d - Vt - drain)/self.Vdd)
+					derLeak = -(g*1e-4)*((Vin - drain)*(m/self.Vdd) + (2 + (m*Vin + d - Vt - drain)/self.Vdd))
+					if transistorNumber == 5:
+						ILeak = -(g*1e-4)*(Vin - drain)*(2 - (m*Vin + d - Vt - drain)/self.Vdd)
+						derLeak = -(g*1e-4)*((Vin - drain)*(-m/self.Vdd) + (2 - (m*Vin + d - Vt - drain)/self.Vdd))
 					I += ILeak
 					firDers[0] += derLeak
 			elif secondCutoff:
@@ -529,16 +596,22 @@ class SchmittMosfet:
 					I += -S*K*(Vout - drain - Vt - (d - drain)/2.0)*(d - drain)
 					firDers[1] += -S*K*(d - drain)
 					derTypes[1] = True
-					ILeak = (g/1e-4)*(d - drain)*(1 + (Vout - Vt - drain)/self.Vdd)
-					derLeak = (g/1e-4)*(d - drain)*(1/self.Vdd)
+					ILeak = -(g*1e-4)*(d - drain)*(2 + (Vout - Vt - drain)/self.Vdd)
+					derLeak = -(g*1e-4)*(d - drain)*(1/self.Vdd)
+					if transistorNumber == 5:
+						ILeak = -(g*1e-4)*(d - drain)*(2 - (Vout - Vt - drain)/self.Vdd)
+						derLeak = -(g*1e-4)*(d - drain)*(-1/self.Vdd)
 					I += ILeak
 					firDers[1] += derLeak
 				else:
 					I += -S*K*(m*Vin + d - drain - Vt - (Vin - drain)/2.0)*(Vin - drain)
 					firDers[0] += -S*K*((m*Vin + d - drain - Vt - (Vin - drain)/2.0) + (Vin - drain)*(m - 0.5))
 					derTypes[0] = True
-					ILeak = (g/1e-4)*(Vin - drain)*(1 + (m*Vin + d - Vt - drain)/self.Vdd)
-					derLeak = (g/1e-4)*((Vin - drain)*(m/self.Vdd) + (1 + (m*Vin + d - Vt - drain)/self.Vdd))
+					ILeak = -(g*1e-4)*(Vin - drain)*(2 + (m*Vin + d - Vt - drain)/self.Vdd)
+					derLeak = -(g*1e-4)*((Vin - drain)*(m/self.Vdd) + (2 + (m*Vin + d - Vt - drain)/self.Vdd))
+					if transistorNumber == 5:
+						ILeak = -(g*1e-4)*(Vin - drain)*(2 - (m*Vin + d - Vt - drain)/self.Vdd)
+						derLeak = -(g*1e-4)*((Vin - drain)*(-m/self.Vdd) + (2 - (m*Vin + d - Vt - drain)/self.Vdd))
 					I += ILeak
 					firDers[0] += derLeak
 
@@ -547,16 +620,22 @@ class SchmittMosfet:
 					I += 0.5*S*K*(Vout - d - Vt)*(Vout - d - Vt)
 					firDers[1] += S*K*(Vout - d - Vt)
 					derTypes[1] = True
-					ILeak = (g/1e-4)*(drain - d)*(1 + (Vout - Vt - d)/self.Vdd)
-					derLeak = (g/1e-4)*(drain - d)*(1/self.Vdd)
+					ILeak = (g*1e-4)*(drain - d)*(2 + (Vout - Vt - d)/self.Vdd)
+					derLeak = (g*1e-4)*(drain - d)*(1/self.Vdd)
+					if transistorNumber == 5:
+						ILeak = (g*1e-4)*(drain - d)*(2 - (Vout - Vt - d)/self.Vdd)
+						derLeak = (g*1e-4)*(drain - d)*(-1/self.Vdd)
 					I += ILeak
 					derTypes[1] += derLeak
 				else:
 					I += 0.5*S*K*(m*Vin + d - Vin - Vt)*(m*Vin + d - Vin - Vt)
 					firDers[0] += -S*K*(m*Vin + d - Vin - Vt)*(m-1)
 					derTypes[0] = True
-					ILeak = (g/1e-4)*(drain - Vin)*(1 + (m*Vin + d - Vt - Vin)/self.Vdd)
-					derLeak = (g/1e-4)*((drain - Vin)*(m-1)/self.Vdd - (1 + (m*Vin + d - Vt - Vin)/self.Vdd))
+					ILeak = (g*1e-4)*(drain - Vin)*(2 + (m*Vin + d - Vt - Vin)/self.Vdd)
+					derLeak = (g*1e-4)*((drain - Vin)*(m-1)/self.Vdd - (2 + (m*Vin + d - Vt - Vin)/self.Vdd))
+					if transistorNumber == 5:
+						ILeak = (g*1e-4)*(drain - Vin)*(2 - (m*Vin + d - Vt - Vin)/self.Vdd)
+						derLeak = (g*1e-4)*((drain - Vin)*(-m+1)/self.Vdd - (2 - (m*Vin + d - Vt - Vin)/self.Vdd))
 					I += ILeak
 					firDers[0] += derLeak
 			elif forthCutoff:
@@ -564,8 +643,11 @@ class SchmittMosfet:
 					I += S*K*(Vout - d - Vt - (drain - d)/2.0)*((drain - d)/2.0)
 					firDers[1] += S*K*(drain - d)
 					derTypes[1] = True
-					ILeak = (g/1e-4)*(drain - d)*(1 + (Vout - Vt - d)/self.Vdd)
-					derLeak = (g/1e-4)*(drain - d)*(1/self.Vdd)
+					ILeak = (g*1e-4)*(drain - d)*(2 + (Vout - Vt - d)/self.Vdd)
+					derLeak = (g*1e-4)*(drain - d)*(1/self.Vdd)
+					if transistorNumber == 5:
+						ILeak = (g*1e-4)*(drain - d)*(2 - (Vout - Vt - d)/self.Vdd)
+						derLeak = (g*1e-4)*(drain - d)*(-1/self.Vdd)
 					I += ILeak
 					derTypes[1] += derLeak
 				else:
@@ -573,8 +655,11 @@ class SchmittMosfet:
 					firDers[0] += S*K*(-(m*Vin + d - Vin - Vt - (drain - Vin)/2.0) + 
 						(drain - Vin)*(m - 0.5))
 					derTypes[0] = True
-					ILeak = (g/1e-4)*(drain - Vin)*(1 + (m*Vin + d - Vt - Vin)/self.Vdd)
-					derLeak = (g/1e-4)*((drain - Vin)*(m-1)/self.Vdd - (1 + (m*Vin + d - Vt - Vin)/self.Vdd))
+					ILeak = (g*1e-4)*(drain - Vin)*(2 + (m*Vin + d - Vt - Vin)/self.Vdd)
+					derLeak = (g*1e-4)*((drain - Vin)*(m-1)/self.Vdd - (2 + (m*Vin + d - Vt - Vin)/self.Vdd))
+					if transistorNumber == 5:
+						ILeak = (g*1e-4)*(drain - Vin)*(2 - (m*Vin + d - Vt - Vin)/self.Vdd)
+						derLeak = (g*1e-4)*((drain - Vin)*(-m+1)/self.Vdd - (2 - (m*Vin + d - Vt - Vin)/self.Vdd))
 					I += ILeak
 					firDers[0] += derLeak
 
@@ -641,12 +726,14 @@ class SchmittMosfet:
 			# the plane and add the constraint related to the plane accordingly
 			sign = " <= "
 
+			#print ("middleD", middleD)
+			#print ("d", d)
 			if middleD > d:
 				sign = " >= "
 
-			'''print ("normal", normal)
-			print ("pointInPlane", pointInPlane)
-			print ("sign", sign)
+			#print ("normal", normal)
+			#print ("pointInPlane", pointInPlane)
+			'''print ("sign", sign)
 			print ("")'''
 			
 			#if np.greater_equal(np.absolute(normal),np.ones(normal.shape)*1e-5).any():
@@ -690,9 +777,6 @@ class SchmittMosfet:
 				regConstraints,regPoints = self.IRegConstraint(I, Vin, Vout, intersect,transistorNumber,i)
 				#print ("regPoints")
 				#print (regPoints)
-				'''if i == 1:
-					print ("regConstraints", regConstraints)
-					print ("regPoints", regPoints)'''
 				if feasiblePoints is None:
 					if len(regPoints) >= 1:
 						feasiblePoints = regPoints
@@ -702,7 +786,10 @@ class SchmittMosfet:
 						feasiblePoints = np.vstack([feasiblePoints,regPoints])
 				numIntersections += 1
 		if numIntersections == 1:
+			#print ("regConstraints")
+			#print (regConstraints)
 			return regConstraints
+
 		# Now construct convex hull with feasible points and add the constraint
 		#feasiblePoints = np.array(feasiblePoints)
 		#print ("feasiblePoints non-unique before")
@@ -719,6 +806,7 @@ class SchmittMosfet:
 		return overallConstraint
 
 	def saddleConvexHull(self, boundaryPlanes, boundaryPts, transistorNumber):
+		#print ("saddleConvexHull", transistorNumber)
 		feasiblePoints = []
 		for pi in range(len(boundaryPlanes)):
 			plane = boundaryPlanes[pi][0]
@@ -748,17 +836,19 @@ class SchmittMosfet:
 					intersectingPt = np.array([xPt, yPt])
 				# TODO: check if this makes sense
 				missingCoord = None
-				if planeNormal[1] == 0 or planeNormal[0] == 0:
+				if planeNormal[1] == 0:
 					missingCoord = point1[0]
-				else:
+				elif planeNormal[0] != 0:
 					missingCoord = (intersectingPt[0] - d)/planeNormal[0]
-				feasiblePoints.append([missingCoord,intersectingPt[0],intersectingPt[1]])
+				if missingCoord is not None:
+					feasiblePoints.append([missingCoord,intersectingPt[0],intersectingPt[1]])
 				#print ("feasiblePt added if", feasiblePoints[-1])
 
 			elif not(derTypes1[1]) and not(derTypes2[1]):
 				m1, m2 = firDers1[0], firDers2[0]
 				c1 = point1[2] - m1*point1[0]
 				c2 = point2[2] - m2*point2[0]
+				#print ("m1", m1, "m2", m2)
 				intersectingPt = None
 				if abs(m1 - m2) < 1e-14:
 					xPt = (point1[0] + point2[0])/2.0
@@ -782,6 +872,7 @@ class SchmittMosfet:
 		except ImportError:
 			return
 		#print ("regionPatch", patch, patch.shape)
+		#print ("I", I, "Vin", Vin, "Vout", Vout)
 		minBounds = np.amin(patch,0)
 		maxBounds = np.amax(patch,0)
 		#print ("minBounds", minBounds)
@@ -805,6 +896,7 @@ class SchmittMosfet:
 
 		#print ("secDerIn", secDerIn)
 		#print ("secDerOut", secDerOut)
+		#print ("secDersign", self.secDerSigns[transistorNumber][polygonNumber])
 
 		patchRing = ogr.Geometry(ogr.wkbLinearRing)
 		for i in range(patch.shape[0]+1):
@@ -980,12 +1072,12 @@ class SchmittMosfet:
 			if len(feasiblePoints) >= 1:
 				feasiblePoints = np.unique(feasiblePoints, axis = 0)
 		else:
-			feasiblePoints = self.saddleConvexHull(boundaryPlanes, boundaryPts, polygonNumber)
+			feasiblePoints = self.saddleConvexHull(boundaryPlanes, boundaryPts, transistorNumber)
 			feasiblePoints = np.array(feasiblePoints)
 			if len(feasiblePoints) >= 1:
 				feasiblePoints = np.unique(feasiblePoints, axis = 0)
 
-			#print ("weird feasiblePoints", feasiblePoints)
+			#print ("feasiblePoints", feasiblePoints)
 			overallConstraint = self.convexHullConstraints(feasiblePoints, I, Vin, Vout)
 		
 		#print ("regionFeasiblePoints")
@@ -1012,6 +1104,7 @@ class SchmittMosfet:
 		return [None, None, nodeCurs]
 
 	def jacobian(self,V):
+		#print ("calculating jacobian")
 		jac = np.zeros((3,3))
 		transCurs = np.zeros((6))
 		transCurDerIns = np.zeros((6))
@@ -1023,6 +1116,7 @@ class SchmittMosfet:
 		transCurs[4], transCurDerIns[4], transCurDerOuts[4] = self.currentFun(V[2], V[0], 4, None)[:3]
 		transCurs[5], transCurDerIns[5], transCurDerOuts[5] = self.currentFun(V[2], V[0], 5, None)[:3]
 
+		#print ("transCurDerOuts[4]", transCurDerOuts[4])
 		jac[0,0] = -transCurDerOuts[4] - transCurDerOuts[1]
 		jac[0,1] = -transCurDerIns[1]
 		jac[0,2] = -transCurDerIns[4]
@@ -1037,9 +1131,110 @@ class SchmittMosfet:
 
 		return jac
 
+	def jacobianInterval(self, bounds):
+		lowerBound = bounds[:,0]
+		upperBound = bounds[:,1]
+		lenV  = len(lowerBound)
+		jac = np.zeros((lenV, lenV, 2))
+
+		transCurDerIns0 = np.zeros((2))
+		transCurDerOuts0 = np.zeros((2))
+
+		transCurDerIns1 = np.zeros((4))
+		transCurDerOuts1 = np.zeros((4))
+
+		transCurDerIns2 = np.zeros((4))
+		transCurDerOuts2 = np.zeros((4))
+
+		transCurDerIns3 = np.zeros((2))
+		transCurDerOuts3 = np.zeros((2))
+
+		transCurDerIns4 = np.zeros((4))
+		transCurDerOuts4 = np.zeros((4))
+
+		transCurDerIns5 = np.zeros((4))
+		transCurDerOuts5 = np.zeros((4))
+
+		transCurs0L, transCurDerIns0[0], transCurDerOuts0[0] = self.currentFun(None, lowerBound[1], 0, None)[:3]
+		transCurs0H, transCurDerIns0[1], transCurDerOuts0[1] = self.currentFun(None, upperBound[1], 0, None)[:3]
+		
+		transCurs1LL, transCurDerIns1[0], transCurDerOuts1[0] = self.currentFun(lowerBound[1], lowerBound[0], 1, None)[:3]
+		transCurs1LH, transCurDerIns1[1], transCurDerOuts1[1] = self.currentFun(lowerBound[1], upperBound[0], 1, None)[:3]
+		transCurs1HL, transCurDerIns1[2], transCurDerOuts1[2] = self.currentFun(upperBound[1], lowerBound[0], 1, None)[:3]
+		transCurs1HH, transCurDerIns1[3], transCurDerOuts1[3] = self.currentFun(upperBound[1], upperBound[0], 1, None)[:3]
+		
+		transCurs2LL, transCurDerIns2[0], transCurDerOuts2[0] = self.currentFun(lowerBound[1], lowerBound[0], 2, None)[:3]
+		transCurs2LH, transCurDerIns2[1], transCurDerOuts2[1] = self.currentFun(lowerBound[1], upperBound[0], 2, None)[:3]
+		transCurs2HL, transCurDerIns2[2], transCurDerOuts2[2] = self.currentFun(upperBound[1], lowerBound[0], 2, None)[:3]
+		transCurs2HH, transCurDerIns2[3], transCurDerOuts2[3] = self.currentFun(upperBound[1], upperBound[0], 2, None)[:3]
+		
+		transCurs3L, transCurDerIns3[0], transCurDerOuts3[0] = self.currentFun(None, lowerBound[0], 3, None)[:3]
+		transCurs3H, transCurDerIns3[1], transCurDerOuts3[1] = self.currentFun(None, upperBound[0], 3, None)[:3]
+		
+		transCurs4LL, transCurDerIns4[0], transCurDerOuts4[0] = self.currentFun(lowerBound[2], lowerBound[0], 4, None)[:3]
+		transCurs4LH, transCurDerIns4[1], transCurDerOuts4[1] = self.currentFun(lowerBound[2], upperBound[0], 4, None)[:3]
+		transCurs4HL, transCurDerIns4[2], transCurDerOuts4[2] = self.currentFun(upperBound[2], lowerBound[0], 4, None)[:3]
+		transCurs4HH, transCurDerIns4[3], transCurDerOuts4[3] = self.currentFun(upperBound[2], upperBound[0], 4, None)[:3]
+		
+		transCurs5LL, transCurDerIns5[0], transCurDerOuts5[0] = self.currentFun(lowerBound[2], lowerBound[0], 5, None)[:3]
+		transCurs5LH, transCurDerIns5[1], transCurDerOuts5[1] = self.currentFun(lowerBound[2], upperBound[0], 5, None)[:3]
+		transCurs5LL, transCurDerIns5[2], transCurDerOuts5[2] = self.currentFun(upperBound[2], lowerBound[0], 5, None)[:3]
+		transCurs5HH, transCurDerIns5[3], transCurDerOuts5[3] = self.currentFun(upperBound[2], upperBound[0], 5, None)[:3]
+
+		jac[:,:,0] = np.ones((lenV, lenV))*float("inf")
+		jac[:,:,1] = -np.ones((lenV, lenV))*float("inf")
+
+		# Figure out min and max node currents
+		for i in range(4):
+			for j in range(4):
+				termVal = -transCurDerOuts4[i] - transCurDerOuts1[j]
+				jac[0,0,0] = min(jac[0,0,0], termVal)
+				jac[0,0,1] = max(jac[0,0,1], termVal)
+
+		for i in range(4):
+			jac[0,1,0] = min(jac[0,1,0], -transCurDerIns1[i])
+			jac[0,1,1] = max(jac[0,1,1], -transCurDerIns1[i])
+
+		for i in range(4):
+			jac[0,2,0] = min(jac[0,2,0], -transCurDerIns4[i])
+			jac[0,2,1] = max(jac[0,2,1], -transCurDerIns4[i])
+
+		for i in range(4):
+			for j in range(4):
+				termVal = transCurDerOuts1[i] + transCurDerOuts2[j]
+				jac[1,0,0] = min(jac[1,0,0], termVal)
+				jac[1,0,1] = max(jac[1,0,1], termVal)
+
+		for i in range(2):
+			for j in range(4):
+				for k in range(4):
+					termVal = -transCurDerOuts0[i] + transCurDerIns1[j] + transCurDerIns2[k]
+					jac[1,1,0] = min(jac[1,1,0], termVal)
+					jac[1,1,1] = max(jac[1,1,1], termVal)
+
+		jac[1,2,:] = [0.0, 0.0]
+
+		for i in range(2):
+			for j in range(4):
+				for k in range(4):
+					termVal = -transCurDerOuts3[i] + transCurDerOuts5[j] + transCurDerOuts4[k]
+					jac[2,0,0] = min(jac[2,2,0], termVal)
+					jac[2,0,1] = max(jac[2,0,1], termVal)
+
+		jac[2,1,:] = [0.0, 0.0]
+
+		for i in range(4):
+			for j in range(4):
+				termVal = transCurDerIns5[i] + transCurDerIns4[j]
+				jac[2,2,0] = min(jac[2,2,0], termVal)
+				jac[2,2,1] = max(jac[2,2,1], termVal)
+
+		return jac
+
+
 	# numerical approximation where i sample jacobian in the patch by bounds
 	# might need a more analytical way of solving this later
-	def jacobianInterval(self,bounds):
+	'''def jacobianInterval(self,bounds):
 		lowerBound = bounds[:,0]
 		upperBound = bounds[:,1]
 		lenV = len(lowerBound)
@@ -1067,7 +1262,7 @@ class SchmittMosfet:
 
 		#print ("jac")
 		#print (jac)
-		return jac
+		return jac'''
 
 	def linearConstraints(self, hyperRectangle):
 		#print ("linearConstraints hyperRectangle")
@@ -1085,6 +1280,8 @@ class SchmittMosfet:
 				inIndex, outIndex = 1, 0
 				if i == 4 or i == 5:
 					inIndex, outIndex = 2, 0
+				#print ("transistorNumber", i)
+				#print ("inIndex", inIndex, "outIndex", outIndex)
 				patch = np.zeros((4,2))
 				patch[0,:] = [hyperRectangle[inIndex][0], hyperRectangle[outIndex][0]]
 				patch[1,:] = [hyperRectangle[inIndex][1], hyperRectangle[outIndex][0]]
@@ -1116,7 +1313,25 @@ class SchmittMosfet:
 			allConstraints += "1 " + self.nIs[i] + " >= 0\n"
 			allConstraints += "1 " + self.nIs[i] + " <= 0\n"
 
+		'''allConstraints += "1 " + self.xs[0] + " >= 0.5515\n"
+		allConstraints += "1 " + self.xs[0] + " <= 0.5516\n"
+		allConstraints += "1 " + self.xs[1] + " >= 0.1185\n"
+		allConstraints += "1 " + self.xs[1] + " <= 0.1186\n"
+		allConstraints += "1 " + self.xs[2] + " >= 1.4812\n"
+		allConstraints += "1 " + self.xs[2] + " <= 1.4813\n"
 
+		#allConstraints += "1 " + self.tIs[0] + " >= 0.1615\n"
+		#allConstraints += "1 " + self.tIs[0] + " <= 0.1616\n"
+		allConstraints += "1 " + self.tIs[1] + " >= 0.1586\n"
+		allConstraints += "1 " + self.tIs[1] + " <= 0.1587\n"
+		allConstraints += "1 " + self.tIs[2] + " >= 0.0029\n"
+		allConstraints += "1 " + self.tIs[2] + " <= 0.0030\n"
+		allConstraints += "1 " + self.tIs[3] + " >= -0.7209\n"
+		allConstraints += "1 " + self.tIs[3] + " <= -0.7204\n"
+		allConstraints += "1 " + self.tIs[4] + " >= -0.1587\n"
+		allConstraints += "1 " + self.tIs[4] + " <= -0.1585\n"
+		allConstraints += "1 " + self.tIs[5] + " >= -0.5620\n"
+		allConstraints += "1 " + self.tIs[5] + " <= -0.5618\n"'''
 		'''allConstraintList = allConstraints.splitlines()
 		allConstraints = ""
 		for i in range(len(allConstraintList)):

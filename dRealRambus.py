@@ -50,7 +50,7 @@ def rambusOscillatorTanhDebug(a, numStages, hyper, g_cc = 0.5):
 		
 		#print ("f_sat")
 		#print (f_sat)
-		result = CheckSatisfiability(f_sat, 1e-16)
+		result = CheckSatisfiability(f_sat, 1e-12)
 		#print (result)
 		if result is None:
 			break
@@ -91,6 +91,7 @@ def rambusOscillatorTanhDebug(a, numStages, hyper, g_cc = 0.5):
 		print ("")
 
 def rambusOscillatorTanh(a, numStages, numSolutions = "all", g_cc = 0.5):
+	epsilon = 1e-12
 	model = TanhModel(modelParam = a, g_cc = g_cc, g_fwd = 1.0, numStages=numStages)
 	start = time.time()
 	g_fwd = 1.0
@@ -138,17 +139,18 @@ def rambusOscillatorTanh(a, numStages, numSolutions = "all", g_cc = 0.5):
 		
 		#print ("f_sat")
 		#print (f_sat)
-		result = CheckSatisfiability(f_sat, 1e-16)
-		#print (result)
+		result = CheckSatisfiability(f_sat, epsilon)
+		print (result)
 		if result is None:
 			break
 		hyper = np.zeros((lenV,2))
 		for i in range(lenV):
-			hyper[i,:] = [result[vs[i]].lb(), result[vs[i]].ub()]
+			hyper[i,:] = [result[vs[i]].lb() - 2*epsilon, result[vs[i]].ub() + 2*epsilon]
 
-		#allSolutions.append(hyper)
+		print ("hyper", hyper)
+		allSolutions.append(hyper)
 		# find the biggest hyperrectangle containing the unique solution
-		hyperWithUniqueSoln = np.zeros((lenV,2))
+		'''hyperWithUniqueSoln = np.zeros((lenV,2))
 		diff = np.ones((lenV))*0.4
 		startingIndex = 0
 		while True:
@@ -165,7 +167,7 @@ def rambusOscillatorTanh(a, numStages, numSolutions = "all", g_cc = 0.5):
 				allSolutions.append(hyperWithUniqueSoln)
 				break
 
-		print ("num solutions found", len(allSolutions))
+		print ("num solutions found", len(allSolutions))'''
 		'''if len(allSolutions) == 3:
 			break'''
 		
@@ -212,12 +214,11 @@ def mosfetCurrent(Vtp, Vtn, Vdd, Kn, Kp, Sn, Sp, IVarN, IVarP, VinVar, VoutVar):
 
 
 def rambusOscillatorMosfet(Vtp, Vtn, Vdd, Kn, Kp, Sn, numStages, numSolutions = "all", g_cc = 0.5):
+	model = MosfetModel(modelParam = [Vtp, Vtn, Vdd, Kn, Kp, Sn], g_cc = g_cc, g_fwd = g_fwd, numStages = numStages)
 	start = time.time()
 	print ("Vtp", Vtp, "Vtn", Vtn, "Vdd", Vdd, "Kn", Kn, "Kp", Kp, "Sn", Sn)
 	g_fwd = 1.0
 	Sp = Sn *2.0
-	model = MosfetModel(modelParam = [Vtp, Vtn, Vdd, Kn, Kp, Sn], g_cc = g_cc, g_fwd = g_fwd, numStages = numStages)
-	boundMap = model.boundMap
 	lenV = numStages*2
 
 	vs = []
@@ -238,8 +239,8 @@ def rambusOscillatorMosfet(Vtp, Vtn, Vdd, Kn, Kp, Sn, numStages, numSolutions = 
 			break
 		allConstraints = []	
 		for i in range(lenV):
-			allConstraints.append(vs[i] >= boundMap[i][0][0])
-			allConstraints.append(vs[i] <= boundMap[i][1][1])
+			allConstraints.append(vs[i] >= 0.0)
+			allConstraints.append(vs[i] <= Vdd)
 			allConstraints.append(g_fwd*(-ifwdNs[i]-ifwdPs[i]) + g_cc*(-iccNs[i]-iccPs[i]) == 0)
 			fwdInd = (i-1)%lenV
 			ccInd = (i+lenV//2)%lenV
@@ -265,7 +266,7 @@ def rambusOscillatorMosfet(Vtp, Vtn, Vdd, Kn, Kp, Sn, numStages, numSolutions = 
 		
 		#print ("f_sat")
 		#print (f_sat)
-		result = CheckSatisfiability(f_sat, 1e-16)
+		result = CheckSatisfiability(f_sat, 1e-12)
 		#print (result)
 		if result is None:
 			break
@@ -275,6 +276,7 @@ def rambusOscillatorMosfet(Vtp, Vtn, Vdd, Kn, Kp, Sn, numStages, numSolutions = 
 
 		#print ("hyper", hyper)
 		# find the biggest hyperrectangle containing the unique solution
+		boundMap = model.boundMap
 		hyperWithUniqueSoln = np.zeros((lenV,2))
 		diff = np.ones((lenV))*0.4
 		startingIndex = 0
@@ -316,7 +318,7 @@ def rambusOscillatorMosfet(Vtp, Vtn, Vdd, Kn, Kp, Sn, numStages, numSolutions = 
 	print ("time taken", end - start)
 
 
-rambusOscillatorTanh(a = -5.0, numStages = 2, numSolutions = 1, g_cc = 0.5)
+rambusOscillatorTanh(a = -5.0, numStages = 4, numSolutions = "all", g_cc = 4.0)
 
 #check if you can easily find the solution in the given hyper
 '''hyper = np.array([[-0.74, -0.72],

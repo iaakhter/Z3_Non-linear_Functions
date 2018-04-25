@@ -45,12 +45,12 @@ solution.
 '''
 def ifFeasibleHyper(hyperRectangle, hyperBound,model):
 	lenV = hyperRectangle.shape[0]
-	#print ("hyperRectangle")
-	#print (hyperRectangle)
+	print ("hyperRectangle")
+	print (hyperRectangle)
 	iterNum = 0
 	while True:
-		#print ("hyperRectangle")
-		#print (hyperRectangle)
+		print ("hyperRectangle")
+		print (hyperRectangle)
 		kResult = intervalUtils.checkExistenceOfSolutionGS(model,hyperRectangle.transpose())
 		#print ("kResult")
 		#print (kResult)
@@ -59,7 +59,7 @@ def ifFeasibleHyper(hyperRectangle, hyperBound,model):
 			return (True, kResult[1])
 
 		if kResult[0] == False and kResult[1] is None:
-			#print ("K operator not feasible")
+			print ("K operator not feasible")
 			return (False, None)
 		#print "kResult"
 		#print kResult
@@ -67,9 +67,9 @@ def ifFeasibleHyper(hyperRectangle, hyperBound,model):
 		#print (hyperRectangle)
 		feasible, newHyperRectangle = model.linearConstraints(hyperRectangle)
 	
-		#print ("newHyperRectangle ", newHyperRectangle)
+		print ("newHyperRectangle ", newHyperRectangle)
 		if feasible == False:
-			#print ("LP not feasible")
+			print ("LP not feasible")
 			return (False, None)
 
 		for i in range(lenV):
@@ -143,8 +143,8 @@ def getFeasibleIntervalIndices(rootCombinationNode,boundMap,hyperBound, model,re
 		return
 
 	intervalIndices = rootCombinationNode.rootArray
-	#print ("intervalIndices", intervalIndices)
-	#print ("boundMap", boundMap)
+	print ("intervalIndices", intervalIndices)
+	print ("boundMap", boundMap)
 	lenV = len(intervalIndices)
 	
 	#feasibility = ifFeasibleOrdering(intervalIndices, boundMap, hyperBound,model)
@@ -166,10 +166,11 @@ def getFeasibleIntervalIndices(rootCombinationNode,boundMap,hyperBound, model,re
 				hyperAlreadyConsidered = True
 				return
 
+	print ("hyperRectangle", hyperRectangle)
 	feasibility = ifFeasibleHyper(hyperRectangle,hyperBound,model)
 
-	#print ("feasibility at level", level)
-	#print (feasibility)
+	print ("feasibility at level", level)
+	print (feasibility)
 
 	if treeVars is not None:
 		global hyperNum
@@ -248,8 +249,8 @@ def bisectHyper(hyperBound,hyperRectangle,bisectingIndex, model,finalHypers, lev
 		global hyperNum
 		parentTree = treeVars[0]
 		parent = treeVars[1]
-	#print "hyperRectangle"
-	#print hyperRectangle
+	print ("hyperRectangle")
+	print (hyperRectangle)
 	lenV = hyperRectangle.shape[0]
 	intervalLength = hyperRectangle[:,1] - hyperRectangle[:,0]
 	bisectingIndex = np.argmax(intervalLength)
@@ -261,16 +262,16 @@ def bisectHyper(hyperBound,hyperRectangle,bisectingIndex, model,finalHypers, lev
 	leftHyper[bisectingIndex][1] = midVal
 
 	rightHyper[bisectingIndex][0] = midVal
-	#print ("leftHyper at level", level)
-	#print (leftHyper)
-	#print ("rightHyper at level", level)
-	#print (rightHyper)
+	print ("leftHyper at level", level)
+	print (leftHyper)
 	feasLeft = ifFeasibleHyper(leftHyper, hyperBound, model)
+	print ("feasLeft")
+	print (feasLeft)
+	print ("rightHyper at level", level)
+	print (rightHyper)
 	feasRight = ifFeasibleHyper(rightHyper, hyperBound, model)
-	#print ("feasLeft")
-	#print (feasLeft)
-	#print ("feasRight")
-	#print (feasRight)
+	print ("feasRight")
+	print (feasRight)
 
 	leftHyperAlreadyConsidered = False
 	rightHyperAlreadyConsidered = False
@@ -364,7 +365,11 @@ def findAndIgnoreNewtonSoln(model, minVal, maxVal, numSolutions, numTrials = 10)
 	for i in range(lenV):
 		overallHyper[i,0] = boundMap[i][0][0]
 		overallHyper[i,1] = boundMap[i][1][1]
+	print ("numTrials in newtons preprocessing", numTrials)
+	start = time.time()
+	numFailures = 0
 	for n in range(numTrials):
+		numFailures += 1
 		if len(allHypers) == numSolutions:
 			break
 		trialSoln = np.random.uniform(minVal, maxVal, (lenV))
@@ -390,12 +395,16 @@ def findAndIgnoreNewtonSoln(model, minVal, maxVal, numSolutions, numTrials = 10)
 						diff[startingIndex] = diff[startingIndex]/2.0
 						startingIndex = (startingIndex + 1)%lenV
 					else:
-						print ("Preprocess: found unique hyper", hyperWithUniqueSoln)
+						end = time.time()
+						print ("Preprocess: found unique hyper ", hyperWithUniqueSoln, "in", end - start, "after", numFailures, "failures")
+						start = time.time()
+						numFailures = 0
 						allHypers.append(hyperWithUniqueSoln)
 						if model.solver is not None:
 							model.ignoreHyperInZ3(hyperWithUniqueSoln)
 						#model.linearConstraints(hyperWithUniqueSoln)
 						break
+	print ("total num hypers found in ", numTrials, " trials is ", len(allHypers))
 	return (allHypers, solutionsFoundSoFar)
 
 
@@ -601,15 +610,15 @@ def schmittTrigger(inputVoltage, treeVars = None, numSolutions = "all", newtonHy
 	print bisectionHypers'''
 
 	'''hyperRectangle = np.zeros((lenV,2))
-	hyperRectangle[0,:] = [1.799999999, 1.800000001]
-	hyperRectangle[1,:] = [1.574999999, 1.575000001]
-	hyperRectangle[2,:] = [1.799999999, 1.800000001]
+	hyperRectangle[0,:] = [0.45, 0.675]
+	hyperRectangle[1,:] = [0.07259583,  0.37749746]
+	hyperRectangle[2,:] = [1.35, 1.8]
 
 	feasibility = ifFeasibleHyper(hyperRectangle, hyperBound,model)
 	#feasibility = intervalUtils.checkExistenceOfSolutionGS(model,hyperRectangle.transpose())
 	print (feasibility)'''
 	#exampleSoln = (hyperRectangle[:,0] + hyperRectangle[:,1])/2.0
-	'''exampleSoln = np.array([1.8, 1.4, 1.8])
+	'''exampleSoln = np.array([1.79997910220505, 1.38792621640977, 1.79999999999999])
 	finalSoln = intervalUtils.newton(model,exampleSoln)
 	print ("finalSoln", finalSoln)'''
 	#print (model.currentFun(0.90732064, 0.09267936))
@@ -648,7 +657,7 @@ def schmittTrigger(inputVoltage, treeVars = None, numSolutions = "all", newtonHy
 	print (allHypers)
 	
 	# categorize solutions found
-	sampleSols, rotatedSols, stableSols, unstableSols = rUtils.categorizeSolutions(allHypers,model)
+	'''sampleSols, rotatedSols, stableSols, unstableSols = rUtils.categorizeSolutions(allHypers,model)
 
 	for hi in range(len(sampleSols)):
 		print ("equivalence class# ", hi)
@@ -667,16 +676,21 @@ def schmittTrigger(inputVoltage, treeVars = None, numSolutions = "all", newtonHy
 
 	print ("")
 	print ("numSolutions, ", len(allHypers))
-	print ("num stable solutions ", len(stableSols))
+	#print ("num stable solutions ", len(stableSols))
 
-	print (model.oscNum(sampleSols[0]))
-	'''for si in range(len(stableSols)):
+	#print (model.oscNum(exampleSoln))
+	for si in range(len(stableSols)):
 		print stableSols[si]'''
 	#print "num unstable solutions ", len(unstableSols)
 	'''for si in range(len(unstableSols)):
-		print unstableSols[si]
+		print unstableSols[si]'''
 	if treeVars is not None:
-		parentTree.show(line_type="ascii-em")'''
+		parentTree.show(line_type="ascii-em")
+	#exampleSoln = np.array([1.73146982670735161, 1.34005499030221964, 1.731472546677237823])
+	#print ("model.oscNum")
+	#print(model.oscNum(exampleSoln))
+	'''finalSoln = intervalUtils.newton(model,exampleSoln)
+	print ("finalSoln", finalSoln)'''
 	endExp = time.time()
 	print ("TOTAL TIME ", endExp - startExp)
 
@@ -805,5 +819,5 @@ def rambusOscillator(numStages, g_cc, treeVars = None, numSolutions="all" , newt
 
 #rambusOscillator(numStages=4, g_cc=4.0, treeVars=None, numSolutions="all" , newtonHypers=True)
 #z3Version(-5.0,2)
-schmittTrigger(inputVoltage = 0.2, treeVars = None, numSolutions = "all", newtonHypers = True)
+schmittTrigger(inputVoltage = 1.2, treeVars = None, numSolutions = "all", newtonHypers = None)
 

@@ -151,11 +151,18 @@ def newton(model,soln):
 	h = soln
 	count = 0
 	maxIter = 100
+	boundMap = model.boundMap
+	lenV = len(soln)
+	overallHyper = np.zeros((lenV,2))
+	for i in range(lenV):
+		overallHyper[i,0] = boundMap[i][0][0]
+		overallHyper[i,1] = boundMap[i][1][1]
+	#print ("overallHyper", overallHyper)
 	while count < maxIter and (np.linalg.norm(h) > 1e-8 or count == 0) :
+		#print ("soln", soln)
 		#print ("h", h)
 		_,_,res = model.oscNum(soln)
 		#print ("res", res)
-		#print ("soln", soln)
 		res = -np.array(res)
 		jac = model.jacobian(soln)
 		#print ("res", res)
@@ -165,6 +172,9 @@ def newton(model,soln):
 		except np.linalg.LinAlgError:
 			h = np.linalg.lstsq(jac, res)[0]
 		soln = soln + h
+		#print ("new soln", soln)
+		if np.less(soln, overallHyper[:,0]).any() or np.greater(soln, overallHyper[:,1]).any():
+			return (False, soln)
 		count+=1
 	if count >= maxIter and np.linalg.norm(h) > 1e-8:
 		return(False, soln)
@@ -200,7 +210,9 @@ def checkExistenceOfSolutionGS(model,hyperRectangle):
 		while True:
 			fail = False
 			try:
-				C = np.linalg.inv(jacMidPoint)
+				#print ("midPoint", midPoint)
+				#print ("jacobian in K", jacMidPoint)
+				C = np.linalg.pinv(jacMidPoint)
 				#print ("C", C)
 			except np.linalg.linalg.LinAlgError:
 				fail = True
@@ -293,6 +305,8 @@ def checkExistenceOfSolutionGS(model,hyperRectangle):
 			if gsInterval[i][1] <= startBounds[i][0] or gsInterval[i][1] >= startBounds[i][1]:
 				uniqueSoln = False
 
+		#print (gsInterval[:,0] - startBounds[:,0])
+		#print (startBounds[:,1] - gsInterval[:,1])
 		if uniqueSoln:
 			#print "Hyperrectangle with unique solution found"
 			#print kInterval
@@ -315,6 +329,7 @@ def checkExistenceOfSolutionGS(model,hyperRectangle):
 						#print ("maxDiff", maxDiff)
 						if maxDiff < 1e-9:
 							maxDiff = 1e-9
+						#maxDiff = 0.01
 						#print "maxDiff ", maxDiff
 						gsIntersect[si,0] = soln[1][si] - maxDiff
 						gsIntersect[si,1] = soln[1][si] + maxDiff
@@ -343,7 +358,7 @@ def checkExistenceOfSolution(model,hyperRectangle):
 	iteration = 0
 	while True:
 		#print "iteration number: ", iteration
-		print ("startBounds ", startBounds)
+		#print ("startBounds ", startBounds)
 		midPoint = (startBounds[:,0] + startBounds[:,1])/2.0
 		#midPoint = startBounds[:,0] + (startBounds[:,1] - startBounds[:,0])*0.25
 		#print "midPoint"
@@ -390,8 +405,8 @@ def checkExistenceOfSolution(model,hyperRectangle):
 		kInterval[:,0] = np.minimum(kInterval1, kInterval2)
 		kInterval[:,1] = np.maximum(kInterval1, kInterval2)
 
-		print ("kInterval ")
-		print (kInterval)
+		#print ("kInterval ")
+		#print (kInterval)
 
 		uniqueSoln = True
 		for i in range(numVolts):
@@ -440,7 +455,7 @@ def checkExistenceOfSolution(model,hyperRectangle):
 				constructBiggerHyper = True
 				exampleVolt = (intersect[:,0] + intersect[:,1])/2.0
 				soln = newton(model,exampleVolt)
-				print ("soln ", soln)
+				#print ("soln ", soln)
 				# the new hyper must contain the solution in the middle and enclose old hyper
 				# and then we check for uniqueness of solution in the newer bigger hyperrectangle
 				if soln[0]:
@@ -453,7 +468,7 @@ def checkExistenceOfSolution(model,hyperRectangle):
 						intersect[si,0] = soln[1][si] - maxDiff
 						intersect[si,1] = soln[1][si] + maxDiff
 
-					print ("bigger hyper ", intersect)
+					#print ("bigger hyper ", intersect)
 					startBounds = intersect
 				#print ("after if constructBiggerHyper", constructBiggerHyper)
 			else:

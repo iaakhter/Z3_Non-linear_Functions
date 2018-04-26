@@ -8,25 +8,21 @@ import time
 
 def nFet(Vtn, Vdd, Kn, Sn, gn, src, gate, drain, tI):
 	constraints = []
-	InLeak = (drain - src)*(1 + (gate - src - Vtn)/Vdd)*(gn/1e-4)
-	constraints.append(Or(
-						And(src > drain, drain - src <= Vtn, tI == InLeak),
-						And(src > drain, gate - src >= drain - src - Vtn, tI == -0.5*Sn*Kn*(drain - src - Vtn)*(drain - src - Vtn) + InLeak),
-						And(src > drain, gate - src <= drain - src - Vtn, tI == -Sn*Kn*(drain - src - Vtn - (gate - src)/2.0)*(gate - src) + InLeak),
-						And(src <= drain, gate - src <= Vtn, tI == InLeak),
-						And(src <= drain, drain - src >= gate - src - Vtn, tI == 0.5*Sn*Kn*(gate - src - Vtn)*(gate - src - Vtn) + InLeak),
-						And(src <= drain, drain - src <= gate - src - Vtn, tI == Sn*Kn*(gate - src - Vtn - (drain - src)/2.0)*(drain - src) + InLeak)))
+	constraints.append(Or(And(src > drain, gate - drain <= Vtn, tI == -(src - drain)*(2 + (gate - drain - Vtn)/Vdd)*(gn*1e-4)),
+							And(src > drain, gate - drain >= Vtn, src - drain >= gate - drain - Vtn, tI == -0.5*Sn*Kn*(gate - drain - Vtn)*(gate - drain - Vtn) - (src - drain)*(2 + (gate - drain - Vtn)/Vdd)*(gn*1e-4)),
+							And(src > drain, gate - drain >= Vtn, src - drain <= gate - drain - Vtn, tI == -Sn*Kn*(gate - drain - Vtn - (src - drain)/2.0)*(src - drain) - (src - drain)*(2 + (gate - drain - Vtn)/Vdd)*(gn*1e-4)),
+							And(src <= drain, gate - src <= Vtn, tI == (drain - src)*(2 + (gate - src - Vtn)/Vdd)*(gn*1e-4)),
+							And(src <= drain, gate - src >= Vtn, drain - src >= gate - src - Vtn, tI == 0.5*Sn*Kn*(gate - src - Vtn)*(gate - src - Vtn) + (drain - src)*(2 + (gate - src - Vtn)/Vdd)*(gn*1e-4)),
+							And(src <= drain, gate - src >= Vtn, drain - src <= gate - src - Vtn, tI == Sn*Kn*(gate - src - Vtn - (drain - src)/2.0)*(drain - src) + (drain - src)*(2 + (gate - src - Vtn)/Vdd)*(gn*1e-4))))
 	return constraints
 def pFet(Vtp, Vdd, Kp, Sp, gp, src, gate, drain, tI):
 	constraints = []
-	IpLeak = (drain - src)*(1 + (gate - src - Vtp)/Vdd)*(gp/1e-4)
-	constraints.append(Or(
-						And(src < drain, drain - src >= Vtp, tI == 0.0 + IpLeak),
-						And(src < drain, gate - src <= drain - src - Vtp, tI == -0.5*Sp*Kp*(drain - src - Vtp)*(drain - src - Vtp) + IpLeak),
-						And(src < drain, gate - src >= drain - src - Vtp, tI == -Sp*Kp*(drain - src - Vtp - (gate - src)/2.0)*(gate - src) + IpLeak),
-						And(src >= drain, gate - src >= Vtp, tI == 0.0 + IpLeak),
-						And(src >= drain, drain - src <= gate - src - Vtp, tI == 0.5*Sp*Kp*(gate - src - Vtp)*(gate - src - Vtp) + IpLeak),
-						And(src >= drain, drain - src >= gate - src - Vtp, tI == Sp*Kp*(gate - src - Vtp - (drain - src)/2.0)*(drain - src) + IpLeak)))
+	constraints.append(Or(And(src < drain, gate - drain >= Vtp, tI == -(src - drain)*(2 - (gate - drain - Vtp)/Vdd)*(gp*1e-4)),
+							And(src < drain, gate - drain <= Vtp, src - drain <= gate - drain - Vtp, tI == -0.5*Sp*Kp*(gate - drain - Vtp)*(gate - drain - Vtp) - (src - drain)*(2 - (gate - drain - Vtp)/Vdd)*(gp*1e-4)),
+							And(src < drain, gate - drain <= Vtp, src - drain >= gate - drain - Vtp, tI == -Sp*Kp*(gate - drain - Vtp - (src - drain)/2.0)*(src - drain) - (src - drain)*(2 - (gate - drain - Vtp)/Vdd)*(gp*1e-4)),
+							And(src >= drain, gate - src >= Vtp, tI == (drain - src)*(2 - (gate - src - Vtp)/Vdd)*(gp*1e-4)),
+							And(src >= drain, gate - src <= Vtp, drain - src <= gate - src - Vtp, tI == 0.5*Sp*Kp*(gate - src - Vtp)*(gate - src - Vtp) + (drain - src)*(2 - (gate - src - Vtp)/Vdd)*(gp*1e-4)),
+							And(src >= drain, gate - src <= Vtp, drain - src >= gate - src - Vtp, tI == Sp*Kp*(gate - src - Vtp - (drain - src)/2.0)*(drain - src) + (drain - src)*(2 - (gate - src - Vtp)/Vdd)*(gp*1e-4))))
 	return constraints
 
 def schmittTrigger(inputVoltage, Vtp, Vtn, Vdd, Kn, Kp, Sn, numSolutions = "all"):
@@ -117,4 +113,4 @@ def schmittTrigger(inputVoltage, Vtp, Vtn, Vdd, Kn, Kp, Sn, numSolutions = "all"
 	end = time.time()
 	print ("time taken", end - start)
 
-schmittTrigger(inputVoltage = 1.8, Vtp = -0.4, Vtn = 0.4, Vdd = 1.8, Kn = 1.5, Kp = -0.75, Sn = (8/3.0), numSolutions = "all")
+schmittTrigger(inputVoltage = 0.2, Vtp = -0.4, Vtn = 0.4, Vdd = 1.8, Kn = 1.5, Kp = -0.75, Sn = (8/3.0), numSolutions = "all")

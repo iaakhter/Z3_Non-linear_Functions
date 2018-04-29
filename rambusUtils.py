@@ -6,8 +6,8 @@ Return true if stable and false otherwise
 '''
 def determineStability(equilibrium,model):
 	jac = model.jacobian(equilibrium)
-	print ("equilibrium", equilibrium)
-	print ("jac", jac)
+	#print ("equilibrium", equilibrium)
+	#print ("jac", jac)
 	eigVals,_ = np.linalg.eig(jac)
 	maxEig = np.amax(eigVals.real)
 	if maxEig > 0:

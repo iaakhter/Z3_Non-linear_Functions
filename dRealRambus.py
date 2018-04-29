@@ -8,6 +8,7 @@ import numpy as np
 from tanhModel import TanhModel
 from mosfetModel import MosfetModel
 import intervalUtils
+import resource
 
 # find the solution in hyper
 def rambusOscillatorTanhDebug(a, numStages, hyper, g_cc = 0.5):
@@ -91,7 +92,7 @@ def rambusOscillatorTanhDebug(a, numStages, hyper, g_cc = 0.5):
 		print ("")
 
 def rambusOscillatorTanh(a, numStages, numSolutions = "all", g_cc = 0.5):
-	epsilon = 1e-12
+	epsilon = 1e-14
 	model = TanhModel(modelParam = a, g_cc = g_cc, g_fwd = 1.0, numStages=numStages)
 	start = time.time()
 	g_fwd = 1.0
@@ -140,7 +141,7 @@ def rambusOscillatorTanh(a, numStages, numSolutions = "all", g_cc = 0.5):
 		#print ("f_sat")
 		#print (f_sat)
 		result = CheckSatisfiability(f_sat, epsilon)
-		print (result)
+		#print (result)
 		if result is None:
 			break
 		hyper = np.zeros((lenV,2))
@@ -149,31 +150,12 @@ def rambusOscillatorTanh(a, numStages, numSolutions = "all", g_cc = 0.5):
 
 		print ("hyper", hyper)
 		allSolutions.append(hyper)
-		# find the biggest hyperrectangle containing the unique solution
-		'''hyperWithUniqueSoln = np.zeros((lenV,2))
-		diff = np.ones((lenV))*0.4
-		startingIndex = 0
-		while True:
-			#print ("diff", diff)
-			hyperWithUniqueSoln[:,0] = hyper[:,0] - diff
-			hyperWithUniqueSoln[:,1] = hyper[:,1] + diff
-			hyperWithUniqueSoln = np.clip(hyperWithUniqueSoln, -1.0, 1.0)
-			kResult = intervalUtils.checkExistenceOfSolutionGS(model,hyperWithUniqueSoln.transpose())
-			if kResult[0] == False and kResult[1] is not None:
-				diff[startingIndex] = diff[startingIndex]/2.0
-				startingIndex = (startingIndex + 1)%lenV
-			else:
-				print ("found unique hyper", hyperWithUniqueSoln)
-				allSolutions.append(hyperWithUniqueSoln)
-				break
 
-		print ("num solutions found", len(allSolutions))'''
-		'''if len(allSolutions) == 3:
-			break'''
+		print ("num solutions found", len(allSolutions))
 		
 
 	# categorize solutions found
-	sampleSols, rotatedSols, stableSols, unstableSols = rUtils.categorizeSolutions(allSolutions,model)
+	'''sampleSols, rotatedSols, stableSols, unstableSols = rUtils.categorizeSolutions(allSolutions,model)
 	
 
 	for hi in range(len(sampleSols)):
@@ -193,7 +175,7 @@ def rambusOscillatorTanh(a, numStages, numSolutions = "all", g_cc = 0.5):
 
 	print ("")
 	print ("num stable solutions ", len(stableSols))
-	print ("num solutions", len(allSolutions))
+	print ("num solutions", len(allSolutions))'''
 	end = time.time()
 	print ("time taken", end - start)
 
@@ -214,9 +196,10 @@ def mosfetCurrent(Vtp, Vtn, Vdd, Kn, Kp, Sn, Sp, IVarN, IVarP, VinVar, VoutVar):
 
 
 def rambusOscillatorMosfet(Vtp, Vtn, Vdd, Kn, Kp, Sn, numStages, numSolutions = "all", g_cc = 0.5):
-	model = MosfetModel(modelParam = [Vtp, Vtn, Vdd, Kn, Kp, Sn], g_cc = g_cc, g_fwd = g_fwd, numStages = numStages)
+	epsilon = 1e-14
+	model = MosfetModel(modelParam = [Vtp, Vtn, Vdd, Kn, Kp, Sn], g_cc = g_cc, g_fwd = 1.0, numStages = numStages)
 	start = time.time()
-	print ("Vtp", Vtp, "Vtn", Vtn, "Vdd", Vdd, "Kn", Kn, "Kp", Kp, "Sn", Sn)
+	#print ("Vtp", Vtp, "Vtn", Vtn, "Vdd", Vdd, "Kn", Kn, "Kp", Kp, "Sn", Sn)
 	g_fwd = 1.0
 	Sp = Sn *2.0
 	lenV = numStages*2
@@ -266,42 +249,21 @@ def rambusOscillatorMosfet(Vtp, Vtn, Vdd, Kn, Kp, Sn, numStages, numSolutions = 
 		
 		#print ("f_sat")
 		#print (f_sat)
-		result = CheckSatisfiability(f_sat, 1e-12)
+		result = CheckSatisfiability(f_sat, epsilon)
 		#print (result)
 		if result is None:
 			break
 		hyper = np.zeros((lenV,2))
 		for i in range(lenV):
-			hyper[i,:] = [result[vs[i]].lb(), result[vs[i]].ub()]
+			hyper[i,:] = [result[vs[i]].lb() - 2*epsilon, result[vs[i]].ub() + 2*epsilon]
 
-		#print ("hyper", hyper)
-		# find the biggest hyperrectangle containing the unique solution
-		boundMap = model.boundMap
-		hyperWithUniqueSoln = np.zeros((lenV,2))
-		diff = np.ones((lenV))*0.4
-		startingIndex = 0
-		while True:
-			#print ("diff", diff)
-			hyperWithUniqueSoln[:,0] = hyper[:,0] - diff
-			hyperWithUniqueSoln[:,1] = hyper[:,1] + diff
-			kResult = intervalUtils.checkExistenceOfSolutionGS(model,hyperWithUniqueSoln.transpose())
-			if kResult[0] == False and kResult[1] is not None:
-				diff[startingIndex] = diff[startingIndex]/2.0
-				startingIndex = (startingIndex + 1)%lenV
-			elif kResult[0]:
-				print ("found unique hyper", hyperWithUniqueSoln)
-				allSolutions.append(hyperWithUniqueSoln)
-				break
-			else:
-				print ("no unique hyper", hyperWithUniqueSoln)
-				return
+		print ("hyper", hyper)
+		allSolutions.append(hyper)
 
 		print ("num solutions found", len(allSolutions))
-		'''if len(allSolutions) == 1:
-			break'''
 
 	# categorize solutions found
-	sampleSols, rotatedSols, stableSols, unstableSols = rUtils.categorizeSolutions(allSolutions,model)
+	'''sampleSols, rotatedSols, stableSols, unstableSols = rUtils.categorizeSolutions(allSolutions,model)
 	
 	for solution in allSolutions:
 		print (solution)
@@ -314,11 +276,13 @@ def rambusOscillatorMosfet(Vtp, Vtn, Vdd, Kn, Kp, Sn, numStages, numSolutions = 
 		for mi in range(len(rotatedSols[hi])):
 			print (rotatedSols[hi][mi])
 		print ("")
-	end = time.time()
+	end = time.time()'''
 	print ("time taken", end - start)
 
 
-rambusOscillatorTanh(a = -5.0, numStages = 4, numSolutions = "all", g_cc = 4.0)
+#rambusOscillatorTanh(a = -5.0, numStages = 2, numSolutions = "all", g_cc = 4.0)
+rambusOscillatorMosfet(Vtp = -0.25, Vtn = 0.25, Vdd = 1.0, Kn = 1.0, Kp = -0.5, Sn = 1.0, numStages = 2, g_cc = 0.5)
+print(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss)
 
 #check if you can easily find the solution in the given hyper
 '''hyper = np.array([[-0.74, -0.72],
@@ -330,5 +294,3 @@ rambusOscillatorTanh(a = -5.0, numStages = 4, numSolutions = "all", g_cc = 4.0)
 	[-1.0, -0.98],
 	[-0.08, -0.06]])
 rambusOscillatorTanhDebug(a = -5.0, numStages = 4, hyper = hyper, g_cc = 4.0)'''
-
-#rambusOscillatorMosfet(Vtp = -0.25, Vtn = 0.25, Vdd = 1.0, Kn = 1.0, Kp = -0.5, Sn = 1.0, numStages = 2, g_cc = 0.5)

@@ -1,7 +1,7 @@
 import numpy as np
 import lpUtils
 from cvxopt import matrix,solvers
-from z3 import *
+#from z3 import *
 
 class TanhModel:
 	def __init__(self, modelParam, g_cc, g_fwd, numStages, solver = None):

@@ -153,10 +153,10 @@ def newton(model,soln):
 	maxIter = 100
 	boundMap = model.boundMap
 	lenV = len(soln)
-	overallHyper = np.zeros((lenV,2))
+	'''overallHyper = np.zeros((lenV,2))
 	for i in range(lenV):
 		overallHyper[i,0] = boundMap[i][0][0]
-		overallHyper[i,1] = boundMap[i][1][1]
+		overallHyper[i,1] = boundMap[i][1][1]'''
 	#print ("overallHyper", overallHyper)
 	while count < maxIter and (np.linalg.norm(h) > 1e-8 or count == 0) :
 		#print ("soln", soln)
@@ -173,8 +173,8 @@ def newton(model,soln):
 			h = np.linalg.lstsq(jac, res)[0]
 		soln = soln + h
 		#print ("new soln", soln)
-		if np.less(soln, overallHyper[:,0]).any() or np.greater(soln, overallHyper[:,1]).any():
-			return (False, soln)
+		'''if np.less(soln, overallHyper[:,0]).any() or np.greater(soln, overallHyper[:,1]).any():
+			return (False, soln)'''
 		count+=1
 	if count >= maxIter and np.linalg.norm(h) > 1e-8:
 		return(False, soln)

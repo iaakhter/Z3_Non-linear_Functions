@@ -4,11 +4,13 @@ import copy
 import intervalUtils
 import tanhModel
 import mosfetModel
+import example1
 import schmittMosfet
 from treelib import Node, Tree
 #from z3 import *
 import rambusUtils as rUtils
 import resource
+import random
 
 hyperNum = 0
 
@@ -56,11 +58,10 @@ def ifFeasibleHyper(hyperRectangle, hyperBound,model):
 		#print ("kResult")
 		#print (kResult)
 		if kResult[0]:
-			#print "LP feasible ", newHyperRectangle
 			return (True, kResult[1])
 
 		if kResult[0] == False and kResult[1] is None:
-			#print ("K operator not feasible")
+			#print ("K operator not feasible", hyperRectangle)
 			return (False, None)
 		#print "kResult"
 		#print kResult
@@ -70,7 +71,7 @@ def ifFeasibleHyper(hyperRectangle, hyperBound,model):
 	
 		#print ("newHyperRectangle ", newHyperRectangle)
 		if feasible == False:
-			#print ("LP not feasible")
+			#print ("LP not feasible", hyperRectangle)
 			return (False, None)
 
 		for i in range(lenV):
@@ -78,11 +79,28 @@ def ifFeasibleHyper(hyperRectangle, hyperBound,model):
 				newHyperRectangle[i,0] = hyperRectangle[i,0]
 			if newHyperRectangle[i,1] > hyperRectangle[i,1]:
 				newHyperRectangle[i,1] = hyperRectangle[i,1]
+
+		#newHyperRectangle = kResult[1]
 			 
 
-		if np.less_equal(newHyperRectangle[:,1] - newHyperRectangle[:,0],hyperBound*np.ones((lenV))).all() or np.less_equal(np.absolute(newHyperRectangle - hyperRectangle),1e-4*np.ones((lenV,2))).all():
+		hyperVol = 1.0
+		for i in range(lenV):
+			hyperVol *= (hyperRectangle[i,1] - hyperRectangle[i,0])
+		hyperVol = hyperVol**(1.0/lenV)
+
+		newHyperVol = 1.0
+		for i in range(lenV):
+			newHyperVol *= (newHyperRectangle[i,1] - newHyperRectangle[i,0])
+		newHyperVol = newHyperVol**(1.0/lenV)
+
+		propReduc = (hyperVol - newHyperVol)/hyperVol
+		#print ("propReduc", propReduc)
+		
+		#if np.less_equal(newHyperRectangle[:,1] - newHyperRectangle[:,0],hyperBound*np.ones((lenV))).all() or np.less_equal(np.absolute(newHyperRectangle - hyperRectangle),1e-4*np.ones((lenV,2))).all():
+		if propReduc < hyperBound:
 			if kResult[0] == False and kResult[1] is not None:
-				return (False, kResult[1])
+				#return (False, kResult[1])
+				return (False, newHyperRectangle)
 		hyperRectangle = newHyperRectangle
 		iterNum+=1
 		#print ("here?")
@@ -239,12 +257,12 @@ def refineHyper(ordering, boundMap, maxHyperBound, model, allHypers, level, tree
 	volumes = []
 
 	#print ("before bisecting num ", len(finalHyper))
-	bisectHyper(maxHyperBound, hyperRectangle, 0,model, finalHypers, level, treeVars, numSolutions)
+	bisectHyper(maxHyperBound, hyperRectangle, model, finalHypers, level, treeVars, numSolutions)
 	#print ("after bisecting num ", len(finalHyper))
 
 	return finalHypers
 
-def bisectHyper(hyperBound,hyperRectangle,bisectingIndex, model,finalHypers, level, treeVars, numSolutions):
+def bisectHyper(hyperBound,hyperRectangle,model,finalHypers, level, treeVars, numSolutions):
 	if treeVars is not None:
 		global hyperNum
 		parentTree = treeVars[0]
@@ -262,73 +280,94 @@ def bisectHyper(hyperBound,hyperRectangle,bisectingIndex, model,finalHypers, lev
 	leftHyper[bisectingIndex][1] = midVal
 
 	rightHyper[bisectingIndex][0] = midVal
-	#print ("leftHyper at level", level)
-	#print (leftHyper)
-	feasLeft = ifFeasibleHyper(leftHyper, hyperBound, model)
-	#print ("feasLeft")
-	#print (feasLeft)
-	#print ("rightHyper at level", level)
-	#print (rightHyper)
-	feasRight = ifFeasibleHyper(rightHyper, hyperBound, model)
-	#print ("feasRight")
-	#print (feasRight)
 
-	leftHyperAlreadyConsidered = False
-	rightHyperAlreadyConsidered = False
+	gsResultLeft = intervalUtils.checkExistenceOfSolutionGS(model, leftHyper.transpose())
+	gsResultRight = intervalUtils.checkExistenceOfSolutionGS(model, rightHyper.transpose())
 
-	for hyper in finalHypers:
-		if np.greater_equal(leftHyper[:,0], hyper[:,0]).all() and np.less_equal(leftHyper[:,1], hyper[:,1]).all():
-			leftHyperAlreadyConsidered = True
-			break
+	if gsResultLeft[0] == False and gsResultLeft[1] is not None and gsResultRight[0] == False and gsResultRight[1] is not None:
+		#print ("leftHyper at level", level)
+		#print (leftHyper)
+		feasLeft = ifFeasibleHyper(leftHyper, hyperBound, model)
+		#print ("feasLeft")
+		#print (feasLeft)
+		#print ("rightHyper at level", level)
+		#print (rightHyper)
+		feasRight = ifFeasibleHyper(rightHyper, hyperBound, model)
+		#print ("feasRight")
+		#print (feasRight)
 
-	for hyper in finalHypers:
-		if np.greater_equal(rightHyper[:,0], hyper[:,0]).all() and np.less_equal(rightHyper[:,1], hyper[:,1]).all():
-			rightHyperAlreadyConsidered = True
-			break
+		leftHyperAlreadyConsidered = False
+		rightHyperAlreadyConsidered = False
+
+		for hyper in finalHypers:
+			if np.greater_equal(leftHyper[:,0], hyper[:,0]).all() and np.less_equal(leftHyper[:,1], hyper[:,1]).all():
+				leftHyperAlreadyConsidered = True
+				break
+
+		for hyper in finalHypers:
+			if np.greater_equal(rightHyper[:,0], hyper[:,0]).all() and np.less_equal(rightHyper[:,1], hyper[:,1]).all():
+				rightHyperAlreadyConsidered = True
+				break
 
 
-	if not(leftHyperAlreadyConsidered):
-		if treeVars is not None:
-			leftHyper_feasHyperString = np.array_str(leftHyper) + "\n"
-			leftHyperId = str(hyperNum)
-			hyperNum += 1
+		if not(leftHyperAlreadyConsidered):
+			if treeVars is not None:
+				leftHyper_feasHyperString = np.array_str(leftHyper) + "\n"
+				leftHyperId = str(hyperNum)
+				hyperNum += 1
+				if feasLeft[0]:
+					leftHyper_feasHyperString += " TRUE\n" + np.array_str(feasLeft[1]) + "\n"
+				elif feasLeft[0] == False and feasLeft[1] is not None:
+					leftHyper_feasHyperString += " ****\n" + np.array_str(feasLeft[1]) + "\n"
+				else:
+					leftHyper_feasHyperString += " FALSE\n" + " NONE\n"
+				parentTree.create_node(leftHyper_feasHyperString, leftHyperId, parent = parent)
+				treeVars = [parentTree, leftHyperId]
+
 			if feasLeft[0]:
-				leftHyper_feasHyperString += " TRUE\n" + np.array_str(feasLeft[1]) + "\n"
+				if numSolutions != "all" and len(finalHypers) == numSolutions:
+					return
+				addToSolutions(model, finalHypers, feasLeft[1])
 			elif feasLeft[0] == False and feasLeft[1] is not None:
-				leftHyper_feasHyperString += " ****\n" + np.array_str(feasLeft[1]) + "\n"
-			else:
-				leftHyper_feasHyperString += " FALSE\n" + " NONE\n"
-			parentTree.create_node(leftHyper_feasHyperString, leftHyperId, parent = parent)
-			treeVars = [parentTree, leftHyperId]
+				bisectHyper(hyperBound,feasLeft[1],model,finalHypers, level+1, treeVars, numSolutions)
 
-		if feasLeft[0]:
-			if numSolutions != "all" and len(finalHypers) == numSolutions:
-				return
-			addToSolutions(model, finalHypers, feasLeft[1])
-		elif feasLeft[0] == False and feasLeft[1] is not None:
-			bisectHyper(hyperBound,feasLeft[1],bisectingIndex+1,model,finalHypers, level+1, treeVars, numSolutions)
+		
+		if not(rightHyperAlreadyConsidered):
+			if treeVars is not None:
+				rightHyper_feasHyperString = np.array_str(rightHyper) + "\n"
+				rightHyperId = str(hyperNum)
+				hyperNum += 1
+				if feasRight[0]:
+					rightHyper_feasHyperString += " TRUE\n" + np.array_str(feasRight[1]) + "\n"
+				elif feasRight[0] == False and feasRight[1] is not None:
+					rightHyper_feasHyperString += " ****\n" + np.array_str(feasRight[1]) + "\n"
+				else:
+					rightHyper_feasHyperString += " FALSE\n" + " NONE\n"
+				parentTree.create_node(rightHyper_feasHyperString, rightHyperId, parent = parent)
+				treeVars = [parentTree, rightHyperId]
 
-	
-	if not(rightHyperAlreadyConsidered):
-		if treeVars is not None:
-			rightHyper_feasHyperString = np.array_str(rightHyper) + "\n"
-			rightHyperId = str(hyperNum)
-			hyperNum += 1
 			if feasRight[0]:
-				rightHyper_feasHyperString += " TRUE\n" + np.array_str(feasRight[1]) + "\n"
+				if numSolutions != "all" and len(finalHypers) == numSolutions:
+					return
+				addToSolutions(model, finalHypers, feasRight[1])
 			elif feasRight[0] == False and feasRight[1] is not None:
-				rightHyper_feasHyperString += " ****\n" + np.array_str(feasRight[1]) + "\n"
-			else:
-				rightHyper_feasHyperString += " FALSE\n" + " NONE\n"
-			parentTree.create_node(rightHyper_feasHyperString, rightHyperId, parent = parent)
-			treeVars = [parentTree, rightHyperId]
+				bisectHyper(hyperBound,feasRight[1],model,finalHypers, level+1, treeVars, numSolutions)
 
-		if feasRight[0]:
+
+	else:
+		if gsResultRight[0]:
 			if numSolutions != "all" and len(finalHypers) == numSolutions:
 				return
-			addToSolutions(model, finalHypers, feasRight[1])
-		elif feasRight[0] == False and feasRight[1] is not None:
-			bisectHyper(hyperBound,feasRight[1],bisectingIndex+1,model,finalHypers, level+1, treeVars, numSolutions)
+			addToSolutions(model, finalHypers, gsResultRight[1])
+		if gsResultLeft[0]:
+			if numSolutions != "all" and len(finalHypers) == numSolutions:
+				return
+			addToSolutions(model, finalHypers, gsResultLeft[1])
+
+		if gsResultRight[0] == False and gsResultRight[1] is not None:
+			bisectHyper(hyperBound,gsResultRight[1],model,finalHypers, level+1, treeVars, numSolutions)
+		elif gsResultLeft[0] == False and gsResultLeft[1] is not None:
+			bisectHyper(hyperBound,gsResultLeft[1],model,finalHypers, level+1, treeVars, numSolutions)
 
 
 def findExcludingBound(ordering,boundMap, model, maxDiff = 0.2):
@@ -728,7 +767,7 @@ def rambusOscillator(numStages, g_cc, treeVars = None, numSolutions="all" , newt
 	minBoundMap = 0
 	maxBoundMap = 1
 	rootCombinationNodes = intervalUtils.combinationWithTrees(lenV,[minBoundMap,maxBoundMap],indexChoiceArray)
-	hyperBound = 0.01
+	hyperBound = 0.3
 	'''bisectionHypers = refineHyper(a, params, xs, ys, zs, [None, None, None, None], boundMap, hyperBound)
 	print "bisectionHypers"
 	print bisectionHypers'''
@@ -783,9 +822,10 @@ def rambusOscillator(numStages, g_cc, treeVars = None, numSolutions="all" , newt
 	
 	print ("allHypers")
 	print (allHypers)
+	print ("numSolutions", len(allHypers))
 	
 	# categorize solutions found
-	sampleSols, rotatedSols, stableSols, unstableSols = rUtils.categorizeSolutions(allHypers,model)
+	'''sampleSols, rotatedSols, stableSols, unstableSols = rUtils.categorizeSolutions(allHypers,model)
 
 	for hi in range(len(sampleSols)):
 		print ("equivalence class# ", hi)
@@ -804,7 +844,7 @@ def rambusOscillator(numStages, g_cc, treeVars = None, numSolutions="all" , newt
 
 	print ("")
 	print ("numSolutions, ", len(allHypers))
-	print ("num stable solutions ", len(stableSols))
+	print ("num stable solutions ", len(stableSols))'''
 	'''for si in range(len(stableSols)):
 		print stableSols[si]'''
 	#print "num unstable solutions ", len(unstableSols)
@@ -816,7 +856,121 @@ def rambusOscillator(numStages, g_cc, treeVars = None, numSolutions="all" , newt
 	if treeVars is not None:
 		parentTree.show(line_type="ascii-em")
 
-rambusOscillator(numStages=2, g_cc=4.0, treeVars=None, numSolutions="all" , newtonHypers=True)
+
+def singleVariableInequality(treeVars = None, newtonHypers=None, numSolutions="all"):
+	#numSolutions = 1
+	start = time.time()
+	xBound = [-100.0, -0.001]
+	model = example1.Example1(xBound[0], xBound[1])
+	'''xRand = random.random()*(xBound[1] - xBound[0]) + xBound[0]
+	xRandVal = model.oscNum(xRand)[1]
+	if model.sign == " >= ":
+		if xRandVal < 0.0:
+			print ("unsat, counter example", xRand)
+			return'''
+
+	lenV = 1
+	indexChoiceArray = [0]
+	print ("indexChoiceArray", indexChoiceArray)
+	boundMap = model.boundMap
+	print ("boundMap ", boundMap)
+	
+	minBoundMap = 0
+	maxBoundMap = 1
+	rootCombinationNodes = intervalUtils.combinationWithTrees(lenV,[minBoundMap,maxBoundMap],indexChoiceArray)
+	hyperBound = 0.01
+
+	if treeVars is not None:
+		global hyperNum
+		hyperNum = 0
+		parentHyper = []
+		for i in range(lenV):
+			parentHyper.append([boundMap[i][0][0], boundMap[i][1][1]])
+		parentHyper = np.array(parentHyper)
+		parentTree = Tree()
+		hyper_feasHyperString = np.array_str(parentHyper) + "\n ****\n" + np.array_str(parentHyper) + "\n"
+		hyperId = str(hyperNum)
+		hyperNum += 1
+		parentTree.create_node(hyper_feasHyperString, hyperId)
+		treeVars = [parentTree, hyperId]
+
+	allHypers = []
+	if newtonHypers is not None:
+		allHypers, solutionsFoundSoFar = findAndIgnoreNewtonSoln(model, boundMap[0][0][0], boundMap[0][1][1], numSolutions=numSolutions, numTrials = numStages*100)
+		newtonHypers = np.copy(allHypers)
+
+	for i in range(len(rootCombinationNodes)):
+		getFeasibleIntervalIndices(rootCombinationNodes[i],boundMap,hyperBound,model,allHypers, level = 0, treeVars=treeVars, numSolutions=numSolutions)
+	
+	print ("allHypers")
+	print (allHypers)
+	print ("numSolutions", len(allHypers))
+
+	sampleSols, rotatedSols, stableSols, unstableSols = rUtils.categorizeSolutions(allHypers,model)
+
+	for hi in range(len(sampleSols)):
+		print ("equivalence class# ", hi)
+		print ("main member ", sampleSols[hi])
+		print ("number of other members ", len(rotatedSols[hi]))
+		print ("other member rotationIndices: ")
+		for mi in range(len(rotatedSols[hi])):
+			print (rotatedSols[hi][mi])
+		print ("")
+
+	end = time.time()
+
+	inequalityIntervals = {" > ": [], " < ": []}
+
+	if len(sampleSols) == 0:
+		xRand = random.random()*(xBound[1] - xBound[0]) + xBound[0]
+		xRandVal = model.oscNum(xRand)[2]
+		if xRandVal > 0:
+			inequalityIntervals[" > "].append(xBound)
+		else:
+			inequalityIntervals[" < "].append(xBound)
+
+	else:
+		allSampleSols = np.sort(sampleSols, axis=None)
+		for si in range(len(allSampleSols)):
+			startInterval, endInterval = None, None
+			if si == 0:
+				startInterval = xBound[0]
+				endInterval = allSampleSols[si]
+			elif si == len(allSampleSols) - 1:
+				startInterval = allSampleSols[si]
+				endInterval = xBound[1]
+			else:
+				startInterval = allSampleSols[si]
+				endInterval = allSampleSols[si + 1]
+			xRand = random.random()*(endInterval - startInterval) + startInterval
+			xRandVal = model.oscNum(xRand)[2]
+			if xRandVal > 0:
+				inequalityIntervals[" > "].append([startInterval, endInterval])
+			else:
+				inequalityIntervals[" < "].append([startInterval, endInterval])
+
+
+
+	if model.sign == " > ":
+		print ("valid intervals", inequalityIntervals[" > "])
+
+	elif model.sign == " < ":
+		print ("valid intervals", inequalityIntervals[" < "])
+
+
+	
+
+
+
+	'''hyperRectangle = np.array([[-50.27303309, -3.24401493]])
+	feasibility = ifFeasibleHyper(hyperRectangle, hyperBound,model)
+	#feasibility = intervalUtils.checkExistenceOfSolutionGS(model,hyperRectangle.transpose())
+	print (feasibility)'''
+	#print (model.oscNum(np.array([-3.59807644])))
+	print ("time taken", end - start)
+
+rambusOscillator(numStages=4, g_cc=4.0, treeVars=None, numSolutions="all" , newtonHypers=True)
 #z3Version(-5.0,2)
 #schmittTrigger(inputVoltage = 1.8, treeVars = None, numSolutions = "all", newtonHypers = True)
+#singleVariableInequality()
 print(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss)

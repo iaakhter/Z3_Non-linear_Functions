@@ -345,7 +345,10 @@ class MosfetModel:
 		#print ("crossRegion Feasible Points")
 		#print (feasiblePoints)
 		#print ("")		
-		overallConstraint = self.convexHullConstraints(feasiblePoints, I, Vin, Vout)
+		try:
+			overallConstraint = self.convexHullConstraints(feasiblePoints, I, Vin, Vout)
+		except:
+			overallConstraint = None
 		#print ("overallConstraint")
 		#print (overallConstraint)
 		return overallConstraint
@@ -752,17 +755,19 @@ class MosfetModel:
 			#print ("fwdPatch", fwdPatch)
 			if not(fwdHyperTooSmall):
 				fwdConstraints = self.ICrossRegConstraint(self.IsFwd[i], self.xs[fwdInd], self.xs[i], fwdPatch)
-				allConstraints += fwdConstraints
+				if fwdConstraints is not None:
+					allConstraints += fwdConstraints
 				#print ("fwdConstraints", fwdConstraints)
-			else:
-				print ("fwdHyper toosmall", fwdPatch)
+			#else:
+			#	print ("fwdHyper toosmall", fwdPatch)
 			#print ("ccPatch", ccPatch)
 			if not(ccHyperTooSmall):
 				ccConstraints = self.ICrossRegConstraint(self.IsCc[i], self.xs[ccInd], self.xs[i], ccPatch)
 				#print ("ccConstraints", ccConstraints)
-				allConstraints += ccConstraints
-			else:
-				print ("ccHyper toosmall", ccPatch)
+				if ccConstraints is not None:
+					allConstraints += ccConstraints
+			#else:
+			#	print ("ccHyper toosmall", ccPatch)
 			allConstraints += "1 " + self.xs[i] + " >= " + str(hyperRectangle[i][0]) + "\n"
 			allConstraints += "1 " + self.xs[i] + " <= " + str(hyperRectangle[i][1]) + "\n"
 			allConstraints += str(self.g_fwd) + " " + self.IsFwd[i] + " + " + str(self.g_cc) + " " + self.IsCc[i] + " >= 0.0\n"

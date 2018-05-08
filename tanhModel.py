@@ -1,6 +1,7 @@
 import numpy as np
 import lpUtils
 from cvxopt import matrix,solvers
+import funCompUtils as fcUtils
 #from z3 import *
 
 class TanhModel:
@@ -44,213 +45,6 @@ class TanhModel:
 		den = np.cosh(self.modelParam*val)*np.cosh(self.modelParam*val)
 		#print "den ", den
 		return self.modelParam/den
-
-
-
-	'''
-	when Vlow < 0 and Vhigh > 0, take the convex hull of 
-	two triangles (one formed on the left side and one on the
-		right side)
-	'''
-	def triangleConvexHullBounds(self, Vin, Vout, Vlow, Vhigh):
-		if (Vlow >= 0 and Vhigh >= 0) or (Vlow <= 0 and Vhigh <= 0):
-			print ("Vlow and Vhigh are in the same quadrants")
-			return
-		VZero = 0.0
-		tanhFunVlow = self.tanhFun(Vlow)
-		tanhFunVhigh = self.tanhFun(Vhigh)
-		tanhFunVZero = self.tanhFun(VZero)
-		dLow = self.tanhFunder(Vlow)
-		dHigh = self.tanhFunder(Vhigh)
-		dZero = self.tanhFunder(0)
-		cLow = tanhFunVlow - dLow*Vlow
-		cHigh = tanhFunVhigh - dHigh*Vhigh
-		cZero = tanhFunVZero - dZero*0
-
-		#print "dHigh ", dHigh, " cHigh ", cHigh
-
-		if abs(dLow - dZero) < 1e-8:
-			leftIntersectX = Vlow
-			leftIntersectY = tanhFunVlow
-		else:
-			leftIntersectX = (cZero - cLow)/(dLow - dZero)
-			leftIntersectY = dLow*leftIntersectX + cLow
-		#print "dLow, ", dLow, "dZero", dZero
-		#print "leftIntersectX ", leftIntersectX, " leftIntersectY ", leftIntersectY
-		#print "Vlow ", Vlow, "Vhigh ", Vhigh
-		if abs(dHigh - dZero) < 1e-8:
-			rightIntersectX = Vhigh
-			rightIntersectY = tanhFunVhigh
-		else:
-			rightIntersectX = (cZero - cHigh)/(dHigh - dZero)
-			rightIntersectY = dHigh*rightIntersectX + cHigh
-
-		overallConstraint = ""
-		if type(Vin) == str is None:
-			overallConstraint = "1 " + Vin + " >= " + str(Vlow) + "\n"
-			overallConstraint += "1 " + Vin + " <= " + str(Vhigh) + "\n"
-
-		# Construct constraints from the convex hull of (Vlow, tanhFunVlow),
-		# (leftIntersectX, leftIntersectY), (0,0), (rightIntersectX, rightIntersectY),
-		# and (Vhigh, tanhFunVhigh)
-		# Use jarvis algorithm from https://www.geeksforgeeks.org/convex-hull-set-1-jarviss-algorithm-or-wrapping/
-		origPoints = [(Vlow, tanhFunVlow),(leftIntersectX, leftIntersectY),
-					(0,0),(rightIntersectX, rightIntersectY), (Vhigh, tanhFunVhigh)]
-		points = []
-		for point in origPoints:
-			if point not in points:
-				points.append(point)
-		#print "points"
-		#print points
-		leftMostIndex = 0
-		convexHullIndices = []
-		nextIndex = leftMostIndex
-		iters = 0
-		while(iters == 0 or nextIndex != leftMostIndex):
-			convexHullIndices.append(nextIndex)
-			otherIndex = (nextIndex + 1)%len(points)
-			for i in range(len(points)):
-				orientation = ((points[i][1] - points[nextIndex][1]) * (points[otherIndex][0] - points[i][0]) - 
-					(points[i][0] - points[nextIndex][0]) * (points[otherIndex][1] - points[i][1]))
-				if orientation < 0:
-					otherIndex = i
-			nextIndex = otherIndex
-			iters += 1
-
-		#print "convexHull", convexHullIndices
-		for ci in range(len(convexHullIndices)):
-			i = convexHullIndices[ci]
-			ii = convexHullIndices[(ci + 1)%len(convexHullIndices)]
-			grad = (points[ii][1] - points[i][1])/(points[ii][0] - points[i][0])
-			c = points[i][1] - grad*points[i][0]
-			if points[i] == (Vlow, tanhFunVlow) and points[ii] == (rightIntersectX, rightIntersectY):
-				if type(Vin) == str:
-					overallConstraint += "1 "+Vout + " + " +str(-grad) + " " + Vin + " >= "+str(c) + "\n"
-				else:
-					self.solver.add(Implies(And(Vin >= Vlow, Vin <= Vhigh), Vout - grad*Vin >= c))
-					self.solver.add(Implies(Vin >= 0, Vout <= 0))
-					self.solver.add(Implies(Vin <= 0, Vout >= 0))
-			
-			elif points[i] == (rightIntersectX, rightIntersectY) and points[ii] == (Vhigh, tanhFunVhigh):
-				if type(Vin) == str:
-					overallConstraint += "1 "+Vout + " + " +str(-grad) + " " + Vin + " >= "+str(c) + "\n"
-				else:
-					self.solver.add(Implies(And(Vin >= Vlow, Vin <= Vhigh), Vout - grad*Vin >= c))
-					self.solver.add(Implies(Vin >= 0, Vout <= 0))
-					self.solver.add(Implies(Vin <= 0, Vout >= 0))
-			
-			elif points[i] == (Vhigh, tanhFunVhigh) and points[ii] == (leftIntersectX, leftIntersectY):
-				if type(Vin) == str:	
-					overallConstraint += "1 "+Vout + " + " +str(-grad) + " " + Vin + " <= "+str(c) + "\n"
-				else:
-					self.solver.add(Implies(And(Vin >= Vlow, Vin <= Vhigh), Vout - grad*Vin <= c))
-					self.solver.add(Implies(Vin >= 0, Vout <= 0))
-					self.solver.add(Implies(Vin <= 0, Vout >= 0))
-			
-			elif points[i] == (leftIntersectX, leftIntersectY) and points[ii] == (Vlow, tanhFunVlow):
-				if type(Vin) == str:
-					overallConstraint += "1 "+Vout + " + " +str(-grad) + " " + Vin + " <= "+str(c) + "\n"
-				else:
-					self.solver.add(Implies(And(Vin >= Vlow, Vin <= Vhigh), Vout - grad*Vin <= c))
-					self.solver.add(Implies(Vin >= 0, Vout <= 0))
-					self.solver.add(Implies(Vin <= 0, Vout >= 0))
-
-			elif points[i] == (Vhigh, tanhFunVhigh) and points[ii] == (Vlow, tanhFunVlow):
-				if type(Vin) == str:
-					overallConstraint += "1 "+Vout + " + " +str(-grad) + " " + Vin + " <= "+str(c) + "\n"
-				else:
-					self.solver.add(Implies(And(Vin >= Vlow, Vin <= Vhigh), Vout - grad*Vin <= c))
-					self.solver.add(Implies(Vin >= 0, Vout <= 0))
-					self.solver.add(Implies(Vin <= 0, Vout >= 0))
-
-			elif points[i] == (Vlow, tanhFunVlow) and points[ii] == (Vhigh, tanhFunVhigh):
-				if type(Vin) == str:	
-					overallConstraint += "1 "+Vout + " + " +str(-grad) + " " + Vin + " >= "+str(c) + "\n"
-				else:
-					self.solver.add(Implies(And(Vin >= Vlow, Vin <= Vhigh), Vout - grad*Vin >= c))
-					self.solver.add(Implies(Vin >= 0, Vout <= 0))
-					self.solver.add(Implies(Vin <= 0, Vout >= 0))
-
-		#print "overallConstraint", overallConstraint
-		return overallConstraint
-
-
-	def triangleBounds(self, Vin, Vout, Vlow, Vhigh):
-		tanhFunVlow = self.tanhFun(Vlow)
-		tanhFunVhigh = self.tanhFun(Vhigh)
-		dLow = self.tanhFunder(Vlow)
-		dHigh = self.tanhFunder(Vhigh)
-		diff = Vhigh - Vlow
-		if(diff == 0):
-			diff = 1e-10
-		dThird = (tanhFunVhigh - tanhFunVlow)/diff
-		cLow = tanhFunVlow - dLow*Vlow
-		cHigh = tanhFunVhigh - dHigh*Vhigh
-		cThird = tanhFunVlow - dThird*Vlow
-
-		overallConstraint = None
-		if type(Vin) == str:
-			overallConstraint = "1 " + Vin + " >= " + str(Vlow) + "\n"
-			overallConstraint += "1 " + Vin + " <= " + str(Vhigh) + "\n"
-
-		#print "dLow ", dLow, "dHigh ", dHigh, "dThird ", dThird
-		#print "cLow ", cLow, "cHigh ", cHigh, "cThird ", 
-
-		#print "a ", a, " Vlow ", Vlow, " Vhigh ", Vhigh
-
-		if self.modelParam > 0:
-			if Vlow >= 0 and Vhigh >=0:
-				if self.solver is None:
-					return overallConstraint + "1 "+ Vout + " + " +str(-dThird) + " " + Vin + " >= "+str(cThird)+"\n" +\
-					"1 "+Vout + " + " +str(-dLow) + " " + Vin + " <= "+str(cLow)+"\n" +\
-					"1 "+Vout + " + " +str(-dHigh) + " " + Vin + " <= "+str(cHigh) + "\n"
-				else:
-					self.solver.add(Implies(And(Vin >= Vlow, Vin <=Vhigh),
-										And(Vout - dThird*Vin >= cThird,
-											Vout - dLow*Vin <= cLow,
-											Vout - dHigh*Vin <= cHigh)))
-					self.solver.add(Implies(Vin >= 0, Vout >= 0))
-					self.solver.add(Implies(Vin >= 0, Vout >= 0))
-
-			elif Vlow <=0 and Vhigh <=0:
-				if self.solver is None:
-					return overallConstraint + "1 "+ Vout + " + " +str(-dThird) + " " + Vin + " <= "+str(cThird)+"\n" +\
-					"1 "+Vout + " + " +str(-dLow) + " " + Vin + " >= "+str(cLow)+"\n" +\
-					"1 "+Vout + " + " +str(-dHigh) + " " + Vin + " >= "+str(cHigh) + "\n"
-				else:
-					self.solver.add(Implies(And(Vin >= Vlow, Vin <=Vhigh),
-										And(Vout - dThird*Vin <= cThird,
-											Vout - dLow*Vin >= cLow,
-											Vout - dHigh*Vin >= cHigh)))
-					self.solver.add(Implies(Vin >= 0, Vout >= 0))
-					self.solver.add(Implies(Vin <= 0, Vout <= 0))
-
-		elif self.modelParam< 0:
-			if Vlow <= 0 and Vhigh <=0:
-				if self.solver is None:
-					return overallConstraint + "1 "+Vout + " + " +str(-dThird) + " " + Vin + " >= "+str(cThird)+"\n" +\
-					"1 "+Vout + " + " +str(-dLow) + " " + Vin + " <= "+str(cLow)+"\n" +\
-					"1 "+Vout + " + " +str(-dHigh) + " " + Vin + " <= "+str(cHigh) + "\n"
-				else:
-					self.solver.add(Implies(And(Vin >= Vlow, Vin <=Vhigh),
-										And(Vout - dThird*Vin >= cThird,
-											Vout - dLow*Vin <= cLow,
-											Vout - dHigh*Vin <= cHigh)))
-					self.solver.add(Implies(Vin <= 0, Vout >= 0))
-					self.solver.add(Implies(Vin >= 0, Vout <= 0))
-
-			elif Vlow >=0 and Vhigh >=0:
-				if self.solver is None:
-					return overallConstraint + "1 "+Vout + " + " +str(-dThird) + " " + Vin + " <= "+str(cThird)+"\n" +\
-					"1 "+Vout + " + " +str(-dLow) + " " + Vin + " >= "+str(cLow)+"\n" +\
-					"1 "+Vout + " + " +str(-dHigh) + " " + Vin + " >= "+str(cHigh) + "\n"
-				else:
-					self.solver.add(Implies(And(Vin >= Vlow, Vin <=Vhigh),
-										And(Vout - dThird*Vin <= cThird,
-											Vout - dLow*Vin >= cLow,
-											Vout - dHigh*Vin >= cHigh)))
-					self.solver.add(Implies(Vin <= 0, Vout >= 0))
-					self.solver.add(Implies(Vin >= 0, Vout <= 0))
 				
 	def oscNum(self,V):
 		lenV = len(V)
@@ -364,18 +158,10 @@ class TanhModel:
 			#print "hyperRectangle[fwdInd][0]", hyperRectangle[fwdInd][0], "hyperRectangle[fwdInd][1]", hyperRectangle[fwdInd][1]
 			
 			if self.solver is None:
-				triangleClaimFwd = ""
-				if hyperRectangle[fwdInd,0] < 0 and hyperRectangle[fwdInd,1] > 0:
-					triangleClaimFwd += self.triangleConvexHullBounds(self.xs[fwdInd],self.ys[i],hyperRectangle[fwdInd,0],hyperRectangle[fwdInd,1])
-				else:
-					triangleClaimFwd += self.triangleBounds(self.xs[fwdInd],self.ys[i],hyperRectangle[fwdInd,0],hyperRectangle[fwdInd,1])
+				triangleClaimFwd = fcUtils.tanhLinearConstraints(self.modelParam, self.xs[fwdInd], self.ys[i], hyperRectangle[fwdInd,0],hyperRectangle[fwdInd,1])
 				allConstraints += triangleClaimFwd
 
-				triangleClaimCc = ""
-				if hyperRectangle[ccInd,0] < 0 and hyperRectangle[ccInd,1] > 0:
-					triangleClaimCc += self.triangleConvexHullBounds(self.xs[ccInd],self.zs[i],hyperRectangle[ccInd,0],hyperRectangle[ccInd,1])
-				else:
-					triangleClaimCc += self.triangleBounds(self.xs[ccInd],self.zs[i],hyperRectangle[ccInd,0],hyperRectangle[ccInd,1])
+				triangleClaimCc = fcUtils.tanhLinearConstraints(self.modelParam, self.xs[ccInd], self.zs[i], hyperRectangle[ccInd,0],hyperRectangle[ccInd,1])
 				allConstraints += triangleClaimCc
 					
 				allConstraints += str(self.g_fwd) + " " + self.ys[i] + " + " + str(-self.g_fwd-self.g_cc) + \

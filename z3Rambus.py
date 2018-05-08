@@ -102,7 +102,7 @@ def rambusOscillatorTanh(a, numStages, numSolutions = "all", g_cc = 0.5):
 	print ("num solutions", len(allSolutions))
 	end = time.time()
 	print ("time taken", end - start)
-
+	return allSolutions
 
 
 
@@ -190,6 +190,8 @@ def rambusOscillatorMosfet(Vtp, Vtn, Vdd, Kn, Kp, Sn, numStages, numSolutions = 
 
 	end = time.time()
 	print ("time taken", end - start)
+	return allSolutions
 
-#rambusOscillatorMosfet(Vtp = -0.25, Vtn = 0.25, Vdd = 1.0, Kn = 1.0, Kp = -0.5, Sn = 1.0, numStages = 2, numSolutions = 1, g_cc = 0.5)
-rambusOscillatorTanh(a = -5.0, numStages = 2, numSolutions = "all", g_cc = 0.5)
+if __name__ == "__main__":
+	#rambusOscillatorMosfet(Vtp = -0.25, Vtn = 0.25, Vdd = 1.0, Kn = 1.0, Kp = -0.5, Sn = 1.0, numStages = 2, numSolutions = 1, g_cc = 0.5)
+	rambusOscillatorTanh(a = -5.0, numStages = 2, numSolutions = "all", g_cc = 0.5)

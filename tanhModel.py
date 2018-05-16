@@ -185,9 +185,9 @@ class TanhModel:
 			allConstraints = ""
 			for i in range(len(allConstraintList)):
 				allConstraints += allConstraintList[i] + "\n"
-			print "numConstraints ", len(allConstraintList)
-			print "allConstraints"
-			print allConstraints'''
+			print "numConstraints ", len(allConstraintList)'''
+			#print "allConstraints"
+			#print allConstraints
 			variableDict, A, B = lpUtils.constructCoeffMatrices(allConstraints)
 			newHyperRectangle = np.copy(hyperRectangle)
 			feasible = True

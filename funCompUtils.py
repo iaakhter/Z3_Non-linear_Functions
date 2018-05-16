@@ -210,6 +210,8 @@ def tanhLinearConstraints(constant, inputVar, outputVar, inputLow, inputHigh):
 
 	overallConstraint = "1 " + inputVar + " >= " + str(inputLow) + "\n"
 	overallConstraint += "1 " + inputVar + " <= " + str(inputHigh) + "\n"
+	overallConstraint += "1 " + outputVar + " <= 1.0\n"
+	overallConstraint += "1 " + outputVar + " >= -1.0\n"
 	allTrianglePoints = []
 	allTrianglePoints += trianglePoints(tanhFun, inputLow, 0.0, constant)
 	allTrianglePoints += trianglePoints(tanhFun, 0.0, inputHigh, constant)

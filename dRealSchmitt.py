@@ -150,5 +150,7 @@ def schmittTrigger(inputVoltage, Vtp, Vtn, Vdd, Kn, Kp, Sn, numSolutions = "all"
 		print ("")'''
 	end = time.time()
 	print ("time taken", end - start)
+	return allSolutions
 
-schmittTrigger(inputVoltage = 1.8, Vtp = -0.4, Vtn = 0.4, Vdd = 1.8, Kn = 1.5, Kp = -0.75, Sn = (8/3.0), numSolutions = "all")
+if __name__ == "__main__":
+	schmittTrigger(inputVoltage = 1.0, Vtp = -0.4, Vtn = 0.4, Vdd = 1.8, Kn = 270*1e-6, Kp = -90*1e-6, Sn = (8/3.0), numSolutions = "all")

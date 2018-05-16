@@ -1,9 +1,9 @@
-currentFun = @currentPFet;
+currentFun = @currentNFet;
 
-src = 0.0:0.01:1.0;
+src = 0.0:0.01:1.8;
 %gate = 0.0:0.01:1.0;
-gate = 0.5;
-drain = 0.0:0.01:1.0;
+gate = 0.8;
+drain = 0.0:0.01:1.8;
 %drain = 1.0
 %drain = 0.0;
 

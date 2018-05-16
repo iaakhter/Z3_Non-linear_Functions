@@ -3,9 +3,10 @@ import lpUtils
 from cvxopt import matrix,solvers
 from scipy.spatial import ConvexHull
 import math
+import funCompUtils as fcUtils
 
 class Example1:
-	def __init__(self, lowBound, upperBound):
+	def __init__(self, lowBound, upperBound, sign):
 		self.solver = None
 		self.x = "x" # main variable
 		self.a = "a" # a = 1/x
@@ -13,25 +14,11 @@ class Example1:
 		self.c = "c" # c = arcsin(cos(0.797)*b)
 		self.d = "d" # d = 2*x*c - 0.0331*x - 2*pi + 2.097
 		self.constant = -2*math.pi + 2.097
-		self.sign = " > "
+		self.sign = sign
 		self.boundMap = []
 		midVal = (lowBound + upperBound)/2.0
 		self.boundMap.append({0:[lowBound,midVal],1:[midVal,upperBound]})
 
-	def sinFun(self,x,const):
-		Ifun = math.sin(const*x)
-		der = const*math.cos(const*x)
-		return [Ifun, der]
-
-	def exponentialFun(self, x, const):
-		Ifun = 1/(const*x)
-		der = -1/(const*const*x*x)
-		return [Ifun, der]
-
-	def arcsinFun(self,x, const):
-		Ifun = math.asin(const*x)
-		der = const/(math.sqrt(1 - const*x*const*x))
-		return [Ifun, der]
 
 	def oscNum(self,xVal):
 		val = 2*xVal*math.asin(math.cos(0.797)*math.sin(math.pi/xVal)) - 0.0331*xVal + self.constant
@@ -53,69 +40,6 @@ class Example1:
 		jac[:,:,0] = np.minimum(jac1, jac2)
 		jac[:,:,1] = np.maximum(jac1, jac2)
 		return jac
-
-	def sinLinearConstraints(self, inputVar, outputVar, inputLow, inputHigh):
-		inputLowPi = math.ceil(inputLow/math.pi)
-		inputHighPi = math.ceil(inputHigh/math.pi)
-		#print ("inputLowPi", inputLowPi, "inputHighPi", inputHighPi)
-
-		if inputLowPi == inputHighPi:
-			if inputLowPi%2 == 0:
-				#print ("coming here?")
-				return self.triangleBounds(self.sinFun, math.pi, inputVar, outputVar, inputLow, inputHigh, "pos")
-			else:
-				return self.triangleBounds(self.sinFun, math.pi, inputVar, outputVar, inputLow, inputHigh, "neg")
-
-		overallConstraint = "1 " + inputVar + " >= " + str(inputLow) + "\n"
-		overallConstraint += "1 " + inputVar + " <= " + str(inputHigh) + "\n"
-		allTrianglePoints = []
-		inputStart = inputLow
-		piInput = inputStart/math.pi
-		inputEnd = math.ceil(piInput)*math.pi
-		while(inputStart < inputHigh):
-			if inputEnd > inputHigh:
-				inputEnd = inputHigh
-			tPts = self.trianglePoints(self.sinFun, inputStart, inputEnd, math.pi)
-			allTrianglePoints += tPts
-			inputStart = inputEnd
-			inputEnd += math.pi
-
-		allTrianglePoints = np.array(allTrianglePoints)
-		return overallConstraint + self.convexHullConstraints2D(allTrianglePoints, inputVar, outputVar)
-
-
-	def exponentialLinearConstraints(self, inputVar, outputVar, inputLow, inputHigh):
-		if inputLow == 0.0 or inputHigh == 0.0:
-			print ("invalid lowBound or highBound for exponential", inputLow, inputHigh)
-			return None
-		if inputLow > 0.0 and inputHigh > 0:
-			return self.triangleBounds(self.exponentialFun, 1, inputVar, outputVar, inputLow, inputHigh, "pos")
-		elif inputLow < 0.0 and inputHigh < 0.0:
-			return self.triangleBounds(self.exponentialFun, 1, inputVar, outputVar, inputLow, inputHigh, "neg")
-		elif inputLow < 0.0 and inputHigh > 0.0:
-			return self.triangleBounds(self.exponentialFun, 1, inputVar, outputVar, inputLow, inputHigh, None)
-	
-	def arcsinLinearConstraints(self, inputVar, outputVar, inputLow, inputHigh):
-		if inputLow < -1.0 or inputLow > 1.0 or inputHigh < -1.0 or inputHigh > 1.0:
-			print ("invalid lowBound or highBound for arcsin", inputLow, inputHigh)
-			return None
-
-		if inputLow >= 0.0 and inputHigh >= 0.0:
-			return self.triangleBounds(self.arcsinFun, math.cos(0.797), inputVar, outputVar, inputLow, inputHigh, "pos")
-
-		elif inputLow <= 0.0 and inputHigh <= 0.0:
-			return self.triangleBounds(self.arcsinFun, math.cos(0.797), inputVar, outputVar, inputLow, inputHigh, "neg")
-
-		overallConstraint = "1 " + inputVar + " >= " + str(inputLow) + "\n"
-		overallConstraint += "1 " + inputVar + " <= " + str(inputHigh) + "\n"
-		allTrianglePoints = []
-		allTrianglePoints += self.trianglePoints(self.arcsinFun, inputLow, 0.0, math.cos(0.797))
-		allTrianglePoints += self.trianglePoints(self.arcsinFun, 0.0, inputHigh, math.cos(0.797))
-		allTrianglePoints = np.array(allTrianglePoints)
-		#print ("inputLow", inputLow, "inputHigh", inputHigh)
-		#print ("allTrianglePoints")
-		#print (allTrianglePoints)
-		return overallConstraint + self.convexHullConstraints2D(allTrianglePoints, inputVar, outputVar)
 	
 	def dLinearConstraints(self, zVar, inputVar, outputVar, patch):
 		points = np.zeros((patch.shape[0],3))
@@ -158,103 +82,6 @@ class Example1:
 		#print ("feasiblePoints", feasiblePoints)
 		overallConstraint = self.convexHullConstraints(feasiblePoints, zVar, inputVar, outputVar)
 		return overallConstraint
-
-	def trianglePoints(self, function, inputLow, inputHigh, constant):
-		[funLow, dLow] = function(inputLow,constant)
-		[funHigh, dHigh] = function(inputHigh,constant)
-		cLow = funLow - dLow*inputLow
-		cHigh = funHigh - dHigh*inputHigh
-
-		diff = inputHigh - inputLow
-		if(diff == 0):
-			diff = 1e-10
-		dThird = (funHigh - funLow)/diff
-		cThird = funLow - dThird*inputLow
-
-		leftIntersectX, leftIntersectY = None, None
-		if abs(dHigh - dLow) < 1e-8:
-			leftIntersectX = inputLow
-			leftIntersectY = funLow
-		else:
-			leftIntersectX = (cHigh - cLow)/(dLow - dHigh)
-			leftIntersectY = dLow*leftIntersectX + cLow
-
-		tPts = [[inputLow, funLow],[inputHigh, funHigh],[leftIntersectX, leftIntersectY]]
-		return tPts
-
-
-	def triangleBounds(self, function, constant, inputVar, outputVar, inputLow, inputHigh, secDer):
-		[funLow, dLow] = function(inputLow, constant)
-		[funHigh, dHigh] = function(inputHigh, constant)
-		cLow = funLow - dLow*inputLow
-		cHigh = funHigh - dHigh*inputHigh
-
-		diff = inputHigh - inputLow
-		if(diff == 0):
-			diff = 1e-10
-		dThird = (funHigh - funLow)/diff
-		cThird = funLow - dThird*inputLow
-
-		overallConstraint = ""
-		overallConstraint += "1 " + inputVar + " >= " + str(inputLow) + "\n"
-		overallConstraint += "1 " + inputVar + " <= " + str(inputHigh) + "\n"
-		if secDer == None:
-			return overallConstraint
-
-		if secDer == "pos":
-			return overallConstraint + "1 "+ outputVar + " + " +str(-dThird) + " " + inputVar + " <= "+str(cThird)+"\n" +\
-					"1 "+outputVar + " + " +str(-dLow) + " " + inputVar + " >= "+str(cLow)+"\n" +\
-					"1 "+outputVar + " + " +str(-dHigh) + " " + inputVar + " >= "+str(cHigh) + "\n"
-
-		
-		if secDer == "neg":
-			return overallConstraint + "1 "+ outputVar + " + " +str(-dThird) + " " + inputVar + " >= "+str(cThird)+"\n" +\
-					"1 "+outputVar + " + " +str(-dLow) + " " + inputVar + " <= "+str(cLow)+"\n" +\
-					"1 "+outputVar + " + " +str(-dHigh) + " " + inputVar + " <= "+str(cHigh) + "\n"
-
-	def convexHullConstraints2D(self, points, inputVar, outputVar):
-		hull = ConvexHull(points)
-		convexHullMiddle = np.zeros((2))
-		numPoints = 0
-		for simplex in hull.simplices:
-			#print ("simplex", simplex)
-			for ind in simplex:
-				convexHullMiddle += [points[ind,0],points[ind,1]]
-				numPoints += 1
-		convexHullMiddle = convexHullMiddle/(numPoints*1.0)
-		#print ("convexHullMiddle", convexHullMiddle)
-		overallConstraint = ""
-		for si in range(len(hull.simplices)):
-			simplex = hull.simplices[si]
-			#print ("simplex", simplex)
-
-			pt1x = points[simplex[0],0]
-			pt1y = points[simplex[0],1]
-
-			pt2x = points[simplex[1],0]
-			pt2y = points[simplex[1],1]
-
-			#print ("pt1x ", pt1x, "pt1y", pt1y)
-			#print ("pt2x ", pt2x, "pt2y", pt2y)
-
-			grad = (pt2y - pt1y)/(pt2x - pt1x)
-			c = pt1y - grad*pt1x
-			#print ("grad", grad, "c", c)
-
-			yMiddle = grad*convexHullMiddle[0] + c
-			#print ("yMiddle", yMiddle)
-
-			sign = " <= "
-			if convexHullMiddle[1] > yMiddle:
-				sign = " >= "
-
-			#print ("sign", sign)
-
-			overallConstraint += "1 " + outputVar + " + " + str(-grad) + " " + inputVar + \
-				sign + str(c) + "\n"
-			
-		return overallConstraint
-
 
 	def convexHullConstraints(self, feasiblePoints, zVar, inVar, outVar):
 		hull = ConvexHull(feasiblePoints)
@@ -397,20 +224,20 @@ class Example1:
 		xUpperBound = hyperRectangle[0,1]
 		aLowBound = 1.0/xUpperBound
 		aUpperBound = 1.0/xLowBound
-		bLowBound = min(self.sinFun(aLowBound,math.pi)[0], self.sinFun(aUpperBound,math.pi)[0])
-		bUpperBound = max(self.sinFun(aLowBound,math.pi)[0], self.sinFun(aUpperBound,math.pi)[0])
+		bLowBound = min(fcUtils.sinFun(aLowBound,math.pi)[0], fcUtils.sinFun(aUpperBound,math.pi)[0])
+		bUpperBound = max(fcUtils.sinFun(aLowBound,math.pi)[0], fcUtils.sinFun(aUpperBound,math.pi)[0])
 		#print ("(aLowBound - math.pi/2.0)/(math.pi)",aLowBound/(math.pi/2.0))
 		#print ("(aUpperBound - math.pi/2.0)/(math.pi)", aUpperBound/(math.pi/2.0))
 		if abs(aLowBound/aUpperBound) > 1.0:
 			bLowBound= -1.0
 			bUpperBound = 1.0
 		#print ("bLowBound", bLowBound, "bUpperBound", bUpperBound)
-		cLowBound = min(self.arcsinFun(bLowBound,math.cos(0.797))[0], self.arcsinFun(bUpperBound,math.cos(0.797))[0])
-		cUpperBound = max(self.arcsinFun(bLowBound,math.cos(0.797))[0], self.arcsinFun(bUpperBound,math.cos(0.797))[0])
+		cLowBound = min(fcUtils.arcsinFun(bLowBound,math.cos(0.797))[0], fcUtils.arcsinFun(bUpperBound,math.cos(0.797))[0])
+		cUpperBound = max(fcUtils.arcsinFun(bLowBound,math.cos(0.797))[0], fcUtils.arcsinFun(bUpperBound,math.cos(0.797))[0])
 
-		allConstraints += self.exponentialLinearConstraints(self.x, self.a, xLowBound, xUpperBound)
-		allConstraints += self.sinLinearConstraints(self.a, self.b, aLowBound, aUpperBound)
-		allConstraints += self.arcsinLinearConstraints(self.b, self.c, bLowBound, bUpperBound)
+		allConstraints += fcUtils.inverseLinearConstraints(1, self.x, self.a, xLowBound, xUpperBound)
+		allConstraints += fcUtils.sinLinearConstraints(math.pi, self.a, self.b, aLowBound, aUpperBound)
+		allConstraints += fcUtils.arcsinLinearConstraints(math.cos(0.797), self.b, self.c, bLowBound, bUpperBound)
 		
 
 		patch = np.zeros((4,2))

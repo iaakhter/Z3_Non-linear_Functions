@@ -121,7 +121,7 @@ class Meti18:
 
 	def oscNum(self,xVal):
 		val = math.cos(math.pi*xVal) - 1.0 + 2*xVal
-		return [None, None, np.array([val])]
+		return [None, None, val]
 
 	def jacobian(self,x):
 		jac = np.zeros((1,1))

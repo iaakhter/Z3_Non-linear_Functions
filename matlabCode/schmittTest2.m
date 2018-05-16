@@ -31,8 +31,8 @@ X_2 = 0.0:0.01:Vdd;
 %equilInput = [];
 %equilOutput = [];
 figure;
-inputVoltages  = 0.0:0.2:Vdd;
-%inputVoltages = 0.0;
+%inputVoltages  = 0.0:0.2:Vdd;
+inputVoltages = 0.67;
 for iv = 1:length(inputVoltages)
 	inputVolt = inputVoltages(iv);
 	%legendVal = [legendVal, num2str(inputVolt)];
@@ -57,19 +57,24 @@ for iv = 1:length(inputVoltages)
 		
 		zerX1 = NaN;
 		zerX2 = NaN;
-		for i=1:length(n_1)-1
-			if n_1(i)*n_1(i+1) <= 0.0 
-				guess1 = X_1(i);
-				guess2 = X_1(i+1);
-				zerX1 = bisection(@schmittNfets,gnd, Vdd, inputVolt, X_0(x0), guess1,guess2);
-				break;
-			end
-		end;
+		zerX1 = bisection(@schmittNfets,gnd, Vdd, inputVolt, X_0(x0), 0.0,Vdd);
+		%for i=1:length(n_1)-1
+		%	if n_1(i)*n_1(i+1) <= 0.0 
+		%		guess1 = X_1(i);
+		%		guess2 = X_1(i+1);
+		%		zerX1 = bisection(@schmittNfets,gnd, Vdd, inputVolt, X_0(x0), guess1,guess2);
+		%		break;
+		%	end
+		%end;
 		if isnan(zerX1)
 			disp('didnt find zerX1')
 		end;
-
+		%zerX2 = bisection(@schmittPFets,gnd, Vdd, inputVolt, X_0(x0), 0.0,Vdd);
 		for i=1:length(n_2)-1
+			%if abs(n_2(i)) < 1e-3 | abs(n_2(i+1)) < 1e-3
+			%	zerX2 = X_2(i);
+			%	break;
+			%end;
 			if n_2(i)*n_2(i+1) <= 0.0 
 				guess1 = X_2(i);
 				guess2 = X_2(i+1);
@@ -78,6 +83,7 @@ for iv = 1:length(inputVoltages)
 			end
 		end;
 		if isnan(zerX2)
+			n_2
 			disp('didnt find zerX2')
 		end;
 		[m_1, blah, blah, blah, blah, blah, blah, blah, blah, blah] = currentNFet(zerX1, inputVolt, X_0(x0));
@@ -88,19 +94,21 @@ for iv = 1:length(inputVoltages)
 	hold on;
 end;
 
-inputVolt = 0.2;
-x0 = 0.6
-zerX1 = bisection(@schmittNfets,gnd, Vdd, inputVolt, x0, 0.0, 1.8);
-zerX2 = bisection(@schmittPFets,gnd, Vdd, inputVolt, x0, 0.0, 1.8);
+%{
+inputVolt = 1.0;
+x0 = 1.8002
+zerX1 = bisection(@schmittNfets,gnd, Vdd, inputVolt, x0, 0.0, 2.0)
+zerX2 = bisection(@schmittPFets,gnd, Vdd, inputVolt, x0, 0.0, 2.0)
 
-x0 = 0.05975199;
-x1 = 0.4919316;
-x2 = 0.28631593;
+x0 = 1.8;
+x1 = 0.8001;
+x2 = 1.8003;
 I1 = schmittNfets(gnd, Vdd, inputVolt, x0, x1)
 I2 = schmittPFets(gnd, Vdd, inputVolt, x0, x2)
 [m_1, blah, blah, blah, blah, blah, blah, blah, blah, blah] = currentNFet(x1, inputVolt, x0);
 [m_4, blah, blah, blah, blah, blah, blah, blah, blah, blah] = currentPFet(x2, inputVolt, x0);
 I0 = -m_1 - m_4
+%}
 
 
 %{

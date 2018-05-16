@@ -747,6 +747,7 @@ class SchmittMosfet:
 		try:
 			from osgeo import ogr
 		except ImportError:
+			print ("No gdal")
 			return
 		#print ("crossRegionPatch", patch)
 		patchRing = ogr.Geometry(ogr.wkbLinearRing)

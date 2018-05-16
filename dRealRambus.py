@@ -148,7 +148,7 @@ def rambusOscillatorTanh(a, numStages, numSolutions = "all", g_cc = 0.5):
 		for i in range(lenV):
 			hyper[i,:] = [result[vs[i]].lb() - 2*epsilon, result[vs[i]].ub() + 2*epsilon]
 
-		print ("hyper", hyper)
+		#print ("hyper", hyper)
 		allSolutions.append(hyper)
 
 		print ("num solutions found", len(allSolutions))
@@ -178,6 +178,7 @@ def rambusOscillatorTanh(a, numStages, numSolutions = "all", g_cc = 0.5):
 	print ("num solutions", len(allSolutions))'''
 	end = time.time()
 	print ("time taken", end - start)
+	return allSolutions
 
 
 def mosfetCurrent(Vtp, Vtn, Vdd, Kn, Kp, Sn, Sp, IVarN, IVarP, VinVar, VoutVar):
@@ -255,9 +256,9 @@ def rambusOscillatorMosfet(Vtp, Vtn, Vdd, Kn, Kp, Sn, numStages, numSolutions = 
 			break
 		hyper = np.zeros((lenV,2))
 		for i in range(lenV):
-			hyper[i,:] = [result[vs[i]].lb() - 2*epsilon, result[vs[i]].ub() + 2*epsilon]
+			hyper[i,:] = [result[vs[i]].lb() - 1000*epsilon, result[vs[i]].ub() + 1000*epsilon]
 
-		print ("hyper", hyper)
+		#print ("hyper", hyper)
 		allSolutions.append(hyper)
 
 		print ("num solutions found", len(allSolutions))
@@ -275,22 +276,24 @@ def rambusOscillatorMosfet(Vtp, Vtn, Vdd, Kn, Kp, Sn, numStages, numSolutions = 
 		print ("other member rotationIndices: ")
 		for mi in range(len(rotatedSols[hi])):
 			print (rotatedSols[hi][mi])
-		print ("")
-	end = time.time()'''
+		print ("")'''
+	end = time.time()
 	print ("time taken", end - start)
+	return allSolutions
 
 
-#rambusOscillatorTanh(a = -5.0, numStages = 2, numSolutions = "all", g_cc = 4.0)
-rambusOscillatorMosfet(Vtp = -0.25, Vtn = 0.25, Vdd = 1.0, Kn = 1.0, Kp = -0.5, Sn = 1.0, numStages = 2, g_cc = 0.5)
-print(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss)
+if __name__ =="__main__":
+	#rambusOscillatorTanh(a = -5.0, numStages = 4, numSolutions = "all", g_cc = 4.0)
+	rambusOscillatorMosfet(Vtp = -0.4, Vtn = 0.4, Vdd = 1.8, Kn = 270*1e-6, Kp = -90*1e-6, Sn = 8/3.0, numStages = 2, g_cc = 4.0)
+	print(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss)
 
-#check if you can easily find the solution in the given hyper
-'''hyper = np.array([[-0.74, -0.72],
-	[-0.60, -0.58],
-	[0.98, 1.0],
-	[0.06, 0.08],
-	[0.72, 0.74],
-	[0.58, 0.60],
-	[-1.0, -0.98],
-	[-0.08, -0.06]])
-rambusOscillatorTanhDebug(a = -5.0, numStages = 4, hyper = hyper, g_cc = 4.0)'''
+	#check if you can easily find the solution in the given hyper
+	'''hyper = np.array([[-0.74, -0.72],
+		[-0.60, -0.58],
+		[0.98, 1.0],
+		[0.06, 0.08],
+		[0.72, 0.74],
+		[0.58, 0.60],
+		[-1.0, -0.98],
+		[-0.08, -0.06]])
+	rambusOscillatorTanhDebug(a = -5.0, numStages = 4, hyper = hyper, g_cc = 4.0)'''

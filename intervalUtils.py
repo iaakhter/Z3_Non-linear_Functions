@@ -45,10 +45,10 @@ def newton(model,soln):
 	maxIter = 100
 	boundMap = model.boundMap
 	lenV = len(soln)
-	'''overallHyper = np.zeros((lenV,2))
+	overallHyper = np.zeros((lenV,2))
 	for i in range(lenV):
 		overallHyper[i,0] = boundMap[i][0][0]
-		overallHyper[i,1] = boundMap[i][1][1]'''
+		overallHyper[i,1] = boundMap[i][1][1]
 	#print ("overallHyper", overallHyper)
 	while count < maxIter and (np.linalg.norm(h) > 1e-8 or count == 0) :
 		#print ("soln", soln)
@@ -63,10 +63,11 @@ def newton(model,soln):
 			h = np.linalg.solve(jac,res)
 		except np.linalg.LinAlgError:
 			h = np.linalg.lstsq(jac, res)[0]
+		#print ("h",  h)
 		soln = soln + h
 		#print ("new soln", soln)
-		'''if np.less(soln, overallHyper[:,0]).any() or np.greater(soln, overallHyper[:,1]).any():
-			return (False, soln)'''
+		if np.less(soln, overallHyper[:,0] - 0.001).any() or np.greater(soln, overallHyper[:,1]+0.001).any():
+			return (False, soln)
 		count+=1
 	if count >= maxIter and np.linalg.norm(h) > 1e-8:
 		return(False, soln)
@@ -134,8 +135,8 @@ def checkExistenceOfSolutionGS(model,hyperRectangle):
 				return'''
 			#return
 
-		#print "C"
-		#print C
+		#print ("C")
+		#print (C)
 		#print "condition number of C", np.linalg.cond(C)
 
 		#Jacobian interval matrix for startBounds
@@ -149,6 +150,8 @@ def checkExistenceOfSolutionGS(model,hyperRectangle):
 
 		#Multiply preconditioner with jacobian interval matrix
 		C_jacInterval = multiplyRegularMatWithIntervalMat(C,jacInterval)
+		#print ("C_jacInterval")
+		#print (C_jacInterval)
 
 		#Gauss-Seidel interval
 		gsInterval = np.zeros((numVolts,2))
@@ -458,7 +461,7 @@ def checkExistenceOfSolution(model,hyperRectangle):
 		jacMidPoint = model.jacobian(midPoint)
 		#print "jacMidPoint"
 		#print jacMidPoint
-		C = np.linalg.pinv(jacMidPoint)
+		C = np.linalg.inv(jacMidPoint)
 		#print "C"
 		#print C
 		#print "condition number of C", np.linalg.cond(C)
@@ -522,12 +525,15 @@ def checkExistenceOfSolution(model,hyperRectangle):
 				maxVal <= kInterval[i][1] and maxVal <= startBounds[i][1]:
 				intersect[i] = [minVal,maxVal]
 				intervalLength =  intersect[:,1] - intersect[:,0]
+			
+			elif np.less_equal(np.absolute(kInterval[i,:] - startBounds[i,:]),1e-8*np.ones((2))).all():
+				intersect[i] = startBounds[i]
 			else:
-				#print "problem index ", i
-				#print "kInterval[i]", kInterval[i][0], kInterval[i][1]
-				#print "startBounds[i]", startBounds[i][0], startBounds[i][1]
-				#print "minVal ", minVal, "maxVal",maxVal
-				#print minVal <= maxVal
+				'''print "problem index ", i
+				print "kInterval[i]", kInterval[i][0], kInterval[i][1]
+				print "startBounds[i]", startBounds[i][0], startBounds[i][1]
+				print "minVal ", minVal, "maxVal",maxVal
+				print minVal <= maxVal'''
 				intersect = None
 				break
 
@@ -566,6 +572,11 @@ def checkExistenceOfSolution(model,hyperRectangle):
 					startBounds = intersect
 				#print ("after if constructBiggerHyper", constructBiggerHyper)
 			else:
+				for ii in range(numVolts):
+					if intersect[ii,0] < hyperRectangle[0,ii]:
+						intersect[ii,0] = hyperRectangle[0,ii]
+					if intersect[ii,1] > hyperRectangle[1,ii]:
+						intersect[ii,1] = hyperRectangle[1,ii]
 				return (False,intersect)
 		else:
 			startBounds = intersect

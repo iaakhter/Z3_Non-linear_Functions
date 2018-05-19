@@ -319,7 +319,10 @@ class MosfetModel:
 				for pi in range(intersectPolyRing.GetPointCount()-1):
 					intersectingPoints.append((intersectPolyRing.GetPoint(pi)[0], intersectPolyRing.GetPoint(pi)[1]))
 				intersect = np.array(intersectingPoints)
-				regConstraints,regPoints = self.IRegConstraint(I, Vin, Vout, intersect,i)
+				try:
+					regConstraints,regPoints = self.IRegConstraint(I, Vin, Vout, intersect,i)
+				except:
+					return None
 				#print ("regPoints")
 				#print (regPoints)
 				'''if i == 1:

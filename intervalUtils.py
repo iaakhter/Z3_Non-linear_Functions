@@ -181,19 +181,24 @@ def checkExistenceOfSolutionGS(model,hyperRectangle):
 			#print ("C_ImidPoint_minus_sumTerm", C_ImidPoint_minus_sumTerm)
 			
 			divisor = np.zeros((2))
+			epsilon = 1e-14
 			if C_jacInterval[i,i,0]*C_jacInterval[i,i,1] >= 0:
-				if C_jacInterval[i,i,0] == 0.0 and C_jacInterval[i,i,1] == 0.0:
+				if abs(C_jacInterval[i,i,0]) <= epsilon and abs(C_jacInterval[i,i,1]) <= epsilon:
 					divisor[0] = -float("inf")
 					divisor[1] = float("inf")
-				elif C_jacInterval[i,i,0] == 1e-14:
+				elif abs(C_jacInterval[i,i,0]) <= epsilon:
 					divisor[0] = 1.0/C_jacInterval[i,i,1]
 					divisor[1] = float("inf")
-				elif C_jacInterval[i,i,1] == 1e-14:
+				elif abs(C_jacInterval[i,i,1]) <= epsilon:
 					divisor[0] = -float("inf")
 					divisor[1] = 1.0/C_jacInterval[i,i,0]
 				else:
-					divisor[0] = 1.0/C_jacInterval[i,i,1]
-					divisor[1] = 1.0/C_jacInterval[i,i,0]
+					if C_jacInterval[i,i,0] >= 0.0:
+						divisor[0] = 1.0/C_jacInterval[i,i,1]
+						divisor[1] = 1.0/C_jacInterval[i,i,0]
+					else:
+						divisor[0] = 1.0/C_jacInterval[i,i,0]
+						divisor[1] = 1.0/C_jacInterval[i,i,1]
 			else:
 				divisor[0] = -float("inf")
 				divisor[1] = float("inf")
@@ -266,6 +271,11 @@ def checkExistenceOfSolutionGS(model,hyperRectangle):
 					#print ("bigger hyper ", gsIntersect)
 					startBounds = gsIntersect
 			else:
+				for ii in range(numVolts):
+					if gsIntersect[ii,0] < hyperRectangle[0,ii]:
+						gsIntersect[ii,0] = hyperRectangle[0,ii]
+					if gsIntersect[ii,1] > hyperRectangle[1,ii]:
+						gsIntersect[ii,1] = hyperRectangle[1,ii]
 				return (False,gsIntersect)
 		else:
 			#Use gsIntersect as startBounds for the next iteration

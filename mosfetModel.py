@@ -312,7 +312,10 @@ class MosfetModel:
 			intersectPoly = polygon.Intersection(patchPolygon)
 			if intersectPoly.GetGeometryName() != "LINESTRING":
 				#print ("Error here?", intersectPoly.GetGeometryName())
-				intersectPolyRing = intersectPoly.GetGeometryRef(0)
+				if intersectPoly.GetGeometryName() != "POINT":
+					intersectPolyRing = intersectPoly.GetGeometryRef(0)
+				else:
+					intersectPolyRing = None
 				#print ("Or here?")
 			if intersectPolyRing is not None:
 				intersectingPoints = []

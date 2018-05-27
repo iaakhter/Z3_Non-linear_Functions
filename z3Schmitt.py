@@ -52,7 +52,7 @@ def schmittTrigger(inputVoltage, Vtp, Vtn, Vdd, Kn, Kp, Sn, numSolutions = "all"
 		allConstraints += nFet(Vtn, Vdd, Kn, Sn, gn, 0.0, inputVoltage, vs[1], tIs[0])
 		allConstraints += nFet(Vtn, Vdd, Kn, Sn, gn, vs[1], inputVoltage, vs[0], tIs[1])
 		allConstraints += nFet(Vtn, Vdd, Kn, Sn, gn, vs[1], vs[0], Vdd, tIs[2])
-		allConstraints += pFet(Vtp, Vdd, Kp, Sp, gp, Vdd, inputVoltage, vs[0], tIs[3])
+		allConstraints += pFet(Vtp, Vdd, Kp, Sp, gp, Vdd, inputVoltage, vs[2], tIs[3])
 		allConstraints += pFet(Vtp, Vdd, Kp, Sp, gp, vs[2], inputVoltage, vs[0], tIs[4])
 		allConstraints += pFet(Vtp, Vdd, Kp, Sp, gp, vs[2], vs[0], 0.0, tIs[5])
 		allConstraints.append(nIs[0] == -tIs[4] - tIs[1])

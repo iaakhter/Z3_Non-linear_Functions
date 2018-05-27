@@ -54,7 +54,7 @@ class SchmittMosfet:
 		self.tModels.append(tMosfet.TransistorMosfet(
 										modelParam = [self.Vtp, self.Vdd, self.Kp, self.Sp],
 										channelType = "pFet",
-										srcVar = None, gateVar = None, drainVar = self.xs[0], IVar = self.tIs[3],
+										srcVar = None, gateVar = None, drainVar = self.xs[2], IVar = self.tIs[3],
 										useLeakage = True))
 
 		self.tModels.append(tMosfet.TransistorMosfet(
@@ -81,7 +81,7 @@ class SchmittMosfet:
 		transCurs[0] = self.tModels[0].ids(0.0, self.inputVoltage, V[1])[0]
 		transCurs[1] = self.tModels[1].ids(V[1], self.inputVoltage, V[0])[0]
 		transCurs[2] = self.tModels[2].ids(V[1], V[0], self.Vdd)[0]
-		transCurs[3] = self.tModels[3].ids(self.Vdd, self.inputVoltage, V[0])[0]
+		transCurs[3] = self.tModels[3].ids(self.Vdd, self.inputVoltage, V[2])[0]
 		transCurs[4] = self.tModels[4].ids(V[2], self.inputVoltage, V[0])[0]
 		transCurs[5] = self.tModels[5].ids(V[2], V[0], 0.0)[0]
 		#print ("transCurs", transCurs)
@@ -93,6 +93,7 @@ class SchmittMosfet:
 
 	def jacobian(self,V):
 		#print ("calculating jacobian")
+		#print ("V", V)
 		jac = np.zeros((3,3))
 		transFirDerSrc = np.zeros((6))
 		transFirDerGate = np.zeros((6))
@@ -101,10 +102,24 @@ class SchmittMosfet:
 		transFirDerSrc[0], transFirDerGate[0], transFirDerDrain[0] = self.tModels[0].jacobian(0.0, self.inputVoltage, V[1])
 		transFirDerSrc[1], transFirDerGate[1], transFirDerDrain[1]  = self.tModels[1].jacobian(V[1], self.inputVoltage, V[0])
 		transFirDerSrc[2], transFirDerGate[2], transFirDerDrain[2]  = self.tModels[2].jacobian(V[1], V[0], self.Vdd)
-		transFirDerSrc[3], transFirDerGate[3], transFirDerDrain[3] = self.tModels[3].jacobian(self.Vdd, self.inputVoltage, V[0])
+		transFirDerSrc[3], transFirDerGate[3], transFirDerDrain[3] = self.tModels[3].jacobian(self.Vdd, self.inputVoltage, V[2])
 		transFirDerSrc[4], transFirDerGate[4], transFirDerDrain[4]  = self.tModels[4].jacobian(V[2], self.inputVoltage, V[0])
 		transFirDerSrc[5], transFirDerGate[5], transFirDerDrain[5]  = self.tModels[5].jacobian(V[2], V[0], 0.0)
 
+		#print ("transFirDerDrain[4]", transFirDerDrain[4])
+		#print ("transFirDerDrain[1]", transFirDerDrain[1])
+		#print ("transFirDerSrc[1]", transFirDerSrc[1])
+		#print ("transFirDerSrc[4]", transFirDerSrc[4])
+		#print ("transFirDerDrain[1]", transFirDerDrain[1])
+		#print ("transFirDerGate[2]", transFirDerGate[2])
+		#print ("transFirDerDrain[0]", transFirDerDrain[0])
+		#print ("transFirDerSrc[1]", transFirDerSrc[1])
+		#print ("transFirDerSrc[2]", transFirDerSrc[2])
+		#print ("transFirDerDrain[3]", transFirDerDrain[3])
+		#print ("transFirDerGate[5]", transFirDerGate[5])
+		#print ("transFirDerDrain[4]", transFirDerDrain[4])
+		#print ("transFirDerSrc[5]", transFirDerSrc[5])
+		#print ("transFirDerSrc[4]", transFirDerSrc[4])
 		jac[0,0] = -transFirDerDrain[4] - transFirDerDrain[1]
 		jac[0,1] = -transFirDerSrc[1]
 		jac[0,2] = -transFirDerSrc[4]
@@ -113,14 +128,17 @@ class SchmittMosfet:
 		jac[1,1] = -transFirDerDrain[0] + transFirDerSrc[1] + transFirDerSrc[2]
 		jac[1,2] = 0.0
 
-		jac[2,0] = -transFirDerDrain[3] + transFirDerGate[5] + transFirDerDrain[4]
+		jac[2,0] = transFirDerDrain[4] + transFirDerGate[5]
 		jac[2,1] = 0.0
-		jac[2,2] = transFirDerSrc[5] + transFirDerSrc[4]
+		jac[2,2] = -transFirDerDrain[3] + transFirDerSrc[4] + transFirDerSrc[5]
+
+		#print ("jac", jac)
 
 		return jac
 
 
 	def jacobianInterval(self,bounds):
+		#print ("calculating jacobian interval")
 		lowerBound = bounds[:,0]
 		upperBound = bounds[:,1]
 		lenV = len(lowerBound)
@@ -175,7 +193,7 @@ class SchmittMosfet:
 			if i == 3:
 				srcGateDrainHyper[0] = [self.Vdd]
 				srcGateDrainHyper[1] = [self.inputVoltage]
-				srcGateDrainHyper[2] = [hyperRectangle[0,0], hyperRectangle[0,1]]
+				srcGateDrainHyper[2] = [hyperRectangle[2,0], hyperRectangle[2,1]]
 			if i == 4:
 				srcGateDrainHyper[0] = [hyperRectangle[2,0], hyperRectangle[2,1]]
 				srcGateDrainHyper[1] = [self.inputVoltage]

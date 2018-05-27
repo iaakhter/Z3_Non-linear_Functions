@@ -94,7 +94,7 @@ class TransistorMosfet:
 			secDerIn, secDerOut, secDerInOut = None, None, None
 			
 			if self.srcVar is None:
-				raise CannotHandleError('Cannot Handle the case where we dont vary srcVar')
+				raise Exception('Cannot Handle the case where we dont vary srcVar')
 			if self.gateVar is None:
 				[I, firDerSrc, firDerGate, firDerDrain, secDerSrc, secDerGate, secDerDrain, secDerSrcGate, secDerSrcDrain, secDerGateDrain] = self.ids(pts[0][0], srcGateDrainHyper[1][0],pts[0][1], pi)
 				secDerIn = secDerSrc
@@ -199,9 +199,9 @@ class TransistorMosfet:
 
 		if (self.channelType == "nFet" and origSrc > origDrain) or (self.channelType == "pFet" and origSrc < origDrain):
 			ILeak = -ILeak
-			firDerLeakSrc, firDerLeakGate, firDerLeakDrain = -firDerLeakSrc, -firDerLeakGate, -firDerLeakDrain
-			secDerLeakSrc, secDerSrcGate, secDerLeakDrain = -secDerLeakSrc, -secDerSrcGate, -secDerLeakDrain
-			secDerLeakSrcGate, secDerLeakSrcDrain, secDerLeakGateDrain = -secDerLeakSrcGate, -secDerLeakSrcDrain, -secDerLeakGateDrain
+			firDerLeakSrc, firDerLeakGate, firDerLeakDrain = -firDerLeakDrain, -firDerLeakGate, -firDerLeakSrc
+			secDerLeakSrc, secDerLeakGate, secDerLeakDrain = -secDerLeakDrain, -secDerLeakGate, -secDerLeakSrc
+			secDerLeakSrcGate, secDerLeakSrcDrain, secDerLeakGateDrain = -secDerLeakGateDrain, -secDerLeakSrcDrain, -secDerLeakSrcGate
 
 		return [ILeak, firDerLeakSrc, firDerLeakGate, firDerLeakDrain, secDerLeakSrc, secDerLeakGate, secDerLeakDrain, secDerLeakSrcGate, secDerLeakSrcDrain, secDerLeakGateDrain]
 
@@ -211,6 +211,7 @@ class TransistorMosfet:
 		return [firDerSrc, firDerGate, firDerDrain]
 
 	def ids(self, src, gate, drain, polygonNumber = None):
+		#print ("src", src, "gate", gate, "drain", drain)
 		I = 0.0
 		firDerSrc, firDerGate, firDerDrain = 0.0, 0.0, 0.0
 		secDerSrc, secDerGate, secDerDrain = 0.0, 0.0, 0.0
@@ -220,7 +221,6 @@ class TransistorMosfet:
 		if self.channelType == "nFet":
 			gs = gate - src
 			ds = drain - src
-
 			firstCutOff = gs <= self.Vt and (polygonNumber is None or polygonNumber == 0)
 			secondCutOff = ds >= gs - self.Vt and (polygonNumber is None or polygonNumber == 1)
 			thirdCutOff = ds <= gs - self.Vt and (polygonNumber is None or polygonNumber == 2)
@@ -237,6 +237,9 @@ class TransistorMosfet:
 		elif self.channelType == "pFet":
 			gs = gate - src
 			ds = drain - src
+
+			#print ("gs", gs, "ds", ds, "self.Vt", self.Vt)
+			#print ("gs - self.Vt", gs-self.Vt)
 
 			firstCutOff = gs >= self.Vt and (polygonNumber is None or polygonNumber == 0)
 			secondCutOff = ds <= gs - self.Vt and (polygonNumber is None or polygonNumber == 1)
@@ -270,6 +273,8 @@ class TransistorMosfet:
 			secDerGateDrain = 0.0
 
 		elif thirdCutOff:
+			#print ("thirdCutoff")
+			#print ("src", src, "drain", drain)
 			I = self.S*(self.K)*(gs - self.Vt - ds/2.0)*ds
 			firDerSrc = self.S*self.K*(src - gate + self.Vt)
 			firDerGate = self.S*self.K*(drain - src)
@@ -280,16 +285,18 @@ class TransistorMosfet:
 			secDerSrcGate = self.S*self.K
 			secDerSrcDrain = 0.0
 			secDerGateDrain = self.S*self.K
+			#print ("firDerSrc here", firDerSrc)
 
 		if (self.channelType == "nFet" and origSrc > origDrain) or (self.channelType == "pFet" and origSrc < origDrain):
 			I = -I
-			firDerSrc, firDerGate, firDerDrain = -firDerSrc, -firDerGate, -firDerDrain
-			secDerSrc, secDerGate, secDerDrain = -secDerSrc, -secDerGate, -secDerDrain
-			secDerSrcGate, secDerSrcDrain, secDerGateDrain = -secDerSrcGate, -secDerSrcDrain, -secDerGateDrain
+			firDerSrc, firDerGate, firDerDrain = -firDerDrain, -firDerGate, -firDerSrc
+			secDerSrc, secDerGate, secDerDrain = -secDerDrain, -secDerGate, -secDerSrc
+			secDerSrcGate, secDerSrcDrain, secDerGateDrain = -secDerGateDrain, -secDerSrcDrain, -secDerSrcGate
 		
 		if self.useLeakage:
 			[ILeak, firDerLeakSrc, firDerLeakGate, firDerLeakDrain, secDerLeakSrc, secDerLeakGate, secDerLeakDrain, secDerLeakSrcGate, secDerLeakSrcDrain, secDerLeakGateDrain] = self.leakCurrent(origSrc, gate, origDrain)
-
+			#print ("before leak")
+			#print ("firDerSrc", firDerSrc, "firDerGate", firDerGate, "firDerDrain", firDerDrain)
 			I += ILeak
 			firDerSrc += firDerLeakSrc
 			firDerGate += firDerLeakGate
@@ -300,6 +307,8 @@ class TransistorMosfet:
 			secDerSrcGate += secDerLeakSrcGate
 			secDerSrcDrain += secDerLeakSrcDrain
 			secDerGateDrain += secDerLeakGateDrain
+			#print ("after leak")
+			#print ("firDerSrc", firDerSrc, "firDerGate", firDerGate, "firDerDrain", firDerDrain)
 
 		return [I, firDerSrc, firDerGate, firDerDrain, secDerSrc, secDerGate, secDerDrain, secDerSrcGate, secDerSrcDrain, secDerGateDrain]
 
@@ -1009,7 +1018,7 @@ class TransistorMosfet:
 		allConstraints = ""
 		numVariableIntervals = len(srcGateDrainHyper[0]) + len(srcGateDrainHyper[1]) + len(srcGateDrainHyper[2])
 		if self.srcVar is not None and self.gateVar is not None and self.drainVar is not None:
-			raise CannotHandleError('Cannot handle 4d case error')
+			raise Exception('Cannot handle 4d case error')
 
 		if numVariableIntervals == 4:
 			if self.srcVar is not None:
@@ -1030,7 +1039,7 @@ class TransistorMosfet:
 			otherVal = None
 
 			if self.srcVar is None:
-				raise CannotHandleError('Cannot handle the case where src is a constant yet')
+				raise Exception('Cannot handle the case where src is a constant yet')
 
 			if self.gateVar is None:
 				inIndex, outIndex = 0, 2

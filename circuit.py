@@ -32,35 +32,61 @@ def my_min(x):
 def my_max(x):
 	return my_reduce_last_dim(lambda x, y: max(x,y), x)
 
+def interval_p(x):
+	return hasattr(x, 'ndim') and (x.ndim == 1) and (len(x) == 2)
+
+def tiny_p(x):
+	if(interval_p(x)):
+	  return(tiny_p(x[0]) and tiny_p(x[1]))
+	else:
+	  return(abs(x) < 1.0e-14)
+
 def interval_fix(x):
-	if(not hasattr(x, 'ndim')):
-		return(np.array([x, x]))
-	else: return(x)
+	return (x if interval_p(x) else np.array([x, x]))
 
 def interval_add(x, y):
-	return(np.array([x[0]+y[0], x[1]+y[1]]))
+	if(interval_p(x) and interval_p(y)):
+		return(np.array([x[0]+y[0], x[1]+y[1]]))
+	elif(interval_p(x)):
+		return(np.array([x[0]+y, x[1]+y]))
+	elif(interval_p(y)):
+		return(np.array([x+y[0], x+y[1]]))
+	else: return(x+y)
 
 def interval_neg(x):
-	return(np.array([-x[1], -x[0]]))
+	if(interval_p(x)):
+		return(np.array([-x[1], -x[0]]))
+	else: return(-x)
 
 def interval_sub(x, y):
 	return(interval_add(x, interval_neg(y)))
 
 def interval_mult(x, y):
-	p = [xx*yy for xx in x for yy in y]
-	return np.array([min(p), max(p)])
+	if(interval_p(x) and interval_p(y)):
+		p = [xx*yy for xx in x for yy in y]
+		return np.array([min(p), max(p)])
+	elif(interval_p(x)):
+		if(y >= 0): return np.array([y*x[0], y*x[1]])
+		else: return(np.array[y*x[1], y*x[0]])
+	elif(interval_p(y)):
+		return interval_mult(y,x)
+	else: return(x*y)
 
 def interval_div(x, y):
-	if(y[0]*y[1] <= 0):
+	if((interval_p(y) and y[0]*y[1] <= 0) or tiny_p(y)):
 		return np.array([float('-inf'), float('+inf')])
-	else:
-		q = [xx/yy for xx in x for yy in y]
+	elif(interval_p(y)):
+		q = [xx/yy for xx in interval_fix(x) for yy in y]
 		return np.array([min(q), max(q)])
+	elif(interval_p(x)):
+		if(y >= 0): return np.array([x[0]/y, x[1]/y])
+		else: return(np.array[x[1]/y, x[0]/y])
+	else: return((x+0.0)/y)
 		
 def interval_union(x, y):
 	if(x is None): return y
-	if(y is None): return x
-	return np.array([min(x[0], y[0]), max(x[1], y[1])])
+	elif(y is None): return x
+	else: return np.array([min(x[0], y[0]), max(x[1], y[1])])
 
 
 class MosfetModel:
@@ -110,7 +136,7 @@ class Mosfet:
 	# grad_ids: compute the partials of ids wrt. Vs, Vg, and Vd
 	#   This function is rather dense.  I would be happier if I could think of
 	#    a way to make it more obvious.
-	def dg_fun(Vs, Vg, Vd, Vt, ks):
+	def dg_fun(self, Vs, Vg, Vd, Vt, ks):
 		if(Vs[0] > Vd[1]): return None
 		Vgse = interval_sub(interval_sub(Vg, np.array([Vs[0], min(Vs[1], Vd[1])])), Vt)
 		Vgse[0] = max(Vgse[0], 0)
@@ -119,7 +145,7 @@ class Mosfet:
 		Vx = np.array([Vgse[0] - Vd[1], Vgse[1]-max(Vs[0], Vd[0])])
 		Vx[0] = max(Vx[0], 0)
 		Vx[1] = max(Vx[1], 0)
-		dg = interval_mult(ks, np.array([min(Vg[0], Vd[0]), Vg[1]]))
+		dg = interval_mult(ks, np.array([min(Vgse[0], Vds[0]), Vgse[1]]))
 		dd = interval_mult(ks, Vx)
 		return np.array([interval_neg(interval_add(dg, dd)), dg, dd])
 
@@ -136,11 +162,13 @@ class Mosfet:
 			Vd = interval_fix(Vd)
 			Vt = interval_fix(Vt)
 			ks = interval_mult(interval_fix(k), interval_fix(s))
-			g0 = dg_fun(Vs, Vg, Vd, Vt, ks)
-			g1x = dg_fun(Vd, Vg, Vs, Vt, ks)
+			g0 = self.dg_fun(Vs, Vg, Vd, Vt, ks)
+			g1x = self.dg_fun(Vd, Vg, Vs, Vt, ks)
 			if(g1x is None): g1 = None
-			else: g1 = -np.array([g1x[2], g1x[1], g1x[0]])
-			return(interval_union(g0, g1))
+			else: g1 = np.array([interval_neg(g1x[2]), interval_neg(g1x[1]), interval_neg(g1x[0])])
+			if g0 is None: return g1
+			elif g1 is None: return g0
+			else: return np.array([interval_union(g0[i], g1[i]) for i in range(len(g0))])
 		elif(Vd < Vs):
 			gx = self.grad_ids_help(Vd, Vg, Vs, channelType, Vt, k, s)
 			return np.array([-gx[2], -gx[1], -gx[0]])

@@ -75,6 +75,7 @@ for VsInt in range(0, 19, 3):
 			ds = (m1.ids(dvs2) - m1.ids(dvs1))/delta
 			if(abs(ds-g[0]) > 1e-2*abs(g[0])):
 				print 'oops: v = ' + str(v) + ', g[0] = ' + str(g[0]) + ', ds = ' + str(ds)
+
 #   derivates wrt Vg
 delta = 0.01
 for VsInt in range(0, 19, 3):
@@ -91,6 +92,7 @@ for VsInt in range(0, 19, 3):
 			dg = (m1.ids(dvg2) - m1.ids(dvg1))/delta
 			if(abs(dg-g[1]) > 1e-2*abs(g[1])):
 				print 'oops: v = ' + str(v) + ', g[1] = ' + str(g[1]) + ', dg = ' + str(dg)
+
 #   derivates wrt Vd
 delta = 0.01
 for VsInt in range(0, 19, 3):
@@ -107,7 +109,6 @@ for VsInt in range(0, 19, 3):
 			dd= (m1.ids(dvd2) - m1.ids(dvd1))/delta
 			if(abs(dd-g[2]) > 1e-2*abs(g[2])):
 				print 'oops: v = ' + str(v) + ', g[2] = ' + str(g[2]) + ', dd = ' + str(dd)
-
 
 #######   gradients for the pfet
 #    derivatives wrt Vs
@@ -127,6 +128,7 @@ for VsInt in range(0, 19, 3):
 			ds = (m2.ids(dvs2) - m2.ids(dvs1))/delta
 			if(abs(ds-g[0]) > 1e-2*abs(g[0])):
 				print 'oops: v = ' + str(v) + ', g[0] = ' + str(g[0]) + ', ds = ' + str(ds)
+
 #   derivates wrt Vg
 delta = 0.01
 for VsInt in range(0, 19, 3):
@@ -144,6 +146,7 @@ for VsInt in range(0, 19, 3):
 			dg = (m2.ids(dvg2) - m2.ids(dvg1))/delta
 			if(abs(dg-g[1]) > 1e-2*abs(g[1])):
 				print 'oops: v = ' + str(v) + ', g[1] = ' + str(g[1]) + ', dg = ' + str(dg)
+
 #   derivates wrt Vd
 delta = 0.01
 for VsInt in range(0, 19, 3):
@@ -189,5 +192,7 @@ for VsInt in range(0, 16, 3):
 						dvs2 = np.array([vs+(delta/2.0), vg, vd, 1.8])
 						ds = (m1.ids(dvs2) - m1.ids(dvs1))/delta
 						#if(abs(ds-g[0]) > 1e-2*abs(g[0])):
-						if ds < g[0][0] or ds > g[0][1]:
+						if(((ds < g[0][0]) or (ds > g[0][1])) and not (tiny_p(ds - g[0][0]) or tiny_p(ds - g[0][1]))):
 							print 'oops gradient interval for v = ' + str(v) +', with sample v ' + str([vs, vg, vd]) + ', g[0] = ' + str(g[0]) + ', ds = ' + str(ds)
+							print 'ds - g[0][0] = ' + str(ds - g[0][0]) + ', tiny_p(ds - g[0][0]) = ' + str(tiny_p(ds - g[0][0]))
+							print 'ds - g[0][1] = ' + str(ds - g[0][1]) + ', tiny_p(ds - g[0][1]) = ' + str(tiny_p(ds - g[0][1]))

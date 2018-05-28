@@ -181,9 +181,9 @@ for VsInt in range(0, 16, 3):
 			#print "g", g
 
 			sampleDelta = 0.0001
-			vsSamples = np.linspace(Vs[0]+sampleDelta, Vs[1]-sampleDelta, 1)
-			vgSamples = np.linspace(Vg[0]+sampleDelta, Vg[1]-sampleDelta, 1)
-			vdSamples = np.linspace(Vd[0]+sampleDelta, Vd[1]-sampleDelta, 1)
+			vsSamples = np.linspace(Vs[0]+sampleDelta, Vs[1]-sampleDelta, 10)
+			vgSamples = np.linspace(Vg[0]+sampleDelta, Vg[1]-sampleDelta, 10)
+			vdSamples = np.linspace(Vd[0]+sampleDelta, Vd[1]-sampleDelta, 10)
 
 			for vs in vsSamples:
 				for vg in vgSamples:

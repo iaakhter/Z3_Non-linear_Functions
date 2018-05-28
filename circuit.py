@@ -142,7 +142,7 @@ class Mosfet:
 		Vgse[0] = max(Vgse[0], 0)
 		Vds = interval_sub(Vd, Vs)
 		Vds[0] = max(Vds[0], 0)
-		Vx = np.array([Vgse[0] - Vd[1], Vgse[1]-max(Vs[0], Vd[0])])
+		Vx = np.array([Vg[0] - Vt[1] - Vd[1], Vg[1] - Vt[0] - max(Vs[0], Vd[0])])
 		Vx[0] = max(Vx[0], 0)
 		Vx[1] = max(Vx[1], 0)
 		dg = interval_mult(ks, np.array([min(Vgse[0], Vds[0]), Vgse[1]]))
@@ -155,7 +155,7 @@ class Mosfet:
 			# returns the partials of -Ids wrt. -Vs, -Vg, and -Vd,
 			# e.g. (d -Ids)/(d -Vs).  The negations cancel out; so
 			# we can just return that gradient.
-			return self.grad_ids_help(-Vs, -Vg, -Vd, 'nfet', -Vt, -k, s)
+			return self.grad_ids_help(interval_neg(Vs), interval_neg(Vg), interval_neg(Vd), 'nfet', interval_neg(Vt), interval_neg(k), s)
 		elif((Vs.ndim > 0) or (Vg.ndim > 0) or (Vd.ndim > 0)):
 			Vs = interval_fix(Vs)
 			Vg = interval_fix(Vg)
@@ -188,6 +188,9 @@ class Mosfet:
 		return(self.grad_ids_help(V[self.s], V[self.g], V[self.d], model.channelType, model.Vt, model.k, model.s))
 			
 
+	def lp_ids(self, V):
+		model = self.model
+		return(self.lp_ids_help(V[self.s], V[self.g], V[self.d], model.channelType, model.Vt, model.k, model.s))
 
 class Circuit:
 	def __init__(self, tr):
@@ -198,12 +201,23 @@ class Circuit:
 		for i in range(len(self.tr)):
 			tr = self.tr[i]
 			Ids = tr.ids(V)
-			I_node[tr.s] += Ids
-			I_node[tr.d] -= Ids
+			I_node[tr.s] = interval_add(I_node[tr.s], Ids)
+			I_node[tr.d] = interval_sub(I_node[tr.d], Ids)
 		return I_node
 
 	# Because the Rambus oscillator was our first example, other parts of
 	# other parts of the code expect an 'oscNum' function.  I think this
 	# if what I'm supposed to provide.
 	def oscNum(self, V):
-	  return [None, None, self.f(V)]
+		return [None, None, self.f(V)]
+
+	def jacobian(self, V):
+		J = np.zeros([len(V), len(V)])
+		for i in range(len(self.tr)):
+			tr = self.tr[i]
+			g = tr.grad_ids(V)
+			sgd = [tr.s, tr.g, tr.d]
+			for i in range(len(sgd)):
+				J[tr.s, sgd[i]] = interval_add(J[tr.s, sgd[i]], g[i])
+				J[tr.d, sgd[i]] = interval_sub(J[tr.s, sgd[i]], g[i])
+		return J

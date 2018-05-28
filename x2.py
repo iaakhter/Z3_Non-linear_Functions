@@ -196,3 +196,160 @@ for VsInt in range(0, 16, 3):
 							print 'oops gradient interval for v = ' + str(v) +', with sample v ' + str([vs, vg, vd]) + ', g[0] = ' + str(g[0]) + ', ds = ' + str(ds)
 							print 'ds - g[0][0] = ' + str(ds - g[0][0]) + ', tiny_p(ds - g[0][0]) = ' + str(tiny_p(ds - g[0][0]))
 							print 'ds - g[0][1] = ' + str(ds - g[0][1]) + ', tiny_p(ds - g[0][1]) = ' + str(tiny_p(ds - g[0][1]))
+
+#	derivatives wrt Vg
+delta = 0.01
+for VsInt in range(0, 16, 3):
+	Vs = np.array([VsInt/10.0, (VsInt + 3)/10.0])
+	for VgInt in range(0, 16, 3):
+		Vg = np.array([VgInt/10.0, (VgInt + 3)/10.0])
+		for VdInt in range(0, 16, 3):
+			Vd = np.array([VdInt/10.0, (VdInt + 3)/10.0])
+			v = np.array([Vs, Vg, Vd, 1.8])
+			Ids = m1.ids(v)
+			g = m1.grad_ids(v)
+			#print "g", g
+
+			sampleDelta = 0.0001
+			vsSamples = np.linspace(Vs[0]+sampleDelta, Vs[1]-sampleDelta, 10)
+			vgSamples = np.linspace(Vg[0]+sampleDelta, Vg[1]-sampleDelta, 10)
+			vdSamples = np.linspace(Vd[0]+sampleDelta, Vd[1]-sampleDelta, 10)
+
+			for vs in vsSamples:
+				for vg in vgSamples:
+					for vd in vdSamples:
+						dvs1 = np.array([vs, vg-(delta/2.0), vd, 1.8])
+						dvs2 = np.array([vs, vg+(delta/2.0), vd, 1.8])
+						dg = (m1.ids(dvs2) - m1.ids(dvs1))/delta
+						#if(abs(ds-g[0]) > 1e-2*abs(g[0])):
+						if(((dg < g[1][0]) or (dg > g[1][1])) and not (tiny_p(dg - g[1][0]) or tiny_p(dg - g[1][1]))):
+							print 'oops gradient interval for v = ' + str(v) +', with sample v ' + str([vs, vg, vd]) + ', g[1] = ' + str(g[1]) + ', dg = ' + str(dg)
+							print 'dg - g[1][0] = ' + str(dg - g[1][0]) + ', tiny_p(dg - g[1][0]) = ' + str(tiny_p(dg - g[1][0]))
+							print 'dg - g[1][1] = ' + str(dg - g[1][1]) + ', tiny_p(dg - g[1][1]) = ' + str(tiny_p(dg - g[1][1]))
+
+#	derivatives wrt Vd
+delta = 0.01
+for VsInt in range(0, 16, 3):
+	Vs = np.array([VsInt/10.0, (VsInt + 3)/10.0])
+	for VgInt in range(0, 16, 3):
+		Vg = np.array([VgInt/10.0, (VgInt + 3)/10.0])
+		for VdInt in range(0, 16, 3):
+			Vd = np.array([VdInt/10.0, (VdInt + 3)/10.0])
+			v = np.array([Vs, Vg, Vd, 1.8])
+			Ids = m1.ids(v)
+			g = m1.grad_ids(v)
+			#print "g", g
+
+			sampleDelta = 0.0001
+			vsSamples = np.linspace(Vs[0]+sampleDelta, Vs[1]-sampleDelta, 10)
+			vgSamples = np.linspace(Vg[0]+sampleDelta, Vg[1]-sampleDelta, 10)
+			vdSamples = np.linspace(Vd[0]+sampleDelta, Vd[1]-sampleDelta, 10)
+
+			for vs in vsSamples:
+				for vg in vgSamples:
+					for vd in vdSamples:
+						dvs1 = np.array([vs, vg, vd-(delta/2.0), 1.8])
+						dvs2 = np.array([vs, vg, vd+(delta/2.0), 1.8])
+						dd = (m1.ids(dvs2) - m1.ids(dvs1))/delta
+						#if(abs(ds-g[0]) > 1e-2*abs(g[0])):
+						if(((dd < g[2][0]) or (dd > g[2][1])) and not (tiny_p(dd - g[2][0]) or tiny_p(dd - g[2][1]))):
+							print 'oops gradient interval for v = ' + str(v) +', with sample v ' + str([vs, vg, vd]) + ', g[2] = ' + str(g[2]) + ', dd = ' + str(dd)
+							print 'dd - g[2][0] = ' + str(dd - g[2][0]) + ', tiny_p(dd - g[2][0]) = ' + str(tiny_p(dd - g[2][0]))
+							print 'dd - g[2][1] = ' + str(dd - g[2][1]) + ', tiny_p(dd - g[2][1]) = ' + str(tiny_p(dd - g[2][1]))
+
+#######   gradients for the pfet
+#	derivatives wrt Vs
+delta = 0.01
+for VsInt in range(0, 16, 3):
+	Vs = np.array([VsInt/10.0, (VsInt + 3)/10.0])
+	for VgInt in range(0, 16, 3):
+		Vg = np.array([VgInt/10.0, (VgInt + 3)/10.0])
+		for VdInt in range(0, 16, 3):
+			Vd = np.array([VdInt/10.0, (VdInt + 3)/10.0])
+			v = np.array([np.array([0.0, 0.0]), Vg, Vd, Vs])
+			Ids = m2.ids(v)
+			#print ("v", v)
+			g = m2.grad_ids(v)
+			#print "g", g
+
+			sampleDelta = 0.0001
+			vsSamples = np.linspace(Vs[0]+sampleDelta, Vs[1]-sampleDelta, 10)
+			vgSamples = np.linspace(Vg[0]+sampleDelta, Vg[1]-sampleDelta, 10)
+			vdSamples = np.linspace(Vd[0]+sampleDelta, Vd[1]-sampleDelta, 10)
+
+			for vs in vsSamples:
+				for vg in vgSamples:
+					for vd in vdSamples:
+						dvs1 = np.array([0.0, vg, vd, vs-(delta/2.0)])
+						dvs2 = np.array([0.0, vg, vd, vs+(delta/2.0)])
+						ds = (m2.ids(dvs2) - m2.ids(dvs1))/delta
+						#if(abs(ds-g[0]) > 1e-2*abs(g[0])):
+						if(((ds < g[0][0]) or (ds > g[0][1])) and not (tiny_p(ds - g[0][0]) or tiny_p(ds - g[0][1]))):
+							print 'oops pfet: gradient interval for v = ' + str(v) +', with sample v ' + str([vs, vg, vd]) + ', g[0] = ' + str(g[0]) + ', ds = ' + str(ds)
+							print 'ds - g[0][0] = ' + str(ds - g[0][0]) + ', tiny_p(ds - g[0][0]) = ' + str(tiny_p(ds - g[0][0]))
+							print 'ds - g[0][1] = ' + str(ds - g[0][1]) + ', tiny_p(ds - g[0][1]) = ' + str(tiny_p(ds - g[0][1]))
+
+
+#	derivatives wrt Vg
+delta = 0.01
+for VsInt in range(0, 16, 3):
+	Vs = np.array([VsInt/10.0, (VsInt + 3)/10.0])
+	for VgInt in range(0, 16, 3):
+		Vg = np.array([VgInt/10.0, (VgInt + 3)/10.0])
+		for VdInt in range(0, 16, 3):
+			Vd = np.array([VdInt/10.0, (VdInt + 3)/10.0])
+			v = np.array([np.array([0.0, 0.0]), Vg, Vd, Vs])
+			Ids = m2.ids(v)
+			#print ("v", v)
+			g = m2.grad_ids(v)
+			#print "g", g
+
+			sampleDelta = 0.0001
+			vsSamples = np.linspace(Vs[0]+sampleDelta, Vs[1]-sampleDelta, 10)
+			vgSamples = np.linspace(Vg[0]+sampleDelta, Vg[1]-sampleDelta, 10)
+			vdSamples = np.linspace(Vd[0]+sampleDelta, Vd[1]-sampleDelta, 10)
+
+			for vs in vsSamples:
+				for vg in vgSamples:
+					for vd in vdSamples:
+						dvs1 = np.array([0.0, vg-(delta/2.0), vd, vs])
+						dvs2 = np.array([0.0, vg+(delta/2.0), vd, vs])
+						dg = (m2.ids(dvs2) - m2.ids(dvs1))/delta
+						#if(abs(ds-g[0]) > 1e-2*abs(g[0])):
+						if(((dg < g[1][0]) or (dg > g[1][1])) and not (tiny_p(dg - g[1][0]) or tiny_p(dg - g[1][1]))):
+							print 'oops pfet: gradient interval for v = ' + str(v) +', with sample v ' + str([vs, vg, vd]) + ', g[1] = ' + str(g[1]) + ', dg = ' + str(dg)
+							print 'dg - g[1][0] = ' + str(dg - g[1][0]) + ', tiny_p(dg - g[1][0]) = ' + str(tiny_p(dg - g[1][0]))
+							print 'dg - g[1][1] = ' + str(dg - g[1][1]) + ', tiny_p(dg - g[1][1]) = ' + str(tiny_p(dg - g[1][1]))
+
+
+#	derivatives wrt Vd
+delta = 0.01
+for VsInt in range(0, 16, 3):
+	Vs = np.array([VsInt/10.0, (VsInt + 3)/10.0])
+	for VgInt in range(0, 16, 3):
+		Vg = np.array([VgInt/10.0, (VgInt + 3)/10.0])
+		for VdInt in range(0, 16, 3):
+			Vd = np.array([VdInt/10.0, (VdInt + 3)/10.0])
+			v = np.array([np.array([0.0, 0.0]), Vg, Vd, Vs])
+			Ids = m2.ids(v)
+			#print ("v", v)
+			g = m2.grad_ids(v)
+			#print "g", g
+
+			sampleDelta = 0.0001
+			vsSamples = np.linspace(Vs[0]+sampleDelta, Vs[1]-sampleDelta, 10)
+			vgSamples = np.linspace(Vg[0]+sampleDelta, Vg[1]-sampleDelta, 10)
+			vdSamples = np.linspace(Vd[0]+sampleDelta, Vd[1]-sampleDelta, 10)
+
+			for vs in vsSamples:
+				for vg in vgSamples:
+					for vd in vdSamples:
+						dvs1 = np.array([0.0, vg, vd-(delta/2.0), vs])
+						dvs2 = np.array([0.0, vg, vd+(delta/2.0), vs])
+						dd = (m2.ids(dvs2) - m2.ids(dvs1))/delta
+						#if(abs(ds-g[0]) > 1e-2*abs(g[0])):
+						if(((dd < g[2][0]) or (dd > g[2][1])) and not (tiny_p(dd - g[2][0]) or tiny_p(dd - g[2][1]))):
+							print 'oops pfet: gradient interval for v = ' + str(v) +', with sample v ' + str([vs, vg, vd]) + ', g[2] = ' + str(g[2]) + ', dd = ' + str(dd)
+							print 'dd - g[2][0] = ' + str(dd - g[2][0]) + ', tiny_p(dd - g[2][0]) = ' + str(tiny_p(dd - g[2][0]))
+							print 'dd - g[2][1] = ' + str(dd - g[2][1]) + ', tiny_p(dd - g[2][1]) = ' + str(tiny_p(dd - g[2][1]))
+

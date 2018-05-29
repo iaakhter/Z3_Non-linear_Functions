@@ -20,10 +20,10 @@ model = mosfetModel.RambusMosfetMark(modelParam = modelParam, g_cc = 0.5, g_fwd 
 
 # stuff from intervalUtils.checkExistenceOfSolutions
 
-startBounds = np.array([[ 1.4030,  1.4032],
-       [ 0.2507 ,  0.2508 ],
-       [ 1.4030,  1.4032],
-       [ 0.2507 ,  0.2508 ]])
+startBounds = np.array([[ 1.4031211 ,  1.4031212],
+       [ 0.2507801,  0.2507804],
+       [ 1.4031211 ,  1.4031212],
+       [ 0.2507801,  0.2507804]])
 numVolts = len(startBounds)
 
 if hasattr(model, 'f'):

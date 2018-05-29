@@ -197,7 +197,14 @@ class Circuit:
 		self.tr = tr
 
 	def f(self, V):
-		I_node = np.zeros(len(V))
+		intervalVal = False
+		for i in range(V.shape[0]):
+			if interval_p(V[i]):
+				intervalVal = True
+				break
+		I_node = np.zeros(V.shape[0])
+		if intervalVal:
+			I_node = np.zeros((V.shape[0],2))
 		for i in range(len(self.tr)):
 			tr = self.tr[i]
 			Ids = tr.ids(V)
@@ -212,12 +219,19 @@ class Circuit:
 		return [None, None, self.f(V)]
 
 	def jacobian(self, V):
-		J = np.zeros([len(V), len(V)])
+		intervalVal = False
+		for i in range(V.shape[0]):
+			if interval_p(V[i]):
+				intervalVal = True
+				break
+		J = np.zeros([V.shape[0], V.shape[0]])
+		if intervalVal:
+			J = np.zeros([V.shape[0], V.shape[0], 2])
 		for i in range(len(self.tr)):
 			tr = self.tr[i]
 			g = tr.grad_ids(V)
 			sgd = [tr.s, tr.g, tr.d]
 			for i in range(len(sgd)):
 				J[tr.s, sgd[i]] = interval_add(J[tr.s, sgd[i]], g[i])
-				J[tr.d, sgd[i]] = interval_sub(J[tr.s, sgd[i]], g[i])
+				J[tr.d, sgd[i]] = interval_sub(J[tr.d, sgd[i]], g[i])
 		return J

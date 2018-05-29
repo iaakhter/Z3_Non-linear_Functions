@@ -3,6 +3,98 @@ import lpUtils
 from cvxopt import matrix,solvers
 from scipy.spatial import ConvexHull
 import transistorMosfet as tMosfet
+import circuit
+
+class SchmittMosfetMark:
+	def __init__(self, modelParam, inputVoltage):
+		self.Vtp = modelParam[0]
+		self.Vtn = modelParam[1]
+		self.Vdd = modelParam[2]
+		self.Kn = modelParam[3]
+		self.Kp = modelParam[4]
+		self.Sn = modelParam[5]
+		self.Sp = self.Sn*2.0
+		self.inputVoltage = inputVoltage
+
+		nfet = circuit.MosfetModel('nfet', self.Vtn, self.Kn, self.Sn)
+		pfet = circuit.MosfetModel('pfet', self.Vtp, self.Kp, self.Sp)
+
+		# with the voltage array containing [grnd, Vdd, input, X[0], X[1], X[2]]
+		# where X[0] is the output voltage and X[1] is the voltage at node with 
+		# nfets and X[2] is the voltage at node with pfets
+
+		# src, gate, drain = grnd, input, X[1]
+		m0 = circuit.Mosfet(0, 2, 4, nfet)
+
+		# src, gate, drain = X[1], input, X[0]
+		m1 = circuit.Mosfet(4, 2, 3, nfet)
+
+		# src, gate, drain = X[1], X[0], Vdd
+		m2 = circuit.Mosfet(4, 3, 1, nfet)
+
+		# src, gate, drain = Vdd, input, X[2]
+		m3 = circuit.Mosfet(1, 2, 5, pfet)
+
+		# src, gate, drain = X[2], in, X[0]
+		m4 = circuit.Mosfet(5, 2, 3, pfet)
+
+		# src, gate, drain = X[2], X[0], grnd
+		m5 = circuit.Mosfet(5, 3, 0, pfet)
+
+		self.c = circuit.Circuit([m0, m1, m2, m3, m4, m5])
+
+		self.boundMap = []
+		for i in range(3):
+			self.boundMap.append({0:[0.0,self.Vdd/2.0],1:[self.Vdd/2.0,self.Vdd]})
+
+		self.solver = None
+
+	def f(self,V):
+		intervalVal = False
+		for i in range(V.shape[0]):
+			if circuit.interval_p(V[i]):
+				intervalVal = True
+				break
+		VForSchmitt = None
+		if intervalVal:
+			VForSchmitt = np.array([[0.0, 0.0], 
+									[self.Vdd, self.Vdd], 
+									[self.inputVoltage, self.inputVoltage], 
+									V[0,:], 
+									V[1,:], 
+									V[2,:]])
+		else:
+			VForSchmitt = np.array([0.0, self.Vdd, self.inputVoltage, V[0], V[1], V[2]])
+		funcVal = self.c.f(VForSchmitt)
+		return funcVal[3:]
+
+	def oscNum(self,V):
+		VForSchmitt = np.array([0.0, self.Vdd, self.inputVoltage, V[0], V[1], V[2]])
+		funcVal = self.c.f(VForSchmitt)
+		return [None, None, funcVal[3:]]
+
+	def jacobian(self,V):
+		#print ("calculating jacobian")
+		VForSchmitt = np.array([0.0, self.Vdd, self.inputVoltage, V[0], V[1], V[2]])
+		#print ("V", V)
+		jac = self.c.jacobian(VForSchmitt)
+		#print ("jac before")
+		#print (jac)
+		return jac[3:,3:]
+
+
+	def jacobianInterval(self,bounds):
+		#print ("calculating jacobian interval")
+		lowerBound = bounds[:,0]
+		upperBound = bounds[:,1]
+		VForSchmitt = np.array([[0.0, 0.0],
+								[self.Vdd, self.Vdd], 
+								[self.inputVoltage, self.inputVoltage], 
+								[lowerBound[0], upperBound[0]], 
+								[lowerBound[1], upperBound[1]],
+								[lowerBound[2], upperBound[2]]])
+		jac = self.c.jacobian(VForSchmitt)
+		return jac[3:,3:]
 
 class SchmittMosfet:
 	def __init__(self, modelParam, inputVoltage):

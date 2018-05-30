@@ -95,7 +95,7 @@ def checkExistenceOfSolutionGS(model,hyperRectangle):
 	#print "startBounds = " + str(startBounds)
 	if hasattr(model, 'f'):
 		funVal = model.f(startBounds)
-		if(not all([funVal[i,0]*funVal[i,1] <= 0 for i in range(numVolts)])):
+		if(not all([funVal[i,0]*funVal[i,1] <= 1e-12 for i in range(numVolts)])):
 			return (False, None)
 
 	midPoint = (startBounds[:,0] + startBounds[:,1])/2.0
@@ -345,7 +345,7 @@ def checkExistenceOfSolution(model,hyperRectangle):
 
 	if hasattr(model, 'f'):
 		funVal = model.f(startBounds)
-		if(not all([funVal[i,0]*funVal[i,1] <= 0 for i in range(numVolts)])):
+		if(not all([funVal[i,0]*funVal[i,1] <= 1e-12 for i in range(numVolts)])):
 			return (False, None)
 	#print "startBounds ", startBounds
 	constructBiggerHyper = False

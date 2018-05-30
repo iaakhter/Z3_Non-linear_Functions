@@ -20,8 +20,8 @@ class RambusMosfetMark:
 		self.numStages = numStages
 		lenV = numStages*2
 
-		nfet = circuit.MosfetModel('nfet', self.Vtn, self.Kn, 1.0e-8)
-		pfet = circuit.MosfetModel('pfet', self.Vtp, self.Kp, 1.0e-8)
+		nfet = circuit.MosfetModel('nfet', self.Vtn, self.Kn)
+		pfet = circuit.MosfetModel('pfet', self.Vtp, self.Kp)
 
 		# for 4 stage oscillator for example
 		# V is like this for Mark's model V = [V0, V1, V2, V3, V4, V5, V6, V7, src, Vdd]

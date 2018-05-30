@@ -22,12 +22,13 @@ class Example1:
 
 
 	def f(self, bounds):
-		return interval_add(interval_sub(
+		bounds = bounds[0]
+		return np.array([interval_add(interval_sub(
 				interval_sub( 
 							interval_mult(interval_mult(2.0, bounds),
 											fcUtils.arcsinFunInterval(interval_mult(math.cos(0.797), 
 																		fcUtils.sinFunInterval(fcUtils.invFunInterval(bounds,1.0), math.pi)), 1.0)),
-							interval_mult(0.0331,bounds)), 2*math.pi), 2.097)
+							interval_mult(0.0331,bounds)), 2*math.pi), 2.097)])
 
 	def oscNum(self,xVal):
 		val = 2*xVal*math.asin(math.cos(0.797)*math.sin(math.pi/xVal)) - 0.0331*xVal + self.constant

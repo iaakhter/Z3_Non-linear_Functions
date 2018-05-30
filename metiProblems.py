@@ -21,9 +21,10 @@ class Meti25:
 
 
 	def f(self, bounds):
-		return interval_add(
+		bounds = bounds[0]
+		return np.array([interval_add(
 			fcUtils.sinFunInterval(bounds, 1.0/3.0),
-			interval_div(fcUtils.sinFunInterval(bounds, 3.0),6.0))
+			interval_div(fcUtils.sinFunInterval(bounds, 3.0),6.0))])
 
 	def oscNum(self,xVal):
 		val = math.sin(xVal/3.0) + math.sin(3*xVal)/6.0
@@ -125,9 +126,10 @@ class Meti18:
 		self.boundMap.append({0:[lowBound,midVal],1:[midVal,upperBound]})
 
 	def f(self, bounds):
-		return interval_add(
+		bounds = bounds[0]
+		return np.array([interval_add(
 						interval_sub(fcUtils.cosFunInterval(bounds, math.pi), 1),
-						interval_mult(2,bounds))
+						interval_mult(2,bounds))])
 	
 	def oscNum(self,xVal):
 		val = math.cos(math.pi*xVal) - 1.0 + 2*xVal

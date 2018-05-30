@@ -4,6 +4,7 @@ from cvxopt import matrix,solvers
 from scipy.spatial import ConvexHull
 import math
 import funCompUtils as fcUtils
+from intervalBasics import *
 
 class Example1:
 	def __init__(self, lowBound, upperBound, sign):
@@ -19,6 +20,14 @@ class Example1:
 		midVal = (lowBound + upperBound)/2.0
 		self.boundMap.append({0:[lowBound,midVal],1:[midVal,upperBound]})
 
+
+	def f(self, bounds):
+		return interval_add(interval_sub(
+				interval_sub( 
+							interval_mult(interval_mult(2.0, bounds),
+											fcUtils.arcsinFunInterval(interval_mult(math.cos(0.797), 
+																		fcUtils.sinFunInterval(fcUtils.invFunInterval(bounds,1.0), math.pi)), 1.0)),
+							interval_mult(0.0331,bounds)), 2*math.pi), 2.097)
 
 	def oscNum(self,xVal):
 		val = 2*xVal*math.asin(math.cos(0.797)*math.sin(math.pi/xVal)) - 0.0331*xVal + self.constant
@@ -295,7 +304,19 @@ class Example1:
 
 
 if __name__ == "__main__":
-	example1 = Example1()
-	print (example1.oscNum(20))
-	print (example1.jacobian(20))
+	example1 = Example1(3, 64, ">")
+	#print (example1.oscNum(20))
+	#print (example1.jacobian(20))
+	x = np.linspace(1.0, 80, 1000)
+	for i in range(len(x)-1):
+		xBound = np.array([x[i], x[i+1]])
+		fVal = example1.f(xBound)
+
+		sampleDelta = 0.0001
+		xSamples = np.linspace(xBound[0] + sampleDelta, xBound[1] - sampleDelta, 100)
+		for xs in xSamples:
+			f = example1.oscNum(xs)[2]
+			if f < fVal[0] or f > fVal[1]:
+				print "oops x ", xs, "for interval", xBound
+				print "actual f", f, "should be in", fVal
 

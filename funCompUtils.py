@@ -1,6 +1,9 @@
 import math
 import numpy as np
 from scipy.spatial import ConvexHull
+from intervalBasics import *
+
+# assume that const > 0 in all cases
 
 
 #sin(const*x)
@@ -9,11 +12,36 @@ def sinFun(x,const):
 	der = const*math.cos(const*x)
 	return [Ifun, der]
 
+def sinFunInterval(x, const):
+	#print ("x", x)
+	lowVal = math.floor(x[0]/(const*math.pi))
+	highVal = math.floor(x[1]/(const*math.pi))
+	if highVal - lowVal > 2.0:
+		return np.array([-1.0, 1.0])
+
+	if int(lowVal) %2 == 0:
+		return np.array([min(sinFun(x[0], const)[0], sinFun(x[1], const)[0]), 1.0])
+	else:
+		return np.array([-1.0, max(sinFun(x[0], const)[0], sinFun(x[1], const)[0])])
+
 #cos(const*x)
 def cosFun(x,const):
 	Ifun = math.cos(const*x)
 	der = -const*math.sin(const*x)
-	return [Ifun, der]	
+	return [Ifun, der]
+
+def cosFunInterval(x, const):
+	shiftedToSin = interval_sub(x,math.pi/2.0)
+	lowVal = math.floor(shiftedToSin[0]/(const*math.pi))
+	highVal = math.floor(shiftedToSin[1]/(const*math.pi))
+	if highVal - lowVal > 2.0:
+		return np.array([-1.0, 1.0])
+
+	if int(lowVal) %2 == 0:
+		return np.array([min(cosFun(x[0], const)[0], cosFun(x[1], const)[0]), 1.0])
+	else:
+		return np.array([-1.0, max(cosFun(x[0], const)[0], cosFun(x[1], const)[0])])
+	return sinInterval
 
 #tanhFun(const*x)
 def tanhFun(x, const):
@@ -27,6 +55,14 @@ def invFun(x, const):
 	Ifun = 1/(const*x)
 	der = -const/(const*const*x*x)
 	return [Ifun, der]
+
+def invFunInterval(x,const):
+	#print ("x in invFunInterval", x)
+	if x[0]*x[1] > 0.0:
+		return np.array([min(invFun(x[0], const)[0], invFun(x[1], const)[0]), max(invFun(x[0], const)[0], invFun(x[1], const)[0])])
+	else:
+		return np.array([-float("inf"), float("inf")])
+
 
 #(const*x)/(2 + const*x)
 def invFun1(x,const):
@@ -45,6 +81,11 @@ def arcsinFun(x, const):
 	Ifun = math.asin(const*x)
 	der = const/(math.sqrt(1 - const*x*const*x))
 	return [Ifun, der]
+
+def arcsinFunInterval(x, const):
+	arcsin1 = arcsinFun(x[0], const)
+	arcsin2 = arcsinFun(x[1], const)
+	return np.array([min(arcsin1, arcsin2)[0], max(arcsin1, arcsin2)[0]])
 
 #arctan(const*x)
 def arctanFun(x, const):

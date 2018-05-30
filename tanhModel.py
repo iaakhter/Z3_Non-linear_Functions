@@ -3,6 +3,7 @@ import lpUtils
 from cvxopt import matrix,solvers
 import funCompUtils as fcUtils
 #from z3 import *
+from intervalBasics import *
 
 class TanhModel:
 	def __init__(self, modelParam, g_cc, g_fwd, numStages, solver = None):
@@ -34,8 +35,12 @@ class TanhModel:
 	calculates the tanhFun of val
 	'''
 	def tanhFun(self,val):
-		return np.tanh(self.modelParam*val)
+		tanhVal = np.tanh(self.modelParam*val)
+		if interval_p(val):
+			return np.array([min(tanhVal[0], tanhVal[1]), max(tanhVal[0], tanhVal[1])])
+		return tanhVal
 		#return -(exp(a*val) - exp(-a*val))/(exp(a*val) + exp(-a*val))
+
 
 	'''
 	takes in non-symbolic python values
@@ -54,6 +59,24 @@ class TanhModel:
 		VoutCc = [self.tanhFun(Vcc[i]) for i in range(lenV)]
 		return (VoutFwd, VoutCc, [((self.tanhFun(Vin[i])-V[i])*self.g_fwd
 				+(self.tanhFun(Vcc[i])-V[i])*self.g_cc) for i in range(lenV)])
+
+	def f(self, bounds):
+		lenV = bounds.shape[0]
+		IBounds = np.zeros((lenV,2))
+		for i in range(lenV):
+			fwdInd = (i-1)%lenV
+			ccInd = (i + lenV//2) % lenV
+			tanhFwd = self.tanhFun(bounds[fwdInd,:])
+			tanhCc = self.tanhFun(bounds[ccInd,:])
+			#print ("bounds[fwdInd]", bounds[fwdInd], "tanhFwd", tanhFwd)
+			#print ("bounds[ccInd]", bounds[ccInd], "tanhCc", tanhCc)
+			fwdTerm = interval_sub(tanhFwd, bounds[i,:])
+			ccTerm = interval_sub(tanhCc, bounds[i,:])
+			#print ("bounds[i,:]", bounds[i,:])
+			#print ("fwdTerm", fwdTerm, "ccTerm", ccTerm)
+			IBounds[i,:] = interval_add(interval_mult(self.g_fwd, fwdTerm),interval_mult(self.g_cc, ccTerm))
+
+		return IBounds
 
 
 	'''Get jacobian of rambus oscillator at V
@@ -209,6 +232,42 @@ class TanhModel:
 						newHyperRectangle[i,1] = maxSol['x'][variableDict[self.xs[i]]] + 1e-6
 
 			return [feasible, newHyperRectangle]
+
+
+if __name__ == "__main__":
+	# do some testing to check if the interval function makes sense
+	model = TanhModel(modelParam = -5, g_cc = 0.5, g_fwd = 1.0, numStages = 2)
+	V0 = np.linspace(-1.0, 1.0, 10)
+	V1 = np.linspace(-1.0, 1.0, 10)
+	V2 = np.linspace(-1.0, 1.0, 10)
+	V3 = np.linspace(-1.0, 1.0, 10)
+	for i in range(len(V0)-1):
+		for j in range(len(V1)-1):
+			for k in range(len(V2)-1):
+				for l in range(len(V3)-1):
+					vInterval = np.array([[V0[i], V0[i+1]],
+											[V1[j], V1[j+1]],
+											[V2[k], V2[k+1]],
+											[V3[l], V3[l+1]]])
+					INum = model.f(vInterval)
+				
+					sampleDelta = 0.0001
+					v0Samples = np.linspace(V0[i]+ sampleDelta, V0[i+1]- sampleDelta,4)
+					v1Samples = np.linspace(V1[j]+ sampleDelta, V1[j+1]- sampleDelta,4)
+					v2Samples = np.linspace(V2[k]+ sampleDelta, V2[k+1]- sampleDelta,4)
+					v3Samples = np.linspace(V3[l]+ sampleDelta, V3[l+1]- sampleDelta,4)
+
+					for v0 in v0Samples:
+						for v1 in v1Samples:
+							for v2 in v2Samples:
+								for v3 in v3Samples:
+									v = np.array([v0, v1, v2, v3])
+									inum = model.oscNum(v)[2]
+									if np.less(inum, INum[:,0]).any() or np.greater(inum, INum[:,1]).any():
+										print ("oops interval weird for ", v, " in interval ", vInterval)
+										print ("inum ", inum, " INum ", INum)
+										exit()
+									
 
 
 

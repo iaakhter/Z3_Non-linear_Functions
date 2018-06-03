@@ -68,11 +68,22 @@ def solverLoop(uniqueHypers, solutionsFoundSoFar, model, volRedThreshold, bisect
 
 	stringHyperList.append(("i", volume(hyperRectangle)))
 
+	start = time.time()
+	feas = intervalUtils.checkExistenceOfSolution(model,hyperRectangle.transpose())
+	end = time.time()
+	totalGSTime += end - start
+	numGs += 1
+	if feas[0] or feas[1] is None:
+		return uniqueHypers
+	stringHyperList.append(("g", volume(feas[1])))
+
+
+
 	#stack containing hyperrectangles about which any decision
 	#has not been made - about whether they contain unique solution
 	#or no solution
 	stackList = []
-	stackList.append(hyperRectangle)
+	stackList.append(feas[1])
 	while len(stackList) > 0:
 		#print ("len stack", len(stackList))
 
@@ -194,33 +205,8 @@ def ifFeasibleHyper(hyperRectangle, volRedThreshold,model,useLp=True):
 	while True:
 		#print ("hyperRectangle")
 		#print (hyperRectangle)
-		start = time.time()
-		#First apply gauss seidel
-		kResult = intervalUtils.checkExistenceOfSolution(model,hyperRectangle.transpose())
-		end = time.time()
-		totalGSTime += (end - start)
-		numGs += 1
-		stringHyperList.append(("g", volume(kResult[1])))
-		#print ("kResult")
-		#print (kResult)
-		
-		#If gauss-seidel interval says there is unique solution
-		#in hyperrectangle or no solution, then return
-		
-		#Unique solution
-		if kResult[0]:
-			#print ("uniqueHyper", hyperRectangle)
-			return (True, kResult[1])
 
-		#No Solution
-		if kResult[0] == False and kResult[1] is None:
-			#print ("K operator not feasible", hyperRectangle)
-			return (False, None)
-		#print "kResult"
-		#print kResult
-		
-		#If Gauss-Seidel cannot make a decision apply linear programming
-		newHyperRectangle = kResult[1]	
+		newHyperRectangle = np.copy(hyperRectangle)
 
 		if useLp:
 			#print ("startlp")
@@ -245,7 +231,34 @@ def ifFeasibleHyper(hyperRectangle, volRedThreshold,model,useLp=True):
 					newHyperRectangle[i,0] = hyperRectangle[i,0]
 				if newHyperRectangle[i,1] > hyperRectangle[i,1]:
 					newHyperRectangle[i,1] = hyperRectangle[i,1]
-		 
+
+		start = time.time()
+		#First apply gauss seidel
+		kResult = intervalUtils.checkExistenceOfSolution(model,newHyperRectangle.transpose())
+		end = time.time()
+		totalGSTime += (end - start)
+		numGs += 1
+		stringHyperList.append(("g", volume(kResult[1])))
+		#print ("kResult")
+		#print (kResult)
+		
+		#If gauss-seidel interval says there is unique solution
+		#in hyperrectangle or no solution, then return
+		
+		#Unique solution
+		if kResult[0]:
+			#print ("uniqueHyper", hyperRectangle)
+			return (True, kResult[1])
+
+		#No Solution
+		if kResult[0] == False and kResult[1] is None:
+			#print ("K operator not feasible", hyperRectangle)
+			return (False, None)
+		#print "kResult"
+		#print kResult
+		
+		#If Gauss-Seidel cannot make a decision apply linear programming
+		newHyperRectangle = kResult[1]			 
 
 		hyperVol = 1.0
 		for i in range(lenV):
@@ -263,9 +276,8 @@ def ifFeasibleHyper(hyperRectangle, volRedThreshold,model,useLp=True):
 		# If the proportion of volume reduction is not atleast
 		# volRedThreshold then return
 		if math.isnan(propReduc) or propReduc < volRedThreshold:
-			if kResult[0] == False and kResult[1] is not None:
-				#return (False, kResult[1])
-				return (False, newHyperRectangle)
+			#return (False, kResult[1])
+			return (False, newHyperRectangle)
 		hyperRectangle = newHyperRectangle
 		iterNum+=1
 	
@@ -648,10 +660,10 @@ def singleVariableInequalities(problemType, volRedThreshold, numSolutions="all",
 
 if __name__ == "__main__":
 	start = time.time()
-	#allHypers, globalVars = rambusOscillator(modelType="tanh", numStages=6, g_cc=4.0, lpThreshold=1.0, numSolutions="all" , newtonHypers=None, useLp=False)
+	allHypers, globalVars = rambusOscillator(modelType="mosfet", numStages=6, g_cc=4.0, lpThreshold=1.0, numSolutions="all" , newtonHypers=None, useLp=False)
 	#print ("allHypers", allHypers)
-	#schmittTrigger(inputVoltage = 1.8, lpThreshold = 1.0, numSolutions = "all", newtonHypers = False, useLp = False)
-	#singleVariableInequalities(problemType="meti18", volRedThreshold=1.0, numSolutions="all", newtonHypers=False, useLp=False)
+	#schmittTrigger(inputVoltage = 0.0, lpThreshold = 1.0, numSolutions = "all", newtonHypers = False, useLp = False)
+	#singleVariableInequalities(problemType="meti18", volRedThreshold=1.0, numSolutions="all", newtonHypers=False, useLp=True)
 	#print(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss)
 	#print ("numSolutions", len(allHypers))
 	end = time.time()

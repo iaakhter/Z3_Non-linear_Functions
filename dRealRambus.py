@@ -258,7 +258,7 @@ def rambusOscillatorMosfet(Vtp, Vtn, Vdd, Kn, Kp, Sn, numStages, numSolutions = 
 		for i in range(lenV):
 			hyper[i,:] = [result[vs[i]].lb() - 1000*epsilon, result[vs[i]].ub() + 1000*epsilon]
 
-		#print ("hyper", hyper)
+		print ("hyper", hyper)
 		allSolutions.append(hyper)
 
 		print ("num solutions found", len(allSolutions))
@@ -284,7 +284,7 @@ def rambusOscillatorMosfet(Vtp, Vtn, Vdd, Kn, Kp, Sn, numStages, numSolutions = 
 
 if __name__ =="__main__":
 	#rambusOscillatorTanh(a = -5.0, numStages = 4, numSolutions = "all", g_cc = 4.0)
-	rambusOscillatorMosfet(Vtp = -0.4, Vtn = 0.4, Vdd = 1.8, Kn = 270*1e-6, Kp = -90*1e-6, Sn = 8/3.0, numStages = 2, g_cc = 4.0)
+	rambusOscillatorMosfet(Vtp = -0.4, Vtn = 0.4, Vdd = 1.8, Kn = 270*1e-6, Kp = -90*1e-6, Sn = 3.0, numStages = 2, g_cc = 0.5)
 	print(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss)
 
 	#check if you can easily find the solution in the given hyper

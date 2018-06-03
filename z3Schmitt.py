@@ -8,21 +8,23 @@ import time
 
 def nFet(Vtn, Vdd, Kn, Sn, gn, src, gate, drain, tI):
 	constraints = []
-	constraints.append(Or(And(src > drain, gate - drain <= Vtn, tI == -(src - drain)*(2 + (gate - drain - Vtn)/Vdd)*(gn*1e-4)),
-							And(src > drain, gate - drain >= Vtn, src - drain >= gate - drain - Vtn, tI == -0.5*Sn*Kn*(gate - drain - Vtn)*(gate - drain - Vtn) - (src - drain)*(2 + (gate - drain - Vtn)/Vdd)*(gn*1e-4)),
-							And(src > drain, gate - drain >= Vtn, src - drain <= gate - drain - Vtn, tI == -Sn*Kn*(gate - drain - Vtn - (src - drain)/2.0)*(src - drain) - (src - drain)*(2 + (gate - drain - Vtn)/Vdd)*(gn*1e-4)),
-							And(src <= drain, gate - src <= Vtn, tI == (drain - src)*(2 + (gate - src - Vtn)/Vdd)*(gn*1e-4)),
-							And(src <= drain, gate - src >= Vtn, drain - src >= gate - src - Vtn, tI == 0.5*Sn*Kn*(gate - src - Vtn)*(gate - src - Vtn) + (drain - src)*(2 + (gate - src - Vtn)/Vdd)*(gn*1e-4)),
-							And(src <= drain, gate - src >= Vtn, drain - src <= gate - src - Vtn, tI == Sn*Kn*(gate - src - Vtn - (drain - src)/2.0)*(drain - src) + (drain - src)*(2 + (gate - src - Vtn)/Vdd)*(gn*1e-4))))
+	gds = 1e-8
+	constraints.append(Or(And(src > drain, gate - drain <= Vtn, tI == -(src - drain)*gds),
+							And(src > drain, gate - drain >= Vtn, src - drain >= gate - drain - Vtn, tI == -0.5*Sn*Kn*(gate - drain - Vtn)*(gate - drain - Vtn) -(src - drain)*gds),
+							And(src > drain, gate - drain >= Vtn, src - drain <= gate - drain - Vtn, tI == -Sn*Kn*(gate - drain - Vtn - (src - drain)/2.0)*(src - drain) -(src - drain)*gds),
+							And(src <= drain, gate - src <= Vtn, tI == (drain - src)*gds),
+							And(src <= drain, gate - src >= Vtn, drain - src >= gate - src - Vtn, tI == 0.5*Sn*Kn*(gate - src - Vtn)*(gate - src - Vtn) + (drain - src)*gds),
+							And(src <= drain, gate - src >= Vtn, drain - src <= gate - src - Vtn, tI == Sn*Kn*(gate - src - Vtn - (drain - src)/2.0)*(drain - src) + (drain - src)*gds)))
 	return constraints
 def pFet(Vtp, Vdd, Kp, Sp, gp, src, gate, drain, tI):
 	constraints = []
-	constraints.append(Or(And(src < drain, gate - drain >= Vtp, tI == -(src - drain)*(2 - (gate - drain - Vtp)/Vdd)*(gp*1e-4)),
-							And(src < drain, gate - drain <= Vtp, src - drain <= gate - drain - Vtp, tI == -0.5*Sp*Kp*(gate - drain - Vtp)*(gate - drain - Vtp) - (src - drain)*(2 - (gate - drain - Vtp)/Vdd)*(gp*1e-4)),
-							And(src < drain, gate - drain <= Vtp, src - drain >= gate - drain - Vtp, tI == -Sp*Kp*(gate - drain - Vtp - (src - drain)/2.0)*(src - drain) - (src - drain)*(2 - (gate - drain - Vtp)/Vdd)*(gp*1e-4)),
-							And(src >= drain, gate - src >= Vtp, tI == (drain - src)*(2 - (gate - src - Vtp)/Vdd)*(gp*1e-4)),
-							And(src >= drain, gate - src <= Vtp, drain - src <= gate - src - Vtp, tI == 0.5*Sp*Kp*(gate - src - Vtp)*(gate - src - Vtp) + (drain - src)*(2 - (gate - src - Vtp)/Vdd)*(gp*1e-4)),
-							And(src >= drain, gate - src <= Vtp, drain - src >= gate - src - Vtp, tI == Sp*Kp*(gate - src - Vtp - (drain - src)/2.0)*(drain - src) + (drain - src)*(2 - (gate - src - Vtp)/Vdd)*(gp*1e-4))))
+	gds = 1e-8
+	constraints.append(Or(And(src < drain, gate - drain >= Vtp, tI == -(src - drain)*gds),
+							And(src < drain, gate - drain <= Vtp, src - drain <= gate - drain - Vtp, tI == -0.5*Sp*Kp*(gate - drain - Vtp)*(gate - drain - Vtp) -(src - drain)*gds),
+							And(src < drain, gate - drain <= Vtp, src - drain >= gate - drain - Vtp, tI == -Sp*Kp*(gate - drain - Vtp - (src - drain)/2.0)*(src - drain) -(src - drain)*gds),
+							And(src >= drain, gate - src >= Vtp, tI == (drain - src)*gds),
+							And(src >= drain, gate - src <= Vtp, drain - src <= gate - src - Vtp, tI == 0.5*Sp*Kp*(gate - src - Vtp)*(gate - src - Vtp) + (drain - src)*gds),
+							And(src >= drain, gate - src <= Vtp, drain - src >= gate - src - Vtp, tI == Sp*Kp*(gate - src - Vtp - (drain - src)/2.0)*(drain - src) + (drain - src)*gds)))
 	return constraints
 
 def schmittTrigger(inputVoltage, Vtp, Vtn, Vdd, Kn, Kp, Sn, numSolutions = "all"):

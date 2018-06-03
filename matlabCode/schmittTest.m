@@ -1,15 +1,15 @@
-currentFun = @currentNFet;
+currentFun = @currentPFet;
 
 src = 0.0:0.01:1.8;
-%gate = 0.0:0.01:1.0;
-gate = 0.8;
-drain = 0.0:0.01:1.8;
-%drain = 1.0
+gate = 0.0:0.01:1.8;
+%gate = 0.6;
+%drain = 0.0:0.01:1.8;
+drain = 0.8
 %drain = 0.0;
 
 Vin = src;
-%Vout = gate;
-Vout = drain;
+Vout = gate;
+%Vout = drain;
 
 I = zeros(length(Vout), length(Vin));
 firDerSrc = zeros(length(Vout), length(Vin));
@@ -23,14 +23,14 @@ secDerSrcDrain = zeros(length(Vout), length(Vin));
 secDerGateDrain = zeros(length(Vout), length(Vin));
 for i = 1:length(Vin)
 	for j = 1:length(Vout)
-		[I(j,i), firDerSrc(j,i), firDerGrnd(j,i), firDerDrain(j,i), secDerSrc(j,i), secDerGrnd(j,i), secDerDrain(j,i), secDerSrcGrnd(j,i), secDerSrcDrain(j,i), secDerGrndDrain(j,i)] = currentFun(Vin(i), gate, Vout(j));
-		%[I(j,i), firDerSrc(j,i), firDerGate(j,i), firDerDrain(j,i), secDerSrc(j,i), secDerGate(j,i), secDerDrain(j,i), secDerSrcGate(j,i), secDerSrcDrain(j,i), secDerGateDrain(j,i)] = currentFun(Vin(i), Vout(j), drain);
+		%[I(j,i), firDerSrc(j,i), firDerGrnd(j,i), firDerDrain(j,i), secDerSrc(j,i), secDerGrnd(j,i), secDerDrain(j,i), secDerSrcGrnd(j,i), secDerSrcDrain(j,i), secDerGrndDrain(j,i)] = currentFun(Vin(i), gate, Vout(j));
+		[I(j,i), firDerSrc(j,i), firDerGate(j,i), firDerDrain(j,i), secDerSrc(j,i), secDerGate(j,i), secDerDrain(j,i), secDerSrcGate(j,i), secDerSrcDrain(j,i), secDerGateDrain(j,i)] = currentFun(Vin(i), Vout(j), drain);
 	end;
 end;
 
 secDerIn = secDerSrc;
-%secDerOut = secDerGate;
-secDerOut = secDerDrain;
+secDerOut = secDerGate;
+%secDerOut = secDerDrain;
 
 [surfVin,surfVout] = meshgrid(Vin,Vout);
 I;

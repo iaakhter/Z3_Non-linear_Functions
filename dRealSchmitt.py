@@ -11,50 +11,51 @@ import intervalUtils
 
 def nFet(Vtn, Vdd, Kn, Sn, gn, src, gate, drain, tI):
 	constraints = []
+	gds = 1e-8
 	if type(src) == Variable or type(gate) == Variable:
-		constraints.append(logical_or(logical_and(src > drain, gate - drain <= Vtn, tI == -(src - drain)*(2 + (gate - drain - Vtn)/Vdd)*(gn*1e-4)),
-										logical_and(src > drain, gate - drain >= Vtn, src - drain >= gate - drain - Vtn, tI == -0.5*Sn*Kn*(gate - drain - Vtn)*(gate - drain - Vtn) - (src - drain)*(2 + (gate - drain - Vtn)/Vdd)*(gn*1e-4)),
-										logical_and(src > drain, gate - drain >= Vtn, src - drain <= gate - drain - Vtn, tI == -Sn*Kn*(gate - drain - Vtn - (src - drain)/2.0)*(src - drain) - (src - drain)*(2 + (gate - drain - Vtn)/Vdd)*(gn*1e-4)),
-										logical_and(src <= drain, gate - src <= Vtn, tI == (drain - src)*(2 + (gate - src - Vtn)/Vdd)*(gn*1e-4)),
-										logical_and(src <= drain, gate - src >= Vtn, drain - src >= gate - src - Vtn, tI == 0.5*Sn*Kn*(gate - src - Vtn)*(gate - src - Vtn) + (drain - src)*(2 + (gate - src - Vtn)/Vdd)*(gn*1e-4)),
-										logical_and(src <= drain, gate - src >= Vtn, drain - src <= gate - src - Vtn, tI == Sn*Kn*(gate - src - Vtn - (drain - src)/2.0)*(drain - src) + (drain - src)*(2 + (gate - src - Vtn)/Vdd)*(gn*1e-4))))
+		constraints.append(logical_or(logical_and(src > drain, gate - drain <= Vtn, tI == -(src - drain)*gds),
+										logical_and(src > drain, gate - drain >= Vtn, src - drain >= gate - drain - Vtn, tI == -0.5*Sn*Kn*(gate - drain - Vtn)*(gate - drain - Vtn) -(src - drain)*gds),
+										logical_and(src > drain, gate - drain >= Vtn, src - drain <= gate - drain - Vtn, tI == -Sn*Kn*(gate - drain - Vtn - (src - drain)/2.0)*(src - drain) -(src - drain)*gds),
+										logical_and(src <= drain, gate - src <= Vtn, tI == (drain - src)*gds),
+										logical_and(src <= drain, gate - src >= Vtn, drain - src >= gate - src - Vtn, tI == 0.5*Sn*Kn*(gate - src - Vtn)*(gate - src - Vtn) + (drain - src)*gds),
+										logical_and(src <= drain, gate - src >= Vtn, drain - src <= gate - src - Vtn, tI == Sn*Kn*(gate - src - Vtn - (drain - src)/2.0)*(drain - src) + (drain - src)*gds)))
 	else:
 		if gate - src <= Vtn:
-			constraints.append(logical_or(logical_and(src > drain, gate - drain <= Vtn, tI == -(src - drain)*(2 + (gate - drain - Vtn)/Vdd)*(gn*1e-4)),
-											logical_and(src > drain, gate - drain >= Vtn, src - drain >= gate - drain - Vtn, tI == -0.5*Sn*Kn*(gate - drain - Vtn)*(gate - drain - Vtn) - (src - drain)*(2 + (gate - drain - Vtn)/Vdd)*(gn*1e-4)),
-											logical_and(src > drain, gate - drain >= Vtn, src - drain <= gate - drain - Vtn, tI == -Sn*Kn*(gate - drain - Vtn - (src - drain)/2.0)*(src - drain) - (src - drain)*(2 + (gate - drain - Vtn)/Vdd)*(gn*1e-4)),
-											logical_and(src <= drain, tI == (drain - src)*(2 + (gate - src - Vtn)/Vdd)*(gn*1e-4))))
+			constraints.append(logical_or(logical_and(src > drain, gate - drain <= Vtn, tI == -(src - drain)*gds),
+											logical_and(src > drain, gate - drain >= Vtn, src - drain >= gate - drain - Vtn, tI == -0.5*Sn*Kn*(gate - drain - Vtn)*(gate - drain - Vtn) -(src - drain)*gds),
+											logical_and(src > drain, gate - drain >= Vtn, src - drain <= gate - drain - Vtn, tI == -Sn*Kn*(gate - drain - Vtn - (src - drain)/2.0)*(src - drain) -(src - drain)*gds),
+											logical_and(src <= drain, tI == (drain - src)*gds)))
 		else:
-			constraints.append(logical_or(logical_and(src > drain, gate - drain <= Vtn, tI == -(src - drain)*(2 + (gate - drain - Vtn)/Vdd)*(gn*1e-4)),
-											logical_and(src > drain, gate - drain >= Vtn, src - drain >= gate - drain - Vtn, tI == -0.5*Sn*Kn*(gate - drain - Vtn)*(gate - drain - Vtn) - (src - drain)*(2 + (gate - drain - Vtn)/Vdd)*(gn*1e-4)),
-											logical_and(src > drain, gate - drain >= Vtn, src - drain <= gate - drain - Vtn, tI == -Sn*Kn*(gate - drain - Vtn - (src - drain)/2.0)*(src - drain) - (src - drain)*(2 + (gate - drain - Vtn)/Vdd)*(gn*1e-4)),
-											logical_and(src <= drain, drain - src >= gate - src - Vtn, tI == 0.5*Sn*Kn*(gate - src - Vtn)*(gate - src - Vtn) + (drain - src)*(2 + (gate - src - Vtn)/Vdd)*(gn*1e-4)),
-											logical_and(src <= drain, drain - src <= gate - src - Vtn, tI == Sn*Kn*(gate - src - Vtn - (drain - src)/2.0)*(drain - src) + (drain - src)*(2 + (gate - src - Vtn)/Vdd)*(gn*1e-4))))
+			constraints.append(logical_or(logical_and(src > drain, gate - drain <= Vtn, tI == -(src - drain)*gds),
+											logical_and(src > drain, gate - drain >= Vtn, src - drain >= gate - drain - Vtn, tI == -0.5*Sn*Kn*(gate - drain - Vtn)*(gate - drain - Vtn) -(src - drain)*gds),
+											logical_and(src > drain, gate - drain >= Vtn, src - drain <= gate - drain - Vtn, tI == -Sn*Kn*(gate - drain - Vtn - (src - drain)/2.0)*(src - drain) -(src - drain)*gds),
+											logical_and(src <= drain, drain - src >= gate - src - Vtn, tI == 0.5*Sn*Kn*(gate - src - Vtn)*(gate - src - Vtn) + (drain - src)*gds),
+											logical_and(src <= drain, drain - src <= gate - src - Vtn, tI == Sn*Kn*(gate - src - Vtn - (drain - src)/2.0)*(drain - src) + (drain - src)*gds)))
 	
 	return constraints
 
-	return constraints
 def pFet(Vtp, Vdd, Kp, Sp, gp, src, gate, drain, tI):
 	constraints = []
+	gds = 1e-8
 	if type(src) == Variable or type(gate) == Variable:
-		constraints.append(logical_or(logical_and(src < drain, gate - drain >= Vtp, tI == -(src - drain)*(2 - (gate - drain - Vtp)/Vdd)*(gp*1e-4)),
-										logical_and(src < drain, gate - drain <= Vtp, src - drain <= gate - drain - Vtp, tI == -0.5*Sp*Kp*(gate - drain - Vtp)*(gate - drain - Vtp) - (src - drain)*(2 - (gate - drain - Vtp)/Vdd)*(gp*1e-4)),
-										logical_and(src < drain, gate - drain <= Vtp, src - drain >= gate - drain - Vtp, tI == -Sp*Kp*(gate - drain - Vtp - (src - drain)/2.0)*(src - drain) - (src - drain)*(2 - (gate - drain - Vtp)/Vdd)*(gp*1e-4)),
-										logical_and(src >= drain, gate - src >= Vtp, tI == (drain - src)*(2 - (gate - src - Vtp)/Vdd)*(gp*1e-4)),
-										logical_and(src >= drain, gate - src <= Vtp, drain - src <= gate - src - Vtp, tI == 0.5*Sp*Kp*(gate - src - Vtp)*(gate - src - Vtp) + (drain - src)*(2 - (gate - src - Vtp)/Vdd)*(gp*1e-4)),
-										logical_and(src >= drain, gate - src <= Vtp, drain - src >= gate - src - Vtp, tI == Sp*Kp*(gate - src - Vtp - (drain - src)/2.0)*(drain - src) + (drain - src)*(2 - (gate - src - Vtp)/Vdd)*(gp*1e-4))))
+		constraints.append(logical_or(logical_and(src < drain, gate - drain >= Vtp, tI == -(src - drain)*gds),
+										logical_and(src < drain, gate - drain <= Vtp, src - drain <= gate - drain - Vtp, tI == -0.5*Sp*Kp*(gate - drain - Vtp)*(gate - drain - Vtp) -(src - drain)*gds),
+										logical_and(src < drain, gate - drain <= Vtp, src - drain >= gate - drain - Vtp, tI == -Sp*Kp*(gate - drain - Vtp - (src - drain)/2.0)*(src - drain) -(src - drain)*gds),
+										logical_and(src >= drain, gate - src >= Vtp, tI == (drain - src)*gds),
+										logical_and(src >= drain, gate - src <= Vtp, drain - src <= gate - src - Vtp, tI == 0.5*Sp*Kp*(gate - src - Vtp)*(gate - src - Vtp) + (drain - src)*gds),
+										logical_and(src >= drain, gate - src <= Vtp, drain - src >= gate - src - Vtp, tI == Sp*Kp*(gate - src - Vtp - (drain - src)/2.0)*(drain - src) + (drain - src)*gds)))
 	else:
 		if gate - src >= Vtp:
-			constraints.append(logical_or(logical_and(src < drain, gate - drain >= Vtp, tI == -(src - drain)*(2 - (gate - drain - Vtp)/Vdd)*(gp*1e-4)),
-											logical_and(src < drain, gate - drain <= Vtp, src - drain <= gate - drain - Vtp, tI == -0.5*Sp*Kp*(gate - drain - Vtp)*(gate - drain - Vtp) - (src - drain)*(2 - (gate - drain - Vtp)/Vdd)*(gp*1e-4)),
-											logical_and(src < drain, gate - drain <= Vtp, src - drain >= gate - drain - Vtp, tI == -Sp*Kp*(gate - drain - Vtp - (src - drain)/2.0)*(src - drain) - (src - drain)*(2 - (gate - drain - Vtp)/Vdd)*(gp*1e-4)),
-											logical_and(src >= drain, tI == (drain - src)*(2 - (gate - src - Vtp)/Vdd)*(gp*1e-4))))
+			constraints.append(logical_or(logical_and(src < drain, gate - drain >= Vtp, tI == -(src - drain)*gds),
+											logical_and(src < drain, gate - drain <= Vtp, src - drain <= gate - drain - Vtp, tI == -0.5*Sp*Kp*(gate - drain - Vtp)*(gate - drain - Vtp) -(src - drain)*gds),
+											logical_and(src < drain, gate - drain <= Vtp, src - drain >= gate - drain - Vtp, tI == -Sp*Kp*(gate - drain - Vtp - (src - drain)/2.0)*(src - drain) -(src - drain)*gds),
+											logical_and(src >= drain, tI == (drain - src)*gds)))
 		else:
-			constraints.append(logical_or(logical_and(src < drain, gate - drain >= Vtp, tI == -(src - drain)*(2 - (gate - drain - Vtp)/Vdd)*(gp*1e-4)),
-											logical_and(src < drain, gate - drain <= Vtp, src - drain <= gate - drain - Vtp, tI == -0.5*Sp*Kp*(gate - drain - Vtp)*(gate - drain - Vtp) - (src - drain)*(2 - (gate - drain - Vtp)/Vdd)*(gp*1e-4)),
-											logical_and(src < drain, gate - drain <= Vtp, src - drain >= gate - drain - Vtp, tI == -Sp*Kp*(gate - drain - Vtp - (src - drain)/2.0)*(src - drain) - (src - drain)*(2 - (gate - drain - Vtp)/Vdd)*(gp*1e-4)),
-											logical_and(src >= drain, drain - src <= gate - src - Vtp, tI == 0.5*Sp*Kp*(gate - src - Vtp)*(gate - src - Vtp) + (drain - src)*(2 - (gate - src - Vtp)/Vdd)*(gp*1e-4)),
-											logical_and(src >= drain, drain - src >= gate - src - Vtp, tI == Sp*Kp*(gate - src - Vtp - (drain - src)/2.0)*(drain - src) + (drain - src)*(2 - (gate - src - Vtp)/Vdd)*(gp*1e-4))))
+			constraints.append(logical_or(logical_and(src < drain, gate - drain >= Vtp, tI == -(src - drain)*gds),
+											logical_and(src < drain, gate - drain <= Vtp, src - drain <= gate - drain - Vtp, tI == -0.5*Sp*Kp*(gate - drain - Vtp)*(gate - drain - Vtp) -(src - drain)*gds),
+											logical_and(src < drain, gate - drain <= Vtp, src - drain >= gate - drain - Vtp, tI == -Sp*Kp*(gate - drain - Vtp - (src - drain)/2.0)*(src - drain) -(src - drain)*gds),
+											logical_and(src >= drain, drain - src <= gate - src - Vtp, tI == 0.5*Sp*Kp*(gate - src - Vtp)*(gate - src - Vtp) + (drain - src)*gds),
+											logical_and(src >= drain, drain - src >= gate - src - Vtp, tI == Sp*Kp*(gate - src - Vtp - (drain - src)/2.0)*(drain - src) + (drain - src)*gds)))
 	
 	return constraints
 
@@ -153,4 +154,4 @@ def schmittTrigger(inputVoltage, Vtp, Vtn, Vdd, Kn, Kp, Sn, numSolutions = "all"
 	return allSolutions
 
 if __name__ == "__main__":
-	schmittTrigger(inputVoltage = 1.0, Vtp = -0.4, Vtn = 0.4, Vdd = 1.8, Kn = 270*1e-6, Kp = -90*1e-6, Sn = (8/3.0), numSolutions = "all")
+	schmittTrigger(inputVoltage = 1.8, Vtp = -0.4, Vtn = 0.4, Vdd = 1.8, Kn = 270*1e-6, Kp = -90*1e-6, Sn = 3.0, numSolutions = "all")

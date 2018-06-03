@@ -10,6 +10,7 @@ import schmittMosfet
 import rambusUtils as rUtils
 import random
 import math
+import circuit
 
 
 def bisectFunOrdering(hyper, orderingArray, orderingIndex):
@@ -113,13 +114,20 @@ def solverLoop(uniqueHypers, solutionsFoundSoFar, model, volRedThreshold, bisect
 			orderIndex = 0
 			while hypForBisection is not None:
 				#print ("hypForBisection", hypForBisection)
+				'''if np.less_equal(hypForBisection[:,1] - hypForBisection[:,0], np.ones((lenV))*0.001).all():
+					feasibility = ifFeasibleHyper(hypForBisection, volRedThreshold, model, useLp)
+					if feasibility[0]:
+						addToSolutions(model, uniqueHypers, solutionsFoundSoFar, feasibility[1])
+						break
+					elif feasibility[0] == False and feasibility[1] is None:
+						break'''
 				lHyp, rHyp = bisectFun(hypForBisection, orderingArray, orderIndex)
 				numBisection += 1
 				stringHyperList.append(("b", [volume(lHyp), volume(rHyp)]))
 				#print ("lHyp", lHyp)
 				orderIndex = (orderIndex + 1)%lenV
 				start = time.time()
-				lFeas = intervalUtils.checkExistenceOfSolutionGS(model,lHyp.transpose())
+				lFeas = intervalUtils.checkExistenceOfSolution(model,lHyp.transpose())
 				end = time.time()
 				totalGSTime += end - start
 				numGs += 1
@@ -127,7 +135,7 @@ def solverLoop(uniqueHypers, solutionsFoundSoFar, model, volRedThreshold, bisect
 				#print ("lFeas", lFeas)
 				#print ("rHyp", rHyp)
 				start = time.time()
-				rFeas = intervalUtils.checkExistenceOfSolutionGS(model,rHyp.transpose())
+				rFeas = intervalUtils.checkExistenceOfSolution(model,rHyp.transpose())
 				end = time.time()
 				totalGSTime += end - start
 
@@ -188,7 +196,7 @@ def ifFeasibleHyper(hyperRectangle, volRedThreshold,model,useLp=True):
 		#print (hyperRectangle)
 		start = time.time()
 		#First apply gauss seidel
-		kResult = intervalUtils.checkExistenceOfSolutionGS(model,hyperRectangle.transpose())
+		kResult = intervalUtils.checkExistenceOfSolution(model,hyperRectangle.transpose())
 		end = time.time()
 		totalGSTime += (end - start)
 		numGs += 1
@@ -315,7 +323,7 @@ def findAndIgnoreNewtonSoln(model, minVal, maxVal, numSolutions, numTrials = 10)
 					#print ("diff", diff)
 					hyperWithUniqueSoln[:,0] = finalSoln[1] - diff
 					hyperWithUniqueSoln[:,1] = finalSoln[1] + diff
-					kResult = intervalUtils.checkExistenceOfSolutionGS(model,hyperWithUniqueSoln.transpose())
+					kResult = intervalUtils.checkExistenceOfSolution(model,hyperWithUniqueSoln.transpose())
 					if kResult[0] == False and kResult[1] is not None:
 						diff[startingIndex] = diff[startingIndex]/2.0
 						startingIndex = (startingIndex + 1)%lenV
@@ -332,6 +340,7 @@ def findAndIgnoreNewtonSoln(model, minVal, maxVal, numSolutions, numTrials = 10)
 	#print ("total num hypers found in ", numTrials, " trials is ", len(allHypers))
 	return (allHypers, solutionsFoundSoFar)
 
+
 def schmittTrigger(inputVoltage, lpThreshold, numSolutions = "all", newtonHypers = True, useLp = True):
 	global numBisection, numLp, numGs, numSingleKill, numDoubleKill
 	global stringHyperList
@@ -343,7 +352,8 @@ def schmittTrigger(inputVoltage, lpThreshold, numSolutions = "all", newtonHypers
 	#load the schmitt trigger model
 	#modelParam = [Vtp, Vtn, Vdd, Kn, Kp, Sn]
 	modelParam = [-0.4, 0.4, 1.8, 270*1e-6, -90*1e-6, 8/3.0]
-	model = schmittMosfet.SchmittMosfet(modelParam = modelParam, inputVoltage = inputVoltage)
+	#model = schmittMosfet.SchmittMosfet(modelParam = modelParam, inputVoltage = inputVoltage)
+	model = schmittMosfet.SchmittMosfetMark(modelParam = modelParam, inputVoltage = inputVoltage)
 
 	startExp = time.time()
 	lenV = 3
@@ -377,12 +387,12 @@ def schmittTrigger(inputVoltage, lpThreshold, numSolutions = "all", newtonHypers
 	'''newtonSol = intervalUtils.newton(model,np.array([0.0, 0.0, 0.415]))
 	print ("newtonSol", newtonSol)
 
-	hyper = np.array([[  1.73280706e-04,   1.73280708e-04],
-       [  1.59222369e-04,   1.59222371e-04],
-       [  4.15297923e-01,   4.15297925e-01]])
+	hyper = np.array([[ 0.9 ,  1.35],
+       [ 0.  ,  0.45],
+       [ 0.9 ,  1.8 ]])
 
-	feas = intervalUtils.checkExistenceOfSolutionGS(model,hyper.transpose())
-	print ("feas", feas)'''
+	feasibility = ifFeasibleHyper(hyper, lpThreshold,model)
+	print ("feas", feasibility)'''
 
 	
 	# categorize solutions found
@@ -436,7 +446,8 @@ def rambusOscillator(modelType, numStages, g_cc, lpThreshold, numSolutions="all"
 		#modelParam = [-0.25, 0.25, 1.0, 1.0, -0.5, 1.0]
 		#modelParam = [-0.4, 0.4, 1.8, 1.5, -0.5, 8/3.0]
 		modelParam = [-0.4, 0.4, 1.8, 270*1e-6, -90*1e-6, 8/3.0]
-		model = mosfetModel.MosfetModel(modelParam = modelParam, g_cc = g_cc, g_fwd = 1.0, numStages = numStages)
+		#model = mosfetModel.MosfetModel(modelParam = modelParam, g_cc = g_cc, g_fwd = 1.0, numStages = numStages)
+		model = mosfetModel.RambusMosfetMark(modelParam = modelParam, g_cc = g_cc, g_fwd = 1.0, numStages = numStages)
 	
 	startExp = time.time()
 	lenV = numStages*2
@@ -455,16 +466,12 @@ def rambusOscillator(modelType, numStages, g_cc, lpThreshold, numSolutions="all"
 	boundMap = model.boundMap
 	#print ("boundMap ", boundMap)
 
-	'''hyper = np.array([[  0.00000000e+00,   0.00000000e+00],
-       [  1.80000000e+00,   1.80000000e+00],
-       [  1.45249523e+00,   1.45249523e+00],
-       [  9.48241024e-15,   9.48241024e-15],
-       [  1.80000000e+00,   1.80000000e+00],
-       [  0.00000000e+00,   0.00000000e+00],
-       [  1.68708185e-01,   1.68708185e-01],
-       [  1.80000000e+00,   1.80000000e+00]])
+	'''hyper = np.array([[ 1.4031211 ,  1.4031212],
+       [ 0.2507801,  0.2507804],
+       [ 1.4031211 ,  1.4031212],
+       [ 0.2507801,  0.2507804]])
 
-	feas = intervalUtils.checkExistenceOfSolutionGS(model,hyper.transpose())
+	feas = intervalUtils.checkExistenceOfSolution(model,hyper.transpose())
 	print ("feas", feas)'''
 	
 
@@ -591,10 +598,12 @@ def singleVariableInequalities(problemType, volRedThreshold, numSolutions="all",
 		model = example1.Example1(xBound[0], xBound[1], " > ")
 
 	if problemType == "meti25":
+		#xBound = [0.0,7*math.pi]
 		xBound = [math.pi/3.0, (2*math.pi/3.0)]
 		model = metiProblems.Meti25(xBound[0], xBound[1], " > ")
 
 	if problemType == "meti18":
+		#xBound = [-1.0, 2.0]
 		xBound = [0.0, 100.0/201]
 		model = metiProblems.Meti18(xBound[0], xBound[1], " > ")
 
@@ -639,10 +648,10 @@ def singleVariableInequalities(problemType, volRedThreshold, numSolutions="all",
 
 if __name__ == "__main__":
 	start = time.time()
-	#allHypers, globalVars = rambusOscillator(modelType="mosfet", numStages=6, g_cc=4.0, lpThreshold=1.0, numSolutions="all" , newtonHypers=None, useLp=True)
+	#allHypers, globalVars = rambusOscillator(modelType="tanh", numStages=6, g_cc=4.0, lpThreshold=1.0, numSolutions="all" , newtonHypers=None, useLp=False)
 	#print ("allHypers", allHypers)
-	#schmittTrigger(inputVoltage = 0.2, lpThreshold = 1.0, numSolutions = "all", newtonHypers = False, useLp = True)
-	singleVariableInequalities(problemType="dRealExample", volRedThreshold=1.0, numSolutions="all", newtonHypers=True, useLp=True)
+	#schmittTrigger(inputVoltage = 1.8, lpThreshold = 1.0, numSolutions = "all", newtonHypers = False, useLp = False)
+	#singleVariableInequalities(problemType="meti18", volRedThreshold=1.0, numSolutions="all", newtonHypers=False, useLp=False)
 	#print(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss)
 	#print ("numSolutions", len(allHypers))
 	end = time.time()

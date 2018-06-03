@@ -12,22 +12,23 @@ def solverRambusExperiments():
 	volThresholdArray = [0.9]
 
 	numStagesArray = [6]
-	gccArray = [0.5, 4.0]
-	modelTypeArray = ["mosfet"]
+	gccArray = [0.5]
+	modelTypeArray = ["tanh"]
 	volThresholdArray = [0.001, 0.002, 0.003, 0.004, 0.005, 0.006, 0.007, 0.008, 0.009,
 						0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.08, 0.09, 
 						0.1, 0.3, 0.5, 0.7, 0.9, 
 						0.91, 0.92, 0.93, 0.94, 0.95, 0.96, 0.97, 0.98, 0.99,
 						0.991, 0.992, 0.993, 0.994, 0.995, 0.996, 0.997, 0.998, 0.999]
 	volThresholdArray = [1.0]
-	useLp = True
+	useLp = False
+	useNewtonHypers = False
 
 	
-	timingFilename = "data/solver_time_det2.csv"
+	timingFilename = "data/solver_time_detKM.csv"
 	headers = ["Problem", "NumSolutions", "volRedThreshold", "numBisection", "numLP", "numGS", "numSingleKill", "numDoubleKill", "totalLPTime", "totalGSTime", "avgLPTime", "avgGSTime"]
 	for i in range(numTrials):
 		headers.append("Run_"+str(i))
-	#headers.append("UseLp")
+	headers.append("UseLp")
 	csvTimeData = [headers]
 
 	for volThreshold in volThresholdArray:
@@ -36,13 +37,14 @@ def solverRambusExperiments():
 				for gcc in gccArray:
 					print ("volThreshold", volThreshold, "modelType", modelType, "numStages", numStages, "gcc", gcc)
 					problemName = "rambus_"+modelType+"_stgs_"+str(numStages)+"_gcc_"+str(gcc)
+					
 					timeData = [problemName]
 					if not(useLp):
 						problemName += "_useLP_false"
 	
 					for n in range(numTrials):
 						start = time.time()
-						allHypers, globalVars = rambusOscillator(modelType=modelType, numStages=numStages, g_cc=gcc, lpThreshold=volThreshold, numSolutions="all" , newtonHypers=True, useLp=useLp)
+						allHypers, globalVars = rambusOscillator(modelType=modelType, numStages=numStages, g_cc=gcc, lpThreshold=volThreshold, numSolutions="all" , newtonHypers=useNewtonHypers, useLp=useLp)
 						end = time.time()
 						[numBisection, numLp, numGs, numSingleKill, numDoubleKill, totalLPTime, totalGSTime, avgLPTime, avgGSTime, stringHyperList] = globalVars
 						numSolutions = len(allHypers)
@@ -62,6 +64,8 @@ def solverRambusExperiments():
 							timeData.append(avgLPTime)
 							timeData.append(avgGSTime)
 							stringTextFilename = problemName + "_volRedThreshold_"+str(volThreshold)+".txt"
+							if not(useLp):
+								stringTextFilename += "_useLP_false"
 							theFile = open("data/textFiles/" + stringTextFilename, 'w')
 							for item in stringHyperList:
 								#print (item, type(item[1]))
@@ -77,14 +81,17 @@ def solverRambusExperiments():
 
 						timeData.append(timeTaken)
 					
-					#timeData.append("False")
+					if not(useLp):
+						timeData.append("False")
+					else:
+						timeData.append("True")
 
 					csvTimeData.append(timeData)
 					
 	timeFile = open(timingFilename, 'a')
 	with timeFile:
-	    writer = csv.writer(timeFile)
-	    writer.writerows(csvTimeData)
+		writer = csv.writer(timeFile)
+		writer.writerows(csvTimeData)
 
 
 def solverSchmittExperiments():
@@ -98,13 +105,15 @@ def solverSchmittExperiments():
 						0.991, 0.992, 0.993, 0.994, 0.995, 0.996, 0.997, 0.998, 0.999]
 
 	volThresholdArray = [1.0]
-	useLp = True
+	useLp = False
+	useNewtonHypers = False
 
 	
-	timingFilename = "data/solver_time_det2.csv"
-	headers = ["Problem", "NumSolutions", "volRedThreshold", "numBisection", "numLP", "numGS", "numSingleKill", "numDoubleKill"]
+	timingFilename = "data/solver_time_detKM.csv"
+	headers = ["Problem", "NumSolutions", "volRedThreshold", "numBisection", "numLP", "numGS", "numSingleKill", "numDoubleKill", "totalLPTime", "totalGSTime", "avgLPTime", "avgGSTime"]
 	for i in range(numTrials):
 		headers.append("Run_"+str(i))
+	headers.append("UseLp")
 	csvTimeData = [headers]
 
 	for inputVoltage in inputVoltageArray:
@@ -115,9 +124,9 @@ def solverSchmittExperiments():
 
 			for n in range(numTrials):
 				start = time.time()
-				allHypers, globalVars = schmittTrigger(inputVoltage, volThreshold, numSolutions = "all", newtonHypers = True, useLp = useLp)
+				allHypers, globalVars = schmittTrigger(inputVoltage, volThreshold, numSolutions = "all", newtonHypers = useNewtonHypers, useLp = useLp)
 				end = time.time()
-				[numBisection, numLp, numGs, numSingleKill, numDoubleKill, stringHyperList] = globalVars
+				[numBisection, numLp, numGs, numSingleKill, numDoubleKill, totalLPTime, totalGSTime, avgLPTime, avgGSTime, stringHyperList] = globalVars
 				numSolutions = len(allHypers)
 				timeTaken = end - start
 				print ("run ", n, "timeTaken", timeTaken)
@@ -130,6 +139,10 @@ def solverSchmittExperiments():
 					timeData.append(numGs)
 					timeData.append(numSingleKill)
 					timeData.append(numDoubleKill)
+					timeData.append(totalLPTime)
+					timeData.append(totalGSTime)
+					timeData.append(avgLPTime)
+					timeData.append(avgGSTime)
 					stringTextFilename = problemName + "_volRedThreshold_"+str(volThreshold)+".txt"
 					if not(useLp):
 						stringTextFilename += "_useLP_false"
@@ -150,12 +163,14 @@ def solverSchmittExperiments():
 			
 			if not(useLp):
 				timeData.append("False")
+			else:
+				timeData.append("True")
 			csvTimeData.append(timeData)
 					
 	timeFile = open(timingFilename, 'a')
 	with timeFile:
-	    writer = csv.writer(timeFile)
-	    writer.writerows(csvTimeData)
+		writer = csv.writer(timeFile)
+		writer.writerows(csvTimeData)
 
 def solverBenchmarkExperiments():
 	from prototype2 import *
@@ -169,14 +184,14 @@ def solverBenchmarkExperiments():
 
 	volThresholdArray = [1.0]
 	useLp = True
+	useNewtonHypers = False
 
 	
-	timingFilename = "data/solver_time_det2.csv"
+	timingFilename = "data/solver_time_detKM.csv"
 	headers = ["Problem", "NumSolutions", "volRedThreshold", "numBisection", "numLP", "numGS", "numSingleKill", "numDoubleKill", "totalLPTime", "totalGSTime", "avgLPTime", "avgGSTime"]
 	for i in range(numTrials):
 		headers.append("Run_"+str(i))
-	if not(useLp):
-		headers.append("UseLp")
+	headers.append("UseLp")
 	csvTimeData = [headers]
 
 	for problemType in problemTypeArray:
@@ -186,7 +201,7 @@ def solverBenchmarkExperiments():
 
 			for n in range(numTrials):
 				start = time.time()
-				allHypers, globalVars = singleVariableInequalities(problemType, volThreshold, numSolutions="all", newtonHypers=True, useLp=useLp)
+				allHypers, globalVars = singleVariableInequalities(problemType, volThreshold, numSolutions="all", newtonHypers=useNewtonHypers, useLp=useLp)
 				end = time.time()
 				timeTaken = end - start
 				print ("run ", n, "timeTaken", timeTaken)
@@ -225,12 +240,14 @@ def solverBenchmarkExperiments():
 			
 			if not(useLp):
 				timeData.append("False")
+			else:
+				timeData.append("True")
 			csvTimeData.append(timeData)
 					
 	timeFile = open(timingFilename, 'a')
 	with timeFile:
-	    writer = csv.writer(timeFile)
-	    writer.writerows(csvTimeData)
+		writer = csv.writer(timeFile)
+		writer.writerows(csvTimeData)
 
 
 # started at 3:21
@@ -278,8 +295,8 @@ def dRealRambusExperiments():
 					
 	timeFile = open(timingFilename, 'a')
 	with timeFile:
-	    writer = csv.writer(timeFile)
-	    writer.writerows(csvTimeData)
+		writer = csv.writer(timeFile)
+		writer.writerows(csvTimeData)
 
 
 def dRealSchmittExperiments():
@@ -315,8 +332,8 @@ def dRealSchmittExperiments():
 					
 	timeFile = open(timingFilename, 'a')
 	with timeFile:
-	    writer = csv.writer(timeFile)
-	    writer.writerows(csvTimeData)
+		writer = csv.writer(timeFile)
+		writer.writerows(csvTimeData)
 
 
 def dRealBenchmarkExperiments():
@@ -355,11 +372,11 @@ def dRealBenchmarkExperiments():
 					
 	timeFile = open(timingFilename, 'a')
 	with timeFile:
-	    writer = csv.writer(timeFile)
-	    writer.writerows(csvTimeData)
+		writer = csv.writer(timeFile)
+		writer.writerows(csvTimeData)
 
 
-#1:27
+#10:47
 def z3RambusExperiments():
 	from z3Rambus import *
 	numTrials = 1
@@ -369,10 +386,10 @@ def z3RambusExperiments():
 
 	numStagesArray = [2]
 	gccArray = [0.5]
-	modelTypeArray = ["tanh"]
+	modelTypeArray = ["mosfet"]
 
 	
-	timingFilename = "data/z3_rambus.csv"
+	timingFilename = "data/z3_time.csv"
 	headers = ["Problem", "NumSolutions"]
 	for i in range(numTrials):
 		headers.append("Run_"+str(i))
@@ -404,16 +421,17 @@ def z3RambusExperiments():
 					
 	timeFile = open(timingFilename, 'a')
 	with timeFile:
-	    writer = csv.writer(timeFile)
-	    writer.writerows(csvTimeData)
+		writer = csv.writer(timeFile)
+		writer.writerows(csvTimeData)
 
 
+#10:47
 def z3SchmittExperiments():
 	from z3Schmitt import *
-	numTrials = 3
-	inputVoltageArray = [0.0, 0.2, 0.4, 0.6, 0.8, 1.0, 1.2, 1.4, 1.6, 1.8]
+	numTrials = 1
+	inputVoltageArray = [0.0]
 	
-	timingFilename = "z3_time_schmitt.csv"
+	timingFilename = "data/z3_time.csv"
 	headers = ["Problem", "NumSolutions"]
 	for i in range(numTrials):
 		headers.append("Run_"+str(i))
@@ -441,8 +459,8 @@ def z3SchmittExperiments():
 					
 	timeFile = open(timingFilename, 'a')
 	with timeFile:
-	    writer = csv.writer(timeFile)
-	    writer.writerows(csvTimeData)
+		writer = csv.writer(timeFile)
+		writer.writerows(csvTimeData)
 
 
 def solverRambusExperimentsMemory():
@@ -482,15 +500,15 @@ def solverRambusExperimentsMemory():
 					
 	memFile = open(memoryFilename, 'a')
 	with memFile:
-	    writer = csv.writer(memFile)
-	    writer.writerows(csvMemData)
+		writer = csv.writer(memFile)
+		writer.writerows(csvMemData)
 
 
+#z3RambusExperiments()
 solverRambusExperiments()
 #solverSchmittExperiments()
 #solverBenchmarkExperiments()
 #dRealRambusExperiments()
 #dRealSchmittExperiments()
 #dRealBenchmarkExperiments()
-#z3RambusExperiments()
-
+#z3SchmittExperiments()

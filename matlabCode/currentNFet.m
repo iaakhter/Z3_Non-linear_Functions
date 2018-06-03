@@ -2,10 +2,23 @@ function [I, firDerSrc, firDerGate, firDerDrain, secDerSrc, secDerGate, secDerDr
   if(nargin < 8) Sn = 8/3.0; end;
   if(nargin < 7) Kn = 1.5; end;
   if(nargin < 6) Vdd = 1.8; end;
-  if(nargin < 5) Vtn = 0.4; end;
-  if(nargin < 4) Vtp = -0.4; end;
+  if(nargin < 5) Vtn = 0.3; end;
+  if(nargin < 4) Vtp = -0.3; end;
   Kp = -Kn/2.0;
   Sp = Sn*2.0;
+
+  I = 0.0;
+  firDerSrc = 0.0;
+  firDerGate = 0.0;
+  firDerDrain = 0.0;
+  secDerSrc = 0.0;
+  secDerGate = 0.0;
+  secDerDrain = 0.0;
+  secDerSrcGate = 0.0;
+  secDerSrcDrain = 0.0;
+  secDerGateDrain = 0.0;
+  gs = gate - src;
+  ds = drain - src;
 
   InMax = 0.0;
   constantSrc = 0.0;
@@ -114,5 +127,6 @@ function [I, firDerSrc, firDerGate, firDerDrain, secDerSrc, secDerGate, secDerDr
     secDerSrcGate = secDerSrcGate + secDerLeakSrcGate;
     secDerSrcDrain = secDerSrcDrain + secDerLeakSrcDrain;
     secDerGateDrain = secDerGateDrain + secDerLeakGateDrain;
+
   end
 end % inverter

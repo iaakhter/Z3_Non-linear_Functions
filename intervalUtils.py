@@ -1,6 +1,7 @@
 import numpy as np
 import copy
 import random
+import math
 from intervalBasics import *
 
 
@@ -10,12 +11,8 @@ def multiplyRegularMatWithIntervalMat(regMat,intervalMat):
 		for j in range(intervalMat.shape[1]):
 			intervalVal = np.zeros(2)
 			for k in range(intervalMat.shape[1]):
-				multMin = min(regMat[i,k]*intervalMat[k,j,0], regMat[i,k]*intervalMat[k,j,1])
-				multMax = max(regMat[i,k]*intervalMat[k,j,0], regMat[i,k]*intervalMat[k,j,1])
-				intervalVal[0] += multMin
-				intervalVal[1] += multMax
-			result[i,j,0] = intervalVal[0]
-			result[i,j,1] = intervalVal[1]
+				intervalVal += interval_mult(regMat[i,k],intervalMat[k,j])
+			result[i,j,:] = intervalVal
 
 	return result
 
@@ -32,13 +29,18 @@ def multiplyIntervalMatWithIntervalVec(mat,vec):
 	for i in range(mat.shape[0]):
 		intervalVal = np.zeros(2)
 		for j in range(mat.shape[1]):
-			multMin = min(mat[i,j,0]*vec[j,0], mat[i,j,0]*vec[j,1], mat[i,j,1]*vec[j,0], mat[i,j,1]*vec[j,1])
-			multMax = max(mat[i,j,0]*vec[j,0], mat[i,j,0]*vec[j,1], mat[i,j,1]*vec[j,0], mat[i,j,1]*vec[j,1])
-			intervalVal[0] += multMin
-			intervalVal[1] += multMax
-		result[i,0] = intervalVal[0]
-		result[i,1] = intervalVal[1]
+			intervalVal += interval_mult(mat[i,j],vec[j])
+		result[i,:] = intervalVal
 	return result
+
+
+def volume(hyperRectangle):
+	if hyperRectangle is None:
+		return None
+	vol = 1
+	for i in range(hyperRectangle.shape[0]):
+		vol *= (hyperRectangle[i,1] - hyperRectangle[i,0])
+	return vol
 
 def newton(model,soln):
 	h = soln
@@ -168,193 +170,28 @@ def checkExistenceOfSolutionGS(model,hyperRectangle):
 		raise Exception('tiny')'''
 	return(False, newBounds)
 	
-'''
-Check existence of solution within a certain hyperRectangle
-using the Gauss-Siedel - like operator???
-'''
-def checkExistenceOfSolutionGS2(model,hyperRectangle):
-	numVolts = len(hyperRectangle[0])
-	#print ("start K operator", hyperRectangle)
-	startBounds = np.zeros((numVolts,2))
-	startBounds[:,0] = hyperRectangle[0,:]
-	startBounds[:,1] = hyperRectangle[1,:]
-	#print "startBounds ", startBounds
-	iteration = 0
-	constructBiggerHyper = False
-	while True:
-		#print ("iteration number: ", iteration)
-		#print ("startBounds ", startBounds)
-		midPoint = (startBounds[:,0] + startBounds[:,1])/2.0
-		#midPoint = startBounds[:,0] + (startBounds[:,1] - startBounds[:,0])*0.25
-		#print ("midPoint")
-		#print (midPoint)
-		_,_,IMidPoint = np.array(model.oscNum(midPoint))
-		jacMidPoint = model.jacobian(midPoint)
-		#print ("jacMidPoint")
-		#print (jacMidPoint)
-		C = None
-		numIterations = 0
-
-		while True:
-			fail = False
-			try:
-				#print ("midPoint", midPoint)
-				#print ("jacobian in K", jacMidPoint)
-				C = np.linalg.pinv(jacMidPoint)
-				#print ("C", C)
-			except np.linalg.linalg.LinAlgError:
-				fail = True
-				randomVal = random.uniform(0.1,0.9)
-				midPoint = startBounds[:,0] + (startBounds[:,1] - startBounds[:,0])*randomVal
-				#print ("newMidPoint", midPoint)
-				_,_,IMidPoint = np.array(model.oscNum(midPoint))
-				jacMidPoint = model.jacobian(midPoint)
-
-			if not(fail):
-				break
-			numIterations += 1
-			'''if numIterations == 200:
-				return'''
-			#return
-
-		#print "C"
-		#print C
-		#print "condition number of C", np.linalg.cond(C)
-
-		#print "C ", C
-		#C = np.identity(numVolts)
-		I = np.identity(numVolts)
-
-		jacInterval = model.jacobianInterval(startBounds)
-		#print "jacInterval"
-		#print jacInterval
-		#print "IMidPoint"
-		#print IMidPoint
-		C_IMidPoint = np.dot(C,IMidPoint)
-		#print "C_IMidPoint", C_IMidPoint
-
-		C_jacInterval = multiplyRegularMatWithIntervalMat(C,jacInterval)
-
-		I_minus_C_jacInterval = subtractIntervalMatFromRegularMat(I,C_jacInterval)
-
-		gsInterval = np.zeros((numVolts,2))
-		gsIntersect = np.copy(startBounds)
-		for i in range(numVolts):
-			sumTerm = np.zeros((2))
-			for j in range(numVolts):
-				subTerm1 = gsIntersect[j,0] - midPoint[j]
-				subTerm2 = gsIntersect[j,1] - midPoint[j]
-				mult = np.zeros((2))
-				mult1 = I_minus_C_jacInterval[i,j,0] * subTerm1
-				mult2 = I_minus_C_jacInterval[i,j,0] * subTerm2
-				mult3 = I_minus_C_jacInterval[i,j,1] * subTerm1
-				mult4 = I_minus_C_jacInterval[i,j,1] * subTerm2
-				mult[0] = min(mult1, mult2, mult3, mult4)
-				mult[1] = max(mult1, mult2, mult3, mult4)
-				sumTerm += mult
-			C_ImidPoint_minus_sumTerm = np.zeros((2))
-			C_ImidPoint_minus_sumTerm[0] = min(C_IMidPoint[i] - sumTerm[0], C_IMidPoint[i] - sumTerm[1])
-			C_ImidPoint_minus_sumTerm[1] = max(C_IMidPoint[i] - sumTerm[0], C_IMidPoint[i] - sumTerm[1])
-			#divTerm = np.zeros((2))
-			#div1 = C_ImidPoint_minus_sumTerm[0]/C_jacInterval[i,i,0]
-			#div2 = C_ImidPoint_minus_sumTerm[0]/C_jacInterval[i,i,1]
-			#div3 = C_ImidPoint_minus_sumTerm[1]/C_jacInterval[i,i,0]
-			#div4 = C_ImidPoint_minus_sumTerm[1]/C_jacInterval[i,i,1]
-			#divTerm[0] = min(div1,div2,div3,div4)
-			#divTerm[1] = max(div1,div2,div3,div4)
-			#print "divTerm ", divTerm
-			gsInterval[i][0] = min(midPoint[i] - C_ImidPoint_minus_sumTerm[0], midPoint[i] - C_ImidPoint_minus_sumTerm[1])
-			gsInterval[i][1] = max(midPoint[i] - C_ImidPoint_minus_sumTerm[0], midPoint[i] - C_ImidPoint_minus_sumTerm[1])
-			minVal = max(gsInterval[i][0],startBounds[i][0])
-			maxVal = min(gsInterval[i][1],startBounds[i][1])
-			if minVal <= maxVal and \
-				minVal >= gsInterval[i][0] and minVal >= startBounds[i][0] and \
-				minVal <= gsInterval[i][1] and minVal <= startBounds[i][1] and \
-				maxVal >= gsInterval[i][0] and maxVal >= startBounds[i][0] and \
-				maxVal <= gsInterval[i][1] and maxVal <= startBounds[i][1]:
-				gsIntersect[i] = [minVal,maxVal]
-			elif np.less_equal(np.absolute(gsInterval[i,:] - startBounds[i,:]),1e-8*np.ones((2))).all():
-				gsIntersect[i] = startBounds[i]
-			else:
-				#print ("problem i ", i)
-				#print ("gsInterval[i] ", gsInterval[i])
-				#print (np.absolute(gsInterval[i,:] - startBounds[i,:]))
-				#print (minVal <= maxVal)
-				return (False, None)
-
-		#print ("gsInterval ")
-		#print (gsInterval)
-		#print ("gsIntersect ")
-		#print (gsIntersect)
-		uniqueSoln = True
-		for i in range(numVolts):
-			if gsInterval[i][0] <= startBounds[i][0] or gsInterval[i][0] >= startBounds[i][1]:
-				uniqueSoln = False
-			if gsInterval[i][1] <= startBounds[i][0] or gsInterval[i][1] >= startBounds[i][1]:
-				uniqueSoln = False
-
-		#print (gsInterval[:,0] - startBounds[:,0])
-		#print (startBounds[:,1] - gsInterval[:,1])
-		if uniqueSoln:
-			#print "Hyperrectangle with unique solution found"
-			#print kInterval
-			return (True,gsInterval)
-		
-		#print ("constructBiggerHyper before", constructBiggerHyper)
-		if np.less_equal(gsIntersect[:,1] - gsIntersect[:,0],1e-8*np.ones((numVolts))).all() or  np.less_equal(np.absolute(gsIntersect - startBounds),1e-4*np.ones((numVolts,2))).all():
-			if constructBiggerHyper == False and np.less_equal(gsIntersect[:,1] - gsIntersect[:,0],1e-8*np.ones((numVolts))).all():
-				#print ("gsIntersect before")
-				#print (gsIntersect)
-				constructBiggerHyper = True
-				exampleVolt = (gsIntersect[:,0] + gsIntersect[:,1])/2.0
-				soln = newton(model,exampleVolt)
-				#print ("soln ", soln)
-				# the new hyper must contain the solution in the middle and enclose old hyper
-				# and then we check for uniqueness of solution in the newer bigger hyperrectangle
-				if soln[0]:
-					for si in range(numVolts):
-						maxDiff = max(abs(gsIntersect[si,1] - soln[1][si]), abs(soln[1][si] - gsIntersect[si,0]))
-						#print ("maxDiff", maxDiff)
-						if maxDiff < 1e-9:
-							maxDiff = 1e-9
-						#maxDiff = 0.01
-						#print "maxDiff ", maxDiff
-						gsIntersect[si,0] = soln[1][si] - maxDiff
-						gsIntersect[si,1] = soln[1][si] + maxDiff
-
-					#print ("bigger hyper ", gsIntersect)
-					startBounds = gsIntersect
-				#print ("after if constructBiggerHyper", constructBiggerHyper)
-			else:
-				return (False,gsIntersect)
-		else:
-			startBounds = gsIntersect
-		iteration += 1
-		#print ("end")
 
 '''
 Check existence of solution within a certain hyperRectangle
 using the Krawczyk operator
 '''
-def checkExistenceOfSolution(model,hyperRectangle):
-	numVolts = len(hyperRectangle[0])
+def checkExistenceOfSolution(model,hyperRectangle, alpha = 1.0):
+	numV = len(hyperRectangle[0])
 
-	startBounds = np.zeros((numVolts,2))
+	startBounds = np.zeros((numV,2))
 	startBounds[:,0] = hyperRectangle[0,:]
 	startBounds[:,1] = hyperRectangle[1,:]
 
 	if hasattr(model, 'f'):
 		funVal = model.f(startBounds)
-		if(not all([funVal[i,0]*funVal[i,1] <= 1e-12 for i in range(numVolts)])):
+		if(not all([funVal[i,0]*funVal[i,1] <= 1e-12 for i in range(numV)])):
 			return (False, None)
-	#print "startBounds ", startBounds
 	constructBiggerHyper = False
 	iteration = 0
 	while True:
 		#print "iteration number: ", iteration
 		#print ("startBounds ", startBounds)
 		midPoint = (startBounds[:,0] + startBounds[:,1])/2.0
-		#midPoint = startBounds[:,0] + (startBounds[:,1] - startBounds[:,0])*0.25
 		#print "midPoint"
 		#print midPoint
 		fMidPoint = np.array(model.f(midPoint))
@@ -367,7 +204,7 @@ def checkExistenceOfSolution(model,hyperRectangle):
 		#print "condition number of C", np.linalg.cond(C)
 
 		#print "C ", C
-		I = np.identity(numVolts)
+		I = np.identity(numV)
 
 		jacInterval = model.jacobian(startBounds)
 		#print "jacInterval"
@@ -383,75 +220,57 @@ def checkExistenceOfSolution(model,hyperRectangle):
 		I_minus_C_jacInterval = subtractIntervalMatFromRegularMat(I,C_jacInterval)
 		#print "I_minus_C_jacInterval"
 		#print I_minus_C_jacInterval
-		xi_minus_midPoint = np.zeros((numVolts,2))
-		for i in range(numVolts):
-			xi_minus_midPoint[i][0] = min(startBounds[i][0] - midPoint[i], startBounds[i][1] - midPoint[i])
-			xi_minus_midPoint[i][1] = max(startBounds[i][0] - midPoint[i], startBounds[i][1] - midPoint[i])
+		xi_minus_midPoint = np.zeros((numV,2))
+		xi_minus_midPoint[:,0] = startBounds[:,0] - midPoint
+		xi_minus_midPoint[:,1] = startBounds[:,1] - midPoint
+		
 		#print "xi_minus_midPoint", xi_minus_midPoint
 		lastTerm = multiplyIntervalMatWithIntervalVec(I_minus_C_jacInterval, xi_minus_midPoint)
 		#print "lastTerm "
 		#print lastTerm
 
-		kInterval1 = midPoint - C_fMidPoint + lastTerm[:,0]
-		kInterval2 = midPoint - C_fMidPoint + lastTerm[:,1]
-		kInterval = np.zeros((numVolts,2))
-		#print "kInterval1 ", kInterval1, " kInterval2 ", kInterval2
-		kInterval[:,0] = np.minimum(kInterval1, kInterval2)
-		kInterval[:,1] = np.maximum(kInterval1, kInterval2)
+		kInterval = np.zeros((numV,2))
+		kInterval[:,0] = midPoint - C_fMidPoint + lastTerm[:,0]
+		kInterval[:,1] = midPoint - C_fMidPoint + lastTerm[:,1]
 
 		#print ("kInterval ")
 		#print (kInterval)
 
-		uniqueSoln = True
-		for i in range(numVolts):
-			if kInterval[i][0] <= startBounds[i][0] or kInterval[i][0] >= startBounds[i][1]:
-				uniqueSoln = False
-			if kInterval[i][1] <= startBounds[i][0] or kInterval[i][1] >= startBounds[i][1]:
-				uniqueSoln = False
+		# if kInterval is in the interior of startBounds, found a unique solution
+		if(all([ (interval_lo(kInterval[i]) > interval_lo(startBounds[i])) and (interval_hi(kInterval[i]) < interval_hi(startBounds[i]))
+			 for i in range(numV) ])):
+			return (True, kInterval)
 
-		if uniqueSoln:
-			#print "Hyperrectangle with unique solution found"
-			#print kInterval
-			return (True,kInterval)
 
-		intersect = np.zeros((numVolts,2))
-		for i in range(numVolts):
-			minVal = max(kInterval[i][0],startBounds[i][0])
-			maxVal = min(kInterval[i][1],startBounds[i][1])
-			if minVal <= maxVal and \
-				minVal >= kInterval[i][0] and minVal >= startBounds[i][0] and \
-				minVal <= kInterval[i][1] and minVal <= startBounds[i][1] and \
-				maxVal >= kInterval[i][0] and maxVal >= startBounds[i][0] and \
-				maxVal <= kInterval[i][1] and maxVal <= startBounds[i][1]:
-				intersect[i] = [minVal,maxVal]
-				intervalLength =  intersect[:,1] - intersect[:,0]
+		epsilonBounds = 1e-8
+		intersect = np.zeros((numV,2))
+		for i in range(numV):
+			intersectVar = interval_intersect(kInterval[i], startBounds[i])
+			if intersectVar is not None:
+				intersect[i] = intersectVar
 			
-			elif np.less_equal(np.absolute(kInterval[i,:] - startBounds[i,:]),1e-8*np.ones((2))).all():
+			elif np.less_equal(np.absolute(kInterval[i,:] - startBounds[i,:]),epsilonBounds*np.ones((2))).all():
+				# being careful about numerical issues here
 				intersect[i] = startBounds[i]
 			else:
-				'''print "problem index ", i
-				print "kInterval[i]", kInterval[i][0], kInterval[i][1]
-				print "startBounds[i]", startBounds[i][0], startBounds[i][1]
-				print "minVal ", minVal, "maxVal",maxVal
-				print minVal <= maxVal'''
-				intersect = None
-				break
+				# no solution
+				return (False, None)
 
 		#print ("intersect")
 		#print (intersect)
 
-		if intersect is None:
-			#print "hyperrectangle does not contain any solution"
-			return (False,None)
+		oldVolume = volume(startBounds)
+		newVolume = volume(intersect)
+		volReduc = (oldVolume - newVolume)/(oldVolume*1.0)
 
-		#print (intersect[:,1] - intersect[:,0])
+		tinyIntersect = np.less_equal(intersect[:,1] - intersect[:,0],epsilonBounds*np.ones((numV))).all()
 		
-		
-		if np.less_equal(intersect[:,1] - intersect[:,0],1e-5*np.ones((numVolts))).all() or  np.less_equal(np.absolute(intersect - startBounds),1e-4*np.ones((numVolts,2))).all():
-			
-			if constructBiggerHyper == False and np.less_equal(intersect[:,1] - intersect[:,0],1e-5*np.ones((numVolts))).all():
-				#print ("gsIntersect before")
-				#print (gsIntersect)
+		if tinyIntersect or math.isnan(volReduc) or volReduc < alpha:
+			# If intersect is tiny, use newton's method to find a solution
+			# in the intersect and construct a bigger hyper than intersect
+			# with the solution at the center. This is to take care of cases
+			# when the solution is at the boundary
+			if constructBiggerHyper == False and tinyIntersect:
 				constructBiggerHyper = True
 				exampleVolt = (intersect[:,0] + intersect[:,1])/2.0
 				soln = newton(model,exampleVolt)
@@ -459,26 +278,23 @@ def checkExistenceOfSolution(model,hyperRectangle):
 				# the new hyper must contain the solution in the middle and enclose old hyper
 				# and then we check for uniqueness of solution in the newer bigger hyperrectangle
 				if soln[0]:
-					for si in range(numVolts):
+					for si in range(numV):
 						maxDiff = max(abs(intersect[si,1] - soln[1][si]), abs(soln[1][si] - intersect[si,0]))
 						#print ("maxDiff", maxDiff)
-						if maxDiff < 1e-9:
-							maxDiff = 1e-9
+						if maxDiff < epsilonBounds:
+							maxDiff = epsilonBounds
 						#print "maxDiff ", maxDiff
 						intersect[si,0] = soln[1][si] - maxDiff
 						intersect[si,1] = soln[1][si] + maxDiff
 
 					#print ("bigger hyper ", intersect)
 					startBounds = intersect
-				#print ("after if constructBiggerHyper", constructBiggerHyper)
 			else:
-				for ii in range(numVolts):
-					if intersect[ii,0] < hyperRectangle[0,ii]:
-						intersect[ii,0] = hyperRectangle[0,ii]
-					if intersect[ii,1] > hyperRectangle[1,ii]:
-						intersect[ii,1] = hyperRectangle[1,ii]
+				intersect[:,0] = np.maximum(hyperRectangle[0,:], intersect[:,0])
+				intersect[:,1] = np.minimum(hyperRectangle[1,:], intersect[:,1])
 				return (False,intersect)
 		else:
 			startBounds = intersect
 
 		iteration += 1
+

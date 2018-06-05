@@ -34,15 +34,6 @@ def bisectMax(hyper, orderingArray=None, orderingIndex=None):
 	return [lHyper, rHyper]
 
 
-def volume(hyperRectangle):
-	if hyperRectangle is None:
-		return None
-	vol = 1
-	for i in range(hyperRectangle.shape[0]):
-		vol *= (hyperRectangle[i,1] - hyperRectangle[i,0])
-	return vol
-
-
 #solver's main loop
 #hyperrectangles containing unique solutions are added in uniqueHypers. 
 #	If Newton's preprocessing step was used then uniqueHypers also containing
@@ -66,7 +57,7 @@ def solverLoop(uniqueHypers, solutionsFoundSoFar, model, volRedThreshold, bisect
 		hyperRectangle[i,0] = model.bounds[i][0]
 		hyperRectangle[i,1] = model.bounds[i][1]
 
-	stringHyperList.append(("i", volume(hyperRectangle)))
+	stringHyperList.append(("i", intervalUtils.volume(hyperRectangle)))
 
 	start = time.time()
 	feas = intervalUtils.checkExistenceOfSolution(model,hyperRectangle.transpose())
@@ -75,7 +66,7 @@ def solverLoop(uniqueHypers, solutionsFoundSoFar, model, volRedThreshold, bisect
 	numGs += 1
 	if feas[0] or feas[1] is None:
 		return uniqueHypers
-	stringHyperList.append(("g", volume(feas[1])))
+	stringHyperList.append(("g", intervalUtils.volume(feas[1])))
 
 
 
@@ -134,7 +125,7 @@ def solverLoop(uniqueHypers, solutionsFoundSoFar, model, volRedThreshold, bisect
 						break'''
 				lHyp, rHyp = bisectFun(hypForBisection, orderingArray, orderIndex)
 				numBisection += 1
-				stringHyperList.append(("b", [volume(lHyp), volume(rHyp)]))
+				stringHyperList.append(("b", [intervalUtils.volume(lHyp), intervalUtils.volume(rHyp)]))
 				#print ("lHyp", lHyp)
 				orderIndex = (orderIndex + 1)%lenV
 				start = time.time()
@@ -142,7 +133,7 @@ def solverLoop(uniqueHypers, solutionsFoundSoFar, model, volRedThreshold, bisect
 				end = time.time()
 				totalGSTime += end - start
 				numGs += 1
-				stringHyperList.append(("g", volume(lFeas[1])))
+				stringHyperList.append(("g", intervalUtils.volume(lFeas[1])))
 				#print ("lFeas", lFeas)
 				#print ("rHyp", rHyp)
 				start = time.time()
@@ -151,7 +142,7 @@ def solverLoop(uniqueHypers, solutionsFoundSoFar, model, volRedThreshold, bisect
 				totalGSTime += end - start
 
 				numGs += 1
-				stringHyperList.append(("g", volume(rFeas[1])))
+				stringHyperList.append(("g", intervalUtils.volume(rFeas[1])))
 				#print ("rFeas", rFeas)
 				if lFeas[0] or rFeas[0] or (lFeas[0] == False and lFeas[1] is None) or (rFeas[0] == False and rFeas[1] is None):
 					if lFeas[0] and rFeas[0]:
@@ -217,7 +208,7 @@ def ifFeasibleHyper(hyperRectangle, volRedThreshold,model,useLp=True):
 			#print ("endlp")
 			numLp += 1
 			if feasible:
-				vol = volume(newHyperRectangle)
+				vol = intervalUtils.volume(newHyperRectangle)
 			else:
 				vol = None
 			stringHyperList.append(("l", vol))
@@ -238,7 +229,7 @@ def ifFeasibleHyper(hyperRectangle, volRedThreshold,model,useLp=True):
 		end = time.time()
 		totalGSTime += (end - start)
 		numGs += 1
-		stringHyperList.append(("g", volume(kResult[1])))
+		stringHyperList.append(("g", intervalUtils.volume(kResult[1])))
 		#print ("kResult")
 		#print (kResult)
 		
@@ -260,14 +251,10 @@ def ifFeasibleHyper(hyperRectangle, volRedThreshold,model,useLp=True):
 		#If Gauss-Seidel cannot make a decision apply linear programming
 		newHyperRectangle = kResult[1]			 
 
-		hyperVol = 1.0
-		for i in range(lenV):
-			hyperVol *= (hyperRectangle[i,1] - hyperRectangle[i,0])
+		hyperVol = intervalUtils.volume(hyperRectangle)
 		#hyperVol = hyperVol**(1.0/lenV)
 
-		newHyperVol = 1.0
-		for i in range(lenV):
-			newHyperVol *= (newHyperRectangle[i,1] - newHyperRectangle[i,0])
+		newHyperVol = intervalUtils.volume(newHyperRectangle)
 		#newHyperVol = newHyperVol**(1.0/lenV)
 
 		propReduc = (hyperVol - newHyperVol)/hyperVol
@@ -617,9 +604,6 @@ def singleVariableInequalities(problemType, volRedThreshold, numSolutions="all",
 		xBound = [0.0, 100.0/201]
 		model = metiProblems.Meti18(xBound[0], xBound[1], " > ")
 
-	if problemType == "meti10":
-		xBound = [0.5, 1.06155141]
-		model = metiProblems.Meti10(xBound[0], xBound[1], " < ")
 
 	lenV = 1
 	indexChoiceArray = [0]
@@ -658,10 +642,10 @@ def singleVariableInequalities(problemType, volRedThreshold, numSolutions="all",
 
 if __name__ == "__main__":
 	start = time.time()
-	allHypers, globalVars = rambusOscillator(modelType="mosfet", numStages=4, g_cc=4.0, lpThreshold=1.0, numSolutions="all" , newtonHypers=None, useLp=False)
+	allHypers, globalVars = rambusOscillator(modelType="tanh", numStages=6, g_cc=4.0, lpThreshold=1.0, numSolutions="all" , newtonHypers=None, useLp=True)
 	#print ("allHypers", allHypers)
-	#schmittTrigger(inputVoltage = 1.0, lpThreshold = 1.0, numSolutions = "all", newtonHypers = False, useLp = False)
-	#singleVariableInequalities(problemType="flyspeck172", volRedThreshold=1.0, numSolutions="all", newtonHypers=False, useLp=True)
+	#schmittTrigger(inputVoltage = 1.8, lpThreshold = 1.0, numSolutions = "all", newtonHypers = False, useLp = False)
+	#singleVariableInequalities(problemType="meti18", volRedThreshold=1.0, numSolutions="all", newtonHypers=False, useLp=True)
 	#print(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss)
 	#print ("numSolutions", len(allHypers))
 	end = time.time()

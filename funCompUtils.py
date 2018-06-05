@@ -8,60 +8,97 @@ from intervalBasics import *
 
 #sin(const*x)
 def sinFun(x,const):
-	Ifun = math.sin(const*x)
-	der = const*math.cos(const*x)
-	return [Ifun, der]
+	funVal = np.sin(const*x)
 
-def sinFunInterval(x, const):
-	#print ("x", x)
-	lowVal = math.floor(x[0]/(const*math.pi))
-	highVal = math.floor(x[1]/(const*math.pi))
-	if highVal - lowVal > 2.0:
-		return np.array([-1.0, 1.0])
+	if interval_p(x):
+		lowVal = math.floor(x[0]/(const*math.pi))
+		highVal = math.floor(x[1]/(const*math.pi))
+		if highVal - lowVal > 2.0:
+			return np.array([-1.0, 1.0])
 
-	if int(lowVal) %2 == 0:
-		return np.array([min(sinFun(x[0], const)[0], sinFun(x[1], const)[0]), 1.0])
-	else:
-		return np.array([-1.0, max(sinFun(x[0], const)[0], sinFun(x[1], const)[0])])
+		if int(lowVal) %2 == 0:
+			return np.array([min(funVal[0], funVal[1]), 1.0])
+		else:
+			return np.array([-1.0, max(funVal[0], funVal[1])])
+	return funVal
+	
+
+def sinFunder(x,const):
+	return interval_mult(const,cosFun(x,const))
+
+
 
 #cos(const*x)
 def cosFun(x,const):
-	Ifun = math.cos(const*x)
-	der = -const*math.sin(const*x)
-	return [Ifun, der]
+	funVal = np.cos(const*x)
 
-def cosFunInterval(x, const):
-	shiftedToSin = interval_sub(x,math.pi/2.0)
-	lowVal = math.floor(shiftedToSin[0]/(const*math.pi))
-	highVal = math.floor(shiftedToSin[1]/(const*math.pi))
-	if highVal - lowVal > 2.0:
-		return np.array([-1.0, 1.0])
+	if interval_p(x):
+		shiftedToSin = interval_sub(x,math.pi/2.0)
+		lowVal = math.floor(shiftedToSin[0]/(const*math.pi))
+		highVal = math.floor(shiftedToSin[1]/(const*math.pi))
+		if highVal - lowVal > 2.0:
+			return np.array([-1.0, 1.0])
 
-	if int(lowVal) %2 == 0:
-		return np.array([min(cosFun(x[0], const)[0], cosFun(x[1], const)[0]), 1.0])
-	else:
-		return np.array([-1.0, max(cosFun(x[0], const)[0], cosFun(x[1], const)[0])])
-	return sinInterval
+		if int(lowVal) %2 == 0:
+			return np.array([min(funVal[0], funVal[1]), 1.0])
+		else:
+			return np.array([-1.0, max(funVal[0], funVal[1])])
+	return funVal
+	
 
-#tanhFun(const*x)
+def cosFunder(x,const):
+	return interval_mult(const,interval_neg(sinFun(x,const)))
+
+
 def tanhFun(x, const):
-	Ifun = np.tanh(const*x)
+	tanhVal = np.tanh(const*x)
+	if interval_p(x):
+		return np.array([min(tanhVal[0], tanhVal[1]), max(tanhVal[0], tanhVal[1])])
+	return tanhVal
+	#return -(exp(a*val) - exp(-a*val))/(exp(a*val) + exp(-a*val))
+
+
+def tanhFunder(x, const):
 	den = np.cosh(const*x)*np.cosh(const*x)
-	der = const/den
-	return [Ifun, der]
+	grad = np.divide(const,den)
+	if interval_p(x):
+		if x[0]*x[1] >= 0:
+			grad = np.array([min(grad[0], grad[1]), max(grad[0], grad[1])])
+		else:
+			den0 = np.cosh(0.0)*np.cosh(0.0)
+			grad0 = np.divide(const,den0)
+			grad = np.array([min(grad[0], grad[1], grad0), max(grad[0], grad[1], grad0)])
+
+	return grad
 
 #1/(const*x)
 def invFun(x, const):
-	Ifun = 1/(const*x)
-	der = -const/(const*const*x*x)
-	return [Ifun, der]
+	funVal = np.divide(1, (const*x))
+	if interval_p(x):
+		if any([xVal == 0 for xVal in x]):
+			raise Exception('Invalid argument for invFun ' + str(x))
+		if x[0]*x[1] > 0.0:
+			return np.array([min(funVal[0], funVal[1]), max(funVal[0], funVal[1])])
+		else:
+			return np.array([-float("inf"), float("inf")])
+	if x == 0:
+		raise Exception('Invalid argument for invFun ' + str(x))
+	return funVal
+	
 
-def invFunInterval(x,const):
-	#print ("x in invFunInterval", x)
-	if x[0]*x[1] > 0.0:
-		return np.array([min(invFun(x[0], const)[0], invFun(x[1], const)[0]), max(invFun(x[0], const)[0], invFun(x[1], const)[0])])
-	else:
-		return np.array([-float("inf"), float("inf")])
+def invFunder(x,const):
+	der = -np.divide(const,(const*const*x*x))
+	if interval_p(x):
+		if any([xVal == 0 for xVal in x]):
+			raise Exception('Invalid argument for invFun ' + str(x))
+		if x[0]*x[1] > 0.0:
+			return np.array([min(der[0], der[1]), max(der[0], der[1])])
+		else:
+			return np.array([-float("inf"), max(der[0], der[1])])
+	if x == 0:
+		raise Exception('Invalid argument for invFun ' + str(x))
+	return der
+
 
 
 #(const*x)/(2 + const*x)
@@ -78,14 +115,31 @@ def logFun1(x,const):
 
 #arcsin(const*x)
 def arcsinFun(x, const):
-	Ifun = math.asin(const*x)
-	der = const/(math.sqrt(1 - const*x*const*x))
-	return [Ifun, der]
+	fun = np.arcsin(const*x)
+	if interval_p(x):
+		if any([xVal < -1 or xVal > 1 for xVal in x]):
+			raise Exception('Invalid argument for arcsin ' + str(x))
+		return np.array([min(fun[0], fun[1]), max(fun[0], fun[1])])
+	if x < -1 or x > 1:
+		raise Exception('Invalid argument for arcsin ' + str(x))
+	return fun
 
-def arcsinFunInterval(x, const):
-	arcsin1 = arcsinFun(x[0], const)
-	arcsin2 = arcsinFun(x[1], const)
-	return np.array([min(arcsin1, arcsin2)[0], max(arcsin1, arcsin2)[0]])
+
+def arcsinFunder(x, const):
+	grad = np.divide(const,(np.sqrt(1 - const*x*const*x)))
+	if interval_p(x):
+		if any([xVal < -1 or xVal > 1 for xVal in x]):
+			raise Exception('Invalid argument for arcsin ' + str(x))
+		if x[0]*x[1] >= 0:
+			grad = np.array([min(grad[0], grad[1]), max(grad[0], grad[1])])
+		else:
+			grad0 = np.divide(const,(1.0))
+			grad = np.array([min(grad[0], grad[1], grad0), max(grad[0], grad[1], grad0)])
+
+	if x < -1 or x > 1:
+		raise Exception('Invalid argument for arcsin ' + str(x))
+	return grad
+
 
 #arctan(const*x)
 def arctanFun(x, const):
@@ -109,9 +163,9 @@ def sinLinearConstraints(constant, inputVar, outputVar, inputLow, inputHigh):
 	if inputLowPi == inputHighPi:
 		if inputLowPi%2 == 0:
 			#print ("coming here?")
-			return triangleBounds(sinFun, constant, inputVar, outputVar, inputLow, inputHigh, "pos")
+			return triangleBounds(sinFun, sinFunder, constant, inputVar, outputVar, inputLow, inputHigh, "pos")
 		else:
-			return triangleBounds(sinFun, constant, inputVar, outputVar, inputLow, inputHigh, "neg")
+			return triangleBounds(sinFun, sinFunder, constant, inputVar, outputVar, inputLow, inputHigh, "neg")
 
 	overallConstraint = "1 " + inputVar + " >= " + str(inputLow) + "\n"
 	overallConstraint += "1 " + inputVar + " <= " + str(inputHigh) + "\n"
@@ -123,7 +177,7 @@ def sinLinearConstraints(constant, inputVar, outputVar, inputLow, inputHigh):
 		if inputEnd > inputHigh:
 			inputEnd = inputHigh
 		#print ("inputStart", inputStart, "inputEnd", inputEnd)
-		tPts = trianglePoints(sinFun, inputStart, inputEnd, constant)
+		tPts = trianglePoints(sinFun, sinFunder, inputStart, inputEnd, constant)
 		allTrianglePoints += tPts
 		inputStart = inputEnd
 		inputEnd += math.pi/constant
@@ -147,9 +201,9 @@ def cosLinearConstraints(constant, inputVar, outputVar, inputLow, inputHigh):
 	if inputLowPi == inputHighPi:
 		if inputLowPi%2 == 0:
 			#print ("coming here?")
-			return triangleBounds(cosFun, constant, inputVar, outputVar, inputLow, inputHigh, "pos")
+			return triangleBounds(cosFun, cosFunder, constant, inputVar, outputVar, inputLow, inputHigh, "pos")
 		else:
-			return triangleBounds(cosFun, constant, inputVar, outputVar, inputLow, inputHigh, "neg")
+			return triangleBounds(cosFun, cosFunder, constant, inputVar, outputVar, inputLow, inputHigh, "neg")
 
 	overallConstraint = "1 " + inputVar + " >= " + str(inputLow) + "\n"
 	overallConstraint += "1 " + inputVar + " <= " + str(inputHigh) + "\n"
@@ -161,7 +215,7 @@ def cosLinearConstraints(constant, inputVar, outputVar, inputLow, inputHigh):
 		if inputEnd > inputHigh:
 			inputEnd = inputHigh
 		#print ("inputStart", inputStart, "inputEnd", inputEnd)
-		tPts = trianglePoints(cosFun, inputStart, inputEnd, constant)
+		tPts = trianglePoints(cosFun, cosFunder, inputStart, inputEnd, constant)
 		allTrianglePoints += tPts
 		inputStart = inputEnd
 		inputEnd += math.pi/constant
@@ -204,32 +258,31 @@ def log1LinearConstraints(constant, inputVar, outputVar, inputLow, inputHigh):
 #linear constraints for 1/(constant*x)
 def inverseLinearConstraints(constant, inputVar, outputVar, inputLow, inputHigh):
 	if inputLow == 0.0 or inputHigh == 0.0:
-		print ("invalid lowBound or highBound for exponential", inputLow, inputHigh)
-		return None
+		raise  Exception("invalid lowBound or highBound for exponential" + str(inputLow) + " " + str(inputHigh))
 	if inputLow > 0.0 and inputHigh > 0:
-		return triangleBounds(invFun, constant, inputVar, outputVar, inputLow, inputHigh, "pos")
+		return triangleBounds(invFun, invFunder, constant, inputVar, outputVar, inputLow, inputHigh, "pos")
 	elif inputLow < 0.0 and inputHigh < 0.0:
-		return triangleBounds(invFun, constant, inputVar, outputVar, inputLow, inputHigh, "neg")
+		return triangleBounds(invFun, invFunder, constant, inputVar, outputVar, inputLow, inputHigh, "neg")
 	elif inputLow < 0.0 and inputHigh > 0.0:
-		return triangleBounds(invFun, constant, inputVar, outputVar, inputLow, inputHigh, None)
+		return triangleBounds(invFun, invFunder, constant, inputVar, outputVar, inputLow, inputHigh, None)
 
 #linear constraints for arcsin(constant*x)
 def arcsinLinearConstraints(constant, inputVar, outputVar, inputLow, inputHigh):
 	if inputLow < -1.0 or inputLow > 1.0 or inputHigh < -1.0 or inputHigh > 1.0:
-		print ("invalid lowBound or highBound for arcsin", inputLow, inputHigh)
+		raise Exception("invalid lowBound or highBound for arcsin" + str(inputLow) + " " + str(inputHigh))
 		return None
 
 	if inputLow >= 0.0 and inputHigh >= 0.0:
-		return triangleBounds(arcsinFun, constant, inputVar, outputVar, inputLow, inputHigh, "pos")
+		return triangleBounds(arcsinFun, arcsinFunder, constant, inputVar, outputVar, inputLow, inputHigh, "pos")
 
 	elif inputLow <= 0.0 and inputHigh <= 0.0:
-		return triangleBounds(arcsinFun, constant, inputVar, outputVar, inputLow, inputHigh, "neg")
+		return triangleBounds(arcsinFun, arcsinFunder, constant, inputVar, outputVar, inputLow, inputHigh, "neg")
 
 	overallConstraint = "1 " + inputVar + " >= " + str(inputLow) + "\n"
 	overallConstraint += "1 " + inputVar + " <= " + str(inputHigh) + "\n"
 	allTrianglePoints = []
-	allTrianglePoints += trianglePoints(arcsinFun, inputLow, 0.0, constant)
-	allTrianglePoints += trianglePoints(arcsinFun, 0.0, inputHigh, constant)
+	allTrianglePoints += trianglePoints(arcsinFun, arcsinFunder, inputLow, 0.0, constant)
+	allTrianglePoints += trianglePoints(arcsinFun, arcsinFunder, 0.0, inputHigh, constant)
 	allTrianglePoints = np.array(allTrianglePoints)
 	#print ("inputLow", inputLow, "inputHigh", inputHigh)
 	#print ("allTrianglePoints")
@@ -240,22 +293,22 @@ def arcsinLinearConstraints(constant, inputVar, outputVar, inputLow, inputHigh):
 def tanhLinearConstraints(constant, inputVar, outputVar, inputLow, inputHigh):
 	if constant < 0:
 		if inputLow <= 0.0 and inputHigh <= 0.0:
-			return triangleBounds(tanhFun, constant, inputVar, outputVar, inputLow, inputHigh, "neg")
+			return triangleBounds(tanhFun, tanhFunder, constant, inputVar, outputVar, inputLow, inputHigh, "neg")
 		if inputLow >= 0.0 and inputHigh >= 0.0:
-			return triangleBounds(tanhFun, constant, inputVar, outputVar, inputLow, inputHigh, "pos")
+			return triangleBounds(tanhFun, tanhFunder, constant, inputVar, outputVar, inputLow, inputHigh, "pos")
 	elif constant >= 0:
 		if inputLow <= 0.0 and inputHigh <= 0.0:
-			return triangleBounds(tanhFun, constant, inputVar, outputVar, inputLow, inputHigh, "pos")
+			return triangleBounds(tanhFun, tanhFunder, constant, inputVar, outputVar, inputLow, inputHigh, "pos")
 		if inputLow >= 0.0 and inputHigh >= 0.0:
-			return triangleBounds(tanhFun, constant, inputVar, outputVar, inputLow, inputHigh, "neg")
+			return triangleBounds(tanhFun, tanhFunder, constant, inputVar, outputVar, inputLow, inputHigh, "neg")
 
 	overallConstraint = "1 " + inputVar + " >= " + str(inputLow) + "\n"
 	overallConstraint += "1 " + inputVar + " <= " + str(inputHigh) + "\n"
 	overallConstraint += "1 " + outputVar + " <= 1.0\n"
 	overallConstraint += "1 " + outputVar + " >= -1.0\n"
 	allTrianglePoints = []
-	allTrianglePoints += trianglePoints(tanhFun, inputLow, 0.0, constant)
-	allTrianglePoints += trianglePoints(tanhFun, 0.0, inputHigh, constant)
+	allTrianglePoints += trianglePoints(tanhFun, tanhFunder, inputLow, 0.0, constant)
+	allTrianglePoints += trianglePoints(tanhFun, tanhFunder, 0.0, inputHigh, constant)
 	allTrianglePoints = np.array(allTrianglePoints)
 	try:
 		cHullConstraints = convexHullConstraints2D(allTrianglePoints, inputVar, outputVar)
@@ -290,11 +343,14 @@ def xSquareLinearConstraints(constant, inputVar, outputVar, inputLow, inputHigh)
 	return triangleBounds(xSquare, constant, inputVar, outputVar, inputLow, inputHigh, "pos")
 
 #points of triangle formed by trianglebounds for a function
-def trianglePoints(function, inputLow, inputHigh, constant):
+def trianglePoints(function, functionDer, inputLow, inputHigh, constant):
 	if inputLow > inputHigh:
 		return []
-	[funLow, dLow] = function(inputLow,constant)
-	[funHigh, dHigh] = function(inputHigh,constant)
+	funLow = function(inputLow, constant)
+	dLow = functionDer(inputLow, constant)
+	funHigh = function(inputHigh, constant)
+	dHigh = functionDer(inputHigh, constant)
+	
 	cLow = funLow - dLow*inputLow
 	cHigh = funHigh - dHigh*inputHigh
 
@@ -317,9 +373,12 @@ def trianglePoints(function, inputLow, inputHigh, constant):
 	return tPts
 
 
-def triangleBounds(function, constant, inputVar, outputVar, inputLow, inputHigh, secDer):
-	[funLow, dLow] = function(inputLow, constant)
-	[funHigh, dHigh] = function(inputHigh, constant)
+def triangleBounds(function, functionDer, constant, inputVar, outputVar, inputLow, inputHigh, secDer):
+	funLow = function(inputLow, constant)
+	dLow = functionDer(inputLow, constant)
+	funHigh = function(inputHigh, constant)
+	dHigh = functionDer(inputHigh, constant)
+	
 	cLow = funLow - dLow*inputLow
 	cHigh = funHigh - dHigh*inputHigh
 

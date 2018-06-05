@@ -6,7 +6,7 @@ import math
 import funCompUtils as fcUtils
 from intervalBasics import *
 
-class Example1:
+class Flyspeck172:
 	def __init__(self, lowBound, upperBound, sign):
 		self.solver = None
 		self.x = "x" # main variable
@@ -21,35 +21,33 @@ class Example1:
 		self.boundMap.append({0:[lowBound,midVal],1:[midVal,upperBound]})
 
 
-	def f(self, bounds):
-		bounds = bounds[0]
+	def f(self, V):
+		if hasattr(V,'ndim') and len(V.shape) == 2:
+			V = V[0]
 		return np.array([interval_add(interval_sub(
 				interval_sub( 
-							interval_mult(interval_mult(2.0, bounds),
-											fcUtils.arcsinFunInterval(interval_mult(math.cos(0.797), 
-																		fcUtils.sinFunInterval(fcUtils.invFunInterval(bounds,1.0), math.pi)), 1.0)),
-							interval_mult(0.0331,bounds)), 2*math.pi), 2.097)])
+							interval_mult(interval_mult(2.0, V),
+											fcUtils.arcsinFun(interval_mult(math.cos(0.797), 
+																		fcUtils.sinFun(fcUtils.invFun(V,1.0), math.pi)), 1.0)),
+							interval_mult(0.0331,V)), 2*math.pi), 2.097)])
 
-	def oscNum(self,xVal):
-		val = 2*xVal*math.asin(math.cos(0.797)*math.sin(math.pi/xVal)) - 0.0331*xVal + self.constant
-		return [None, None, val]
 
 	def jacobian(self,x):
-		jac = np.zeros((1,1))
-		jac[0,0] = 2*math.asin(math.cos(0.797)*math.sin(math.pi/x)) - (2*math.cos(0.797)*math.pi*math.cos(math.pi/x))/(x*(- math.cos(0.797)*math.cos(0.797)*math.sin(math.pi/x)**2 + 1)**(1/2.0)) - 331/10000.0
-		#jac[0,0] = 2*xVal*((-math.cos(0.797)*math.cos(math.pi/xVal)*(1/(xVal*xVal)))/(math.sqrt(1 - (math.cos(0.797)*math.sin(math.pi/xVal)*(math.cos(0.797)*math.sin(math.pi/xVal))))))
-		#jac[0,0] += 2*math.asin(math.cos(0.797)*math.sin(math.pi/xVal)) - 0.0331
+		if hasattr(x,'ndim') and len(x.shape) == 2:
+			x = x[0]
+		intervalVal = interval_p(x)
+
+		if intervalVal:
+			jac = np.zeros((1,1,2))
+			der1 = 2*math.asin(math.cos(0.797)*math.sin(math.pi/x[0])) - (2*math.cos(0.797)*math.pi*math.cos(math.pi/x[0]))/(x[0]*(- math.cos(0.797)*math.cos(0.797)*math.sin(math.pi/x[0])**2 + 1)**(1/2.0)) - 331/10000.0
+			der2 = 2*math.asin(math.cos(0.797)*math.sin(math.pi/x[1])) - (2*math.cos(0.797)*math.pi*math.cos(math.pi/x[1]))/(x[1]*(- math.cos(0.797)*math.cos(0.797)*math.sin(math.pi/x[1])**2 + 1)**(1/2.0)) - 331/10000.0
+			jac[0,0,0] = min(der1, der2)
+			jac[0,0,1] = max(der1, der2)
+		else:
+			jac = np.zeros((1,1))
+			jac[0,0] = 2*math.asin(math.cos(0.797)*math.sin(math.pi/x)) - (2*math.cos(0.797)*math.pi*math.cos(math.pi/x))/(x*(- math.cos(0.797)*math.cos(0.797)*math.sin(math.pi/x)**2 + 1)**(1/2.0)) - 331/10000.0
 		return jac
 
-	def jacobianInterval(self, bounds):
-		lowBound = bounds[:,0]
-		upperBound = bounds[:,1]
-		jac = np.zeros((1,1,2))
-		jac1 = self.jacobian(lowBound)
-		jac2 = self.jacobian(upperBound)
-		jac[:,:,0] = np.minimum(jac1, jac2)
-		jac[:,:,1] = np.maximum(jac1, jac2)
-		return jac
 	
 	def dLinearConstraints(self, zVar, inputVar, outputVar, patch):
 		points = np.zeros((patch.shape[0],3))
@@ -229,32 +227,22 @@ class Example1:
 		#self.b = "b" # b = sin(pi*a)
 		#self.c = "c" # c = arcsin(cos(0.797)*b)
 		#self.d = "d" # d = 2*x*c - 0.0331*x - 2*pi + 2.097
+		xBounds = hyperRectangle[0]
+		aBounds = fcUtils.invFun(xBounds, 1)
+		bBounds = fcUtils.sinFun(aBounds, math.pi)
+		cBounds = fcUtils.arcsinFun(bBounds, math.cos(0.797))
+		
 
-		xLowBound = hyperRectangle[0,0]
-		xUpperBound = hyperRectangle[0,1]
-		aLowBound = 1.0/xUpperBound
-		aUpperBound = 1.0/xLowBound
-		bLowBound = min(fcUtils.sinFun(aLowBound,math.pi)[0], fcUtils.sinFun(aUpperBound,math.pi)[0])
-		bUpperBound = max(fcUtils.sinFun(aLowBound,math.pi)[0], fcUtils.sinFun(aUpperBound,math.pi)[0])
-		#print ("(aLowBound - math.pi/2.0)/(math.pi)",aLowBound/(math.pi/2.0))
-		#print ("(aUpperBound - math.pi/2.0)/(math.pi)", aUpperBound/(math.pi/2.0))
-		if abs(aLowBound/aUpperBound) > 1.0:
-			bLowBound= -1.0
-			bUpperBound = 1.0
-		#print ("bLowBound", bLowBound, "bUpperBound", bUpperBound)
-		cLowBound = min(fcUtils.arcsinFun(bLowBound,math.cos(0.797))[0], fcUtils.arcsinFun(bUpperBound,math.cos(0.797))[0])
-		cUpperBound = max(fcUtils.arcsinFun(bLowBound,math.cos(0.797))[0], fcUtils.arcsinFun(bUpperBound,math.cos(0.797))[0])
-
-		allConstraints += fcUtils.inverseLinearConstraints(1, self.x, self.a, xLowBound, xUpperBound)
-		allConstraints += fcUtils.sinLinearConstraints(math.pi, self.a, self.b, aLowBound, aUpperBound)
-		allConstraints += fcUtils.arcsinLinearConstraints(math.cos(0.797), self.b, self.c, bLowBound, bUpperBound)
+		allConstraints += fcUtils.inverseLinearConstraints(1, self.x, self.a, xBounds[0], xBounds[1])
+		allConstraints += fcUtils.sinLinearConstraints(math.pi, self.a, self.b, aBounds[0], aBounds[1])
+		allConstraints += fcUtils.arcsinLinearConstraints(math.cos(0.797), self.b, self.c, bBounds[0], bBounds[1])
 		
 
 		patch = np.zeros((4,2))
-		patch[0,:] = [xLowBound, cLowBound]
-		patch[1,:] = [xUpperBound, cLowBound]
-		patch[2,:] = [xUpperBound, cUpperBound]
-		patch[3,:] = [xLowBound, cUpperBound]
+		patch[0,:] = [xBounds[0], cBounds[0]]
+		patch[1,:] = [xBounds[1], cBounds[0]]
+		patch[2,:] = [xBounds[1], cBounds[1]]
+		patch[3,:] = [xBounds[0], cBounds[1]]
 		allConstraints += self.dLinearConstraints(self.d, self.x, self.c, patch)
 		#allConstraints += "1 " + self.x + " >= -3.60\n"
 		#allConstraints += "1 " + self.x + " <= -3.58\n"
@@ -305,7 +293,7 @@ class Example1:
 
 
 if __name__ == "__main__":
-	example1 = Example1(3, 64, ">")
+	example1 = Flyspeck172(3, 64, ">")
 	#print (example1.oscNum(20))
 	#print (example1.jacobian(20))
 	x = np.linspace(1.0, 80, 1000)
@@ -316,7 +304,7 @@ if __name__ == "__main__":
 		sampleDelta = 0.0001
 		xSamples = np.linspace(xBound[0] + sampleDelta, xBound[1] - sampleDelta, 100)
 		for xs in xSamples:
-			f = example1.oscNum(xs)[2]
+			f = example1.f(xs)
 			if f < fVal[0] or f > fVal[1]:
 				print "oops x ", xs, "for interval", xBound
 				print "actual f", f, "should be in", fVal

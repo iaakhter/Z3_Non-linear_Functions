@@ -20,28 +20,33 @@ class Meti25:
 		self.boundMap.append({0:[lowBound,midVal],1:[midVal,upperBound]})
 
 
-	def f(self, bounds):
-		bounds = bounds[0]
+	def f(self, V):
+		if hasattr(V,'ndim') and len(V.shape) == 2:
+			V = V[0]
 		return np.array([interval_add(
-			fcUtils.sinFunInterval(bounds, 1.0/3.0),
-			interval_div(fcUtils.sinFunInterval(bounds, 3.0),6.0))])
+			fcUtils.sinFun(V, 1.0/3.0),
+			interval_div(fcUtils.sinFun(V, 3.0),6.0))])
 
-	def oscNum(self,xVal):
-		val = math.sin(xVal/3.0) + math.sin(3*xVal)/6.0
-		return [None, None, np.array([val])]
 
 	def jacobian(self,x):
-		jac = np.zeros((1,1))
-		jac[0,0] = math.cos(x/3.0)/3.0 + math.cos(x*3.0)/2.0
-		return jac
+		if hasattr(x,'ndim') and len(x.shape) == 2:
+			x = x[0]
+		intervalVal = interval_p(x)
+
+		if intervalVal:
+			return self.jacobianInterval(x)
+		else:	
+			jac = np.zeros((1,1))
+			jac[0,0] = math.cos(x/3.0)/3.0 + math.cos(x*3.0)/2.0
+			return jac
 
 	def secondDer(self,x):
 		return (-1.0/9.0)*math.sin(x/3.0) - 1.5*math.sin(3*x)
 
 
 	def jacobianInterval(self, bounds):
-		lowBound = bounds[:,0]
-		upperBound = bounds[:,1]
+		lowBound = bounds[0]
+		upperBound = bounds[1]
 
 		jac = np.zeros((1,1,2))
 		jac1 = self.jacobian(lowBound)
@@ -125,17 +130,22 @@ class Meti18:
 		midVal = (lowBound + upperBound)/2.0
 		self.boundMap.append({0:[lowBound,midVal],1:[midVal,upperBound]})
 
-	def f(self, bounds):
-		bounds = bounds[0]
+	def f(self, V):
+		if hasattr(V,'ndim') and len(V.shape) == 2:
+			V = V[0]
 		return np.array([interval_add(
-						interval_sub(fcUtils.cosFunInterval(bounds, math.pi), 1),
-						interval_mult(2,bounds))])
+						interval_sub(fcUtils.cosFun(V, math.pi), 1),
+						interval_mult(2,V))])
 	
-	def oscNum(self,xVal):
-		val = math.cos(math.pi*xVal) - 1.0 + 2*xVal
-		return [None, None, val]
 
 	def jacobian(self,x):
+		if hasattr(x,'ndim') and len(x.shape) == 2:
+			x = x[0]
+		intervalVal = interval_p(x)
+
+		if intervalVal:
+			return self.jacobianInterval(x)
+		
 		jac = np.zeros((1,1))
 		jac[0,0] = -math.pi*math.sin(math.pi*x) + 2.0
 		return jac
@@ -145,8 +155,8 @@ class Meti18:
 
 
 	def jacobianInterval(self, bounds):
-		lowBound = bounds[:,0]
-		upperBound = bounds[:,1]
+		lowBound = bounds[0]
+		upperBound = bounds[1]
 
 		jac = np.zeros((1,1,2))
 		jac1 = self.jacobian(lowBound)

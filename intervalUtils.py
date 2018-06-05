@@ -54,7 +54,7 @@ def newton(model,soln):
 	while count < maxIter and (np.linalg.norm(h) > 1e-8 or count == 0) :
 		#print ("soln", soln)
 		#print ("h", h)
-		_,_,res = model.oscNum(soln)
+		res = model.f(soln)
 		#print ("res", res)
 		res = -np.array(res)
 		jac = model.jacobian(soln)
@@ -357,7 +357,7 @@ def checkExistenceOfSolution(model,hyperRectangle):
 		#midPoint = startBounds[:,0] + (startBounds[:,1] - startBounds[:,0])*0.25
 		#print "midPoint"
 		#print midPoint
-		_,_,IMidPoint = np.array(model.oscNum(midPoint))
+		fMidPoint = np.array(model.f(midPoint))
 		jacMidPoint = model.jacobian(midPoint)
 		#print "jacMidPoint"
 		#print jacMidPoint
@@ -369,12 +369,12 @@ def checkExistenceOfSolution(model,hyperRectangle):
 		#print "C ", C
 		I = np.identity(numVolts)
 
-		jacInterval = model.jacobianInterval(startBounds)
+		jacInterval = model.jacobian(startBounds)
 		#print "jacInterval"
 		#print jacInterval
 		#print "IMidPoint"
 		#print IMidPoint
-		C_IMidPoint = np.dot(C,IMidPoint)
+		C_fMidPoint = np.dot(C,fMidPoint)
 		#print "C_IMidPoint", C_IMidPoint
 
 		C_jacInterval = multiplyRegularMatWithIntervalMat(C,jacInterval)
@@ -392,8 +392,8 @@ def checkExistenceOfSolution(model,hyperRectangle):
 		#print "lastTerm "
 		#print lastTerm
 
-		kInterval1 = midPoint - C_IMidPoint + lastTerm[:,0]
-		kInterval2 = midPoint - C_IMidPoint + lastTerm[:,1]
+		kInterval1 = midPoint - C_fMidPoint + lastTerm[:,0]
+		kInterval2 = midPoint - C_fMidPoint + lastTerm[:,1]
 		kInterval = np.zeros((numVolts,2))
 		#print "kInterval1 ", kInterval1, " kInterval2 ", kInterval2
 		kInterval[:,0] = np.minimum(kInterval1, kInterval2)

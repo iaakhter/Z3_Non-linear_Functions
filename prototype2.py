@@ -2,9 +2,9 @@ import numpy as np
 import time
 import copy
 import intervalUtils
-import tanhModel
-import mosfetModel
-import example1
+import rambusTanh
+import rambusMosfet
+import flyspeckProblems
 import metiProblems
 import schmittMosfet
 import rambusUtils as rUtils
@@ -451,15 +451,14 @@ def rambusOscillator(modelType, numStages, g_cc, lpThreshold, numSolutions="all"
 	totalGSTime, totalLPTime = 0, 0
 	stringHyperList = []
 	a = -5.0
-	model = tanhModel.TanhModel(modelParam = a, g_cc = g_cc, g_fwd = 1.0, numStages=numStages)
+	model = rambusTanh.RambusTanh(modelParam = a, g_cc = g_cc, g_fwd = 1.0, numStages=numStages)
 	
 	if modelType == "mosfet":
 		#modelParam = [Vtp, Vtn, Vdd, Kn, Kp, Sn]
 		#modelParam = [-0.25, 0.25, 1.0, 1.0, -0.5, 1.0]
 		#modelParam = [-0.4, 0.4, 1.8, 1.5, -0.5, 8/3.0]
 		modelParam = [-0.4, 0.4, 1.8, 270*1e-6, -90*1e-6, 8/3.0]
-		#model = mosfetModel.MosfetModel(modelParam = modelParam, g_cc = g_cc, g_fwd = 1.0, numStages = numStages)
-		model = mosfetModel.RambusMosfetMark(modelParam = modelParam, g_cc = g_cc, g_fwd = 1.0, numStages = numStages)
+		model = rambusMosfet.RambusMosfetMark(modelParam = modelParam, g_cc = g_cc, g_fwd = 1.0, numStages = numStages)
 	
 	startExp = time.time()
 	lenV = numStages*2
@@ -556,7 +555,7 @@ def validSingleVariableInterval(allHypers, model):
 
 	if len(sampleSols) == 0:
 		xRand = random.random()*(xBound[1] - xBound[0]) + xBound[0]
-		xRandVal = model.oscNum(xRand)[2]
+		xRandVal = model.f(xRand)
 		if xRandVal > 0:
 			inequalityIntervals[" > "].append(xBound)
 		else:
@@ -572,7 +571,7 @@ def validSingleVariableInterval(allHypers, model):
 			endInterval = allSampleSols[si + 1]
 			
 			xRand = random.random()*(endInterval - startInterval) + startInterval
-			xRandVal = model.oscNum(xRand)[2]
+			xRandVal = model.f(np.array([xRand]))
 			#print ("startInterval", startInterval, "endInterval", endInterval)
 			#print ("xRand", xRand, "xRandVal", xRandVal)
 			if xRandVal > 0:
@@ -604,10 +603,10 @@ def singleVariableInequalities(problemType, volRedThreshold, numSolutions="all",
 	#numSolutions = 1
 	startExp = time.time()
 	
-	if problemType == "dRealExample":
+	if problemType == "flyspeck172":
 		#xBound = [-100.0, -0.001]
 		xBound = [3.0, 64.0]
-		model = example1.Example1(xBound[0], xBound[1], " > ")
+		model = flyspeckProblems.Flyspeck172(xBound[0], xBound[1], " > ")
 
 	if problemType == "meti25":
 		#xBound = [0.0,7*math.pi]
@@ -660,10 +659,10 @@ def singleVariableInequalities(problemType, volRedThreshold, numSolutions="all",
 
 if __name__ == "__main__":
 	start = time.time()
-	allHypers, globalVars = rambusOscillator(modelType="mosfet", numStages=6, g_cc=4.0, lpThreshold=1.0, numSolutions="all" , newtonHypers=None, useLp=False)
+	#allHypers, globalVars = rambusOscillator(modelType="tanh", numStages=6, g_cc=4.0, lpThreshold=1.0, numSolutions="all" , newtonHypers=None, useLp=True)
 	#print ("allHypers", allHypers)
-	#schmittTrigger(inputVoltage = 0.0, lpThreshold = 1.0, numSolutions = "all", newtonHypers = False, useLp = False)
-	#singleVariableInequalities(problemType="meti18", volRedThreshold=1.0, numSolutions="all", newtonHypers=False, useLp=True)
+	#schmittTrigger(inputVoltage = 1.8, lpThreshold = 1.0, numSolutions = "all", newtonHypers = False, useLp = False)
+	singleVariableInequalities(problemType="flyspeck172", volRedThreshold=1.0, numSolutions="all", newtonHypers=False, useLp=True)
 	#print(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss)
 	#print ("numSolutions", len(allHypers))
 	end = time.time()

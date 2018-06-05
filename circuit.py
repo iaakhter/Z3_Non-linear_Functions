@@ -1,3 +1,5 @@
+# @author Mark Greenstreet
+
 import numpy as np
 import lpUtils
 from cvxopt import matrix,solvers
@@ -309,15 +311,9 @@ class Circuit:
 			I_node[tr.d] = interval_sub(I_node[tr.d], Ids)
 		return I_node
 
-	# Because the Rambus oscillator was our first example, other parts of
-	# other parts of the code expect an 'oscNum' function.  I think this
-	# if what I'm supposed to provide.
-	def oscNum(self, V):
-		return [None, None, self.f(V)]
 
 	def jacobian(self, V):
 		intervalVal = any([interval_p(x) for x in V])
-		
 		
 		if intervalVal:
 			J = np.zeros([len(V), len(V), 2])

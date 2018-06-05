@@ -1,3 +1,5 @@
+# @author Mark Greenstreet
+
 import numpy as np
 
 def my_reduce_last_dim_help(op, src, dst):

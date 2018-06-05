@@ -5,7 +5,7 @@ import funCompUtils as fcUtils
 #from z3 import *
 from intervalBasics import *
 
-class TanhModel:
+class RambusTanh:
 	def __init__(self, modelParam, g_cc, g_fwd, numStages, solver = None):
 		# gradient of tanh -- y = tanh(modelParam*x)
 		self.solver = solver
@@ -30,96 +30,47 @@ class TanhModel:
 		for i in range(numStages*2):
 			self.boundMap.append({0:[-1.0,0.0],1:[0.0,1.0]})
 
-	'''
-	takes in non-symbolic python values
-	calculates the tanhFun of val
-	'''
-	def tanhFun(self,val):
-		tanhVal = np.tanh(self.modelParam*val)
-		if interval_p(val):
-			return np.array([min(tanhVal[0], tanhVal[1]), max(tanhVal[0], tanhVal[1])])
-		return tanhVal
-		#return -(exp(a*val) - exp(-a*val))/(exp(a*val) + exp(-a*val))
-
-
-	'''
-	takes in non-symbolic python values
-	calculates the derivative of tanhFun of val
-	'''
-	def tanhFunder(self,val):
-		den = np.cosh(self.modelParam*val)*np.cosh(self.modelParam*val)
-		#print "den ", den
-		return self.modelParam/den
-				
-	def oscNum(self,V):
+	def f(self, V):
+		intervalVal = any([interval_p(x) for x in V])
 		lenV = len(V)
-		Vin = [V[i % lenV] for i in range(-1,lenV-1)]
-		Vcc = [V[(i + lenV//2) % lenV] for i in range(lenV)]
-		VoutFwd = [self.tanhFun(Vin[i]) for i in range(lenV)]
-		VoutCc = [self.tanhFun(Vcc[i]) for i in range(lenV)]
-		return (VoutFwd, VoutCc, [((self.tanhFun(Vin[i])-V[i])*self.g_fwd
-				+(self.tanhFun(Vcc[i])-V[i])*self.g_cc) for i in range(lenV)])
+		
+		if intervalVal:
+			fVal = np.zeros((lenV,2))
+		else:
+			fVal = np.zeros((lenV))
 
-	def f(self, bounds):
-		lenV = bounds.shape[0]
-		IBounds = np.zeros((lenV,2))
 		for i in range(lenV):
 			fwdInd = (i-1)%lenV
 			ccInd = (i + lenV//2) % lenV
-			tanhFwd = self.tanhFun(bounds[fwdInd,:])
-			tanhCc = self.tanhFun(bounds[ccInd,:])
-			#print ("bounds[fwdInd]", bounds[fwdInd], "tanhFwd", tanhFwd)
-			#print ("bounds[ccInd]", bounds[ccInd], "tanhCc", tanhCc)
-			fwdTerm = interval_sub(tanhFwd, bounds[i,:])
-			ccTerm = interval_sub(tanhCc, bounds[i,:])
-			#print ("bounds[i,:]", bounds[i,:])
-			#print ("fwdTerm", fwdTerm, "ccTerm", ccTerm)
-			IBounds[i,:] = interval_add(interval_mult(self.g_fwd, fwdTerm),interval_mult(self.g_cc, ccTerm))
+			tanhFwd = fcUtils.tanhFun(V[fwdInd], self.modelParam)
+			tanhCc = fcUtils.tanhFun(V[ccInd], self.modelParam)
+			fwdTerm = interval_sub(tanhFwd, V[i])
+			ccTerm = interval_sub(tanhCc, V[i])
+			fVal[i] = interval_add(interval_mult(self.g_fwd, fwdTerm),interval_mult(self.g_cc, ccTerm))
 
-		return IBounds
+		return fVal
 
 
 	'''Get jacobian of rambus oscillator at V
 	'''
 	def jacobian(self,V):
 		lenV = len(V)
-		Vin = [V[i % lenV] for i in range(-1,lenV-1)]
-		Vcc = [V[(i + lenV//2) % lenV] for i in range(lenV)]
-		jac = np.zeros((lenV, lenV))
+		intervalVal = any([interval_p(x) for x in V])
+
+		if intervalVal:
+			jac = np.zeros((lenV, lenV, 2))
+		else:
+			jac = np.zeros((lenV, lenV))
 		for i in range(lenV):
-			jac[i,i] = -(self.g_fwd + self.g_cc)
-			jac[i,(i-1)%lenV] = self.g_fwd * self.tanhFunder(V[(i-1)%lenV])
-			jac[i,(i + lenV//2) % lenV] = self.g_cc * self.tanhFunder(V[(i + lenV//2) % lenV])
+			if intervalVal:
+				jac[i,i] = interval_fix(-(self.g_fwd + self.g_cc))
+			else:
+				jac[i,i] = -(self.g_fwd + self.g_cc)
+			jac[i,(i-1)%lenV] = interval_mult(self.g_fwd, fcUtils.tanhFunder(V[(i-1)%lenV], self.modelParam))
+			jac[i,(i + lenV//2) % lenV] = interval_mult(self.g_cc, fcUtils.tanhFunder(V[(i + lenV//2) % lenV], self.modelParam))
 
 		return jac
 
-	def jacobianInterval(self,bounds):
-		lowerBound = bounds[:,0]
-		upperBound = bounds[:,1]
-		lenV = len(lowerBound)
-		jac = np.zeros((lenV, lenV,2))
-		zerofwd =  self.g_fwd * self.tanhFunder(0)
-		zerocc = self.g_cc * self.tanhFunder(0)
-		for i in range(lenV):
-			jac[i,i,0] = -(self.g_fwd + self.g_cc)
-			jac[i,i,1] = -(self.g_fwd + self.g_cc)
-			gfwdVal1 = self.g_fwd * self.tanhFunder(lowerBound[(i-1)%lenV])
-			gfwdVal2 = self.g_fwd * self.tanhFunder(upperBound[(i-1)%lenV])
-			if lowerBound[(i-1)%lenV] < 0 and upperBound[(i-1)%lenV] > 0:
-				jac[i,(i-1)%lenV,0] = min(gfwdVal1,gfwdVal2,zerofwd)
-				jac[i,(i-1)%lenV,1] = max(gfwdVal1,gfwdVal2,zerofwd)
-			else:
-				jac[i,(i-1)%lenV,0] = min(gfwdVal1,gfwdVal2)
-				jac[i,(i-1)%lenV,1] = max(gfwdVal1,gfwdVal2)
-			gccVal1 = self.g_cc * self.tanhFunder(lowerBound[(i + lenV//2) % lenV])
-			gccVal2 = self.g_cc * self.tanhFunder(upperBound[(i + lenV//2) % lenV])
-			if lowerBound[(i + lenV//2) % lenV] < 0 and upperBound[(i + lenV//2) % lenV] > 0:
-				jac[i,(i + lenV//2) % lenV,0] = min(gccVal1,gccVal2,zerocc)
-				jac[i,(i + lenV//2) % lenV,1] = max(gccVal1,gccVal2,zerocc)
-			else:
-				jac[i,(i + lenV//2) % lenV,0] = min(gccVal1,gccVal2)
-				jac[i,(i + lenV//2) % lenV,1] = max(gccVal1,gccVal2)
-		return jac
 
 	def ignoreHyperInZ3(self, hyperRectangle):
 		lenV = hyperRectangle.shape[0]

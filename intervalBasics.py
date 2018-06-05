@@ -90,7 +90,7 @@ def interval_mult(x, y):
 		return np.array([min(p), max(p)])
 	elif(interval_p(x)):
 		if(y >= 0): return np.array([y*x[0], y*x[1]])
-		else: return(np.array[y*x[1], y*x[0]])
+		else: return np.array([y*x[1], y*x[0]])
 	elif(interval_p(y)):
 		return interval_mult(y,x)
 	else: return(x*y)

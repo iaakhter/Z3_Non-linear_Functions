@@ -9,16 +9,12 @@ from intervalBasics import *
 
 class Meti25:
 	def __init__(self, lowBound, upperBound, sign):
-		self.solver = None
 		self.x = "x" # main variable
 		self.a = "a" # a = sin(x/3)
 		self.b = "b" # b = sin(3*x)
 		self.c = "c" # c = a + b/6.0
 		self.sign = sign
-		self.boundMap = []
-		midVal = (lowBound + upperBound)/2.0
-		self.boundMap.append({0:[lowBound,midVal],1:[midVal,upperBound]})
-
+		self.bounds = [[lowBound, upperBound]]
 
 	def f(self, V):
 		if hasattr(V,'ndim') and len(V.shape) == 2:
@@ -97,38 +93,34 @@ class Meti25:
 		allConstraints += "1 " + self.c + " <= 0\n"
 
 
-		if self.solver is None:
-			variableDict, A, B = lpUtils.constructCoeffMatrices(allConstraints)
-			newHyperRectangle = np.copy(hyperRectangle)
-			feasible = True
+		variableDict, A, B = lpUtils.constructCoeffMatrices(allConstraints)
+		newHyperRectangle = np.copy(hyperRectangle)
+		feasible = True
 
-			minObjConstraint = "min 1 " + self.x
-			maxObjConstraint = "max 1 " + self.x
-			Cmin = lpUtils.constructObjMatrix(minObjConstraint,variableDict)
-			Cmax = lpUtils.constructObjMatrix(maxObjConstraint,variableDict)
-			minSol = solvers.lp(Cmin,A,B)
-			maxSol = solvers.lp(Cmax,A,B)
-			if minSol["status"] == "primal infeasible" and maxSol["status"] == "primal infeasible":
-				feasible = False
-			else:
-				if minSol["status"] == "optimal":
-					newHyperRectangle[0,0] = minSol['x'][variableDict[self.x]] - 1e-6
-				if maxSol["status"] == "optimal":
-					newHyperRectangle[0,1] = maxSol['x'][variableDict[self.x]] + 1e-6
+		minObjConstraint = "min 1 " + self.x
+		maxObjConstraint = "max 1 " + self.x
+		Cmin = lpUtils.constructObjMatrix(minObjConstraint,variableDict)
+		Cmax = lpUtils.constructObjMatrix(maxObjConstraint,variableDict)
+		minSol = solvers.lp(Cmin,A,B)
+		maxSol = solvers.lp(Cmax,A,B)
+		if minSol["status"] == "primal infeasible" and maxSol["status"] == "primal infeasible":
+			feasible = False
+		else:
+			if minSol["status"] == "optimal":
+				newHyperRectangle[0,0] = minSol['x'][variableDict[self.x]] - 1e-6
+			if maxSol["status"] == "optimal":
+				newHyperRectangle[0,1] = maxSol['x'][variableDict[self.x]] + 1e-6
 
-			return [feasible, newHyperRectangle]
+		return [feasible, newHyperRectangle]
 
 
 class Meti18:
 	def __init__(self, lowBound, upperBound, sign):
-		self.solver = None
 		self.x = "x" # main variable
 		self.a = "a" # a = cos(pi*x)
 		self.b = "b" # b = a - 1 + 2x
 		self.sign = sign
-		self.boundMap = []
-		midVal = (lowBound + upperBound)/2.0
-		self.boundMap.append({0:[lowBound,midVal],1:[midVal,upperBound]})
+		self.bounds = [[lowBound, upperBound]]
 
 	def f(self, V):
 		if hasattr(V,'ndim') and len(V.shape) == 2:
@@ -205,38 +197,34 @@ class Meti18:
 		allConstraints += "1 " + self.b + " <= 0\n"
 
 
-		if self.solver is None:
-			variableDict, A, B = lpUtils.constructCoeffMatrices(allConstraints)
-			newHyperRectangle = np.copy(hyperRectangle)
-			feasible = True
+		variableDict, A, B = lpUtils.constructCoeffMatrices(allConstraints)
+		newHyperRectangle = np.copy(hyperRectangle)
+		feasible = True
 
-			minObjConstraint = "min 1 " + self.x
-			maxObjConstraint = "max 1 " + self.x
-			Cmin = lpUtils.constructObjMatrix(minObjConstraint,variableDict)
-			Cmax = lpUtils.constructObjMatrix(maxObjConstraint,variableDict)
-			minSol = solvers.lp(Cmin,A,B)
-			maxSol = solvers.lp(Cmax,A,B)
-			if minSol["status"] == "primal infeasible" and maxSol["status"] == "primal infeasible":
-				feasible = False
-			else:
-				if minSol["status"] == "optimal":
-					newHyperRectangle[0,0] = minSol['x'][variableDict[self.x]] - 1e-6
-				if maxSol["status"] == "optimal":
-					newHyperRectangle[0,1] = maxSol['x'][variableDict[self.x]] + 1e-6
+		minObjConstraint = "min 1 " + self.x
+		maxObjConstraint = "max 1 " + self.x
+		Cmin = lpUtils.constructObjMatrix(minObjConstraint,variableDict)
+		Cmax = lpUtils.constructObjMatrix(maxObjConstraint,variableDict)
+		minSol = solvers.lp(Cmin,A,B)
+		maxSol = solvers.lp(Cmax,A,B)
+		if minSol["status"] == "primal infeasible" and maxSol["status"] == "primal infeasible":
+			feasible = False
+		else:
+			if minSol["status"] == "optimal":
+				newHyperRectangle[0,0] = minSol['x'][variableDict[self.x]] - 1e-6
+			if maxSol["status"] == "optimal":
+				newHyperRectangle[0,1] = maxSol['x'][variableDict[self.x]] + 1e-6
 
-			return [feasible, newHyperRectangle]
+		return [feasible, newHyperRectangle]
 
 class Meti10:
 	def __init__(self, lowBound, upperBound, sign):
-		self.solver = None
 		self.x = "x" # main variable
 		self.a = "a" # a = x/(2 + x)
 		self.b = "b" # b = ln(1 + x)
 		self.c = "c" # c = 2*a - b
 		self.sign = sign
-		self.boundMap = []
-		midVal = (lowBound + upperBound)/2.0
-		self.boundMap.append({0:[lowBound,midVal],1:[midVal,upperBound]})
+		self.bounds = [[lowBound, upperBound]]
 
 
 	def oscNum(self,xVal):
@@ -286,26 +274,25 @@ class Meti10:
 		allConstraints += "1 " + self.c + " <= 0\n"
 
 
-		if self.solver is None:
-			variableDict, A, B = lpUtils.constructCoeffMatrices(allConstraints)
-			newHyperRectangle = np.copy(hyperRectangle)
-			feasible = True
+		variableDict, A, B = lpUtils.constructCoeffMatrices(allConstraints)
+		newHyperRectangle = np.copy(hyperRectangle)
+		feasible = True
 
-			minObjConstraint = "min 1 " + self.x
-			maxObjConstraint = "max 1 " + self.x
-			Cmin = lpUtils.constructObjMatrix(minObjConstraint,variableDict)
-			Cmax = lpUtils.constructObjMatrix(maxObjConstraint,variableDict)
-			minSol = solvers.lp(Cmin,A,B)
-			maxSol = solvers.lp(Cmax,A,B)
-			if minSol["status"] == "primal infeasible" and maxSol["status"] == "primal infeasible":
-				feasible = False
-			else:
-				if minSol["status"] == "optimal":
-					newHyperRectangle[0,0] = minSol['x'][variableDict[self.x]] - 1e-6
-				if maxSol["status"] == "optimal":
-					newHyperRectangle[0,1] = maxSol['x'][variableDict[self.x]] + 1e-6
+		minObjConstraint = "min 1 " + self.x
+		maxObjConstraint = "max 1 " + self.x
+		Cmin = lpUtils.constructObjMatrix(minObjConstraint,variableDict)
+		Cmax = lpUtils.constructObjMatrix(maxObjConstraint,variableDict)
+		minSol = solvers.lp(Cmin,A,B)
+		maxSol = solvers.lp(Cmax,A,B)
+		if minSol["status"] == "primal infeasible" and maxSol["status"] == "primal infeasible":
+			feasible = False
+		else:
+			if minSol["status"] == "optimal":
+				newHyperRectangle[0,0] = minSol['x'][variableDict[self.x]] - 1e-6
+			if maxSol["status"] == "optimal":
+				newHyperRectangle[0,1] = maxSol['x'][variableDict[self.x]] + 1e-6
 
-			return [feasible, newHyperRectangle]
+		return [feasible, newHyperRectangle]
 
 
 if __name__ == "__main__":

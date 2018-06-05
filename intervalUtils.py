@@ -44,12 +44,12 @@ def newton(model,soln):
 	h = soln
 	count = 0
 	maxIter = 100
-	boundMap = model.boundMap
+	bounds = model.bounds
 	lenV = len(soln)
 	overallHyper = np.zeros((lenV,2))
 	for i in range(lenV):
-		overallHyper[i,0] = boundMap[i][0][0]
-		overallHyper[i,1] = boundMap[i][1][1]
+		overallHyper[i,0] = bounds[i][0]
+		overallHyper[i,1] = bounds[i][1]
 	#print ("overallHyper", overallHyper)
 	while count < maxIter and (np.linalg.norm(h) > 1e-8 or count == 0) :
 		#print ("soln", soln)

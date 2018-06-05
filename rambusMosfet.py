@@ -38,11 +38,10 @@ class RambusMosfetMark:
 		self.c = circuit.Circuit(transistorList)
 
 
-		self.boundMap = []
+		self.bounds = []
 		for i in range(numStages*2):
-			self.boundMap.append({0:[0.0,self.Vdd/2.0],1:[self.Vdd/2.0,self.Vdd]})
+			self.bounds.append([0.0, self.Vdd])
 
-		self.solver = None
 
 	def f(self,V):
 		myV = [x for x in V] + [0.0, self.Vdd]

@@ -59,12 +59,12 @@ def solverLoop(uniqueHypers, solutionsFoundSoFar, model, volRedThreshold, bisect
 	global numBisection, numLp, numGs, numSingleKill, numDoubleKill
 	global stringHyperList
 	global totalLPTime, totalGSTime
-	lenV = len(model.boundMap)
+	lenV = len(model.bounds)
 	hyperRectangle = np.zeros((lenV,2))
 
 	for i in range(lenV):
-		hyperRectangle[i,0] = model.boundMap[i][0][0]
-		hyperRectangle[i,1] = model.boundMap[i][1][1]
+		hyperRectangle[i,0] = model.bounds[i][0]
+		hyperRectangle[i,1] = model.bounds[i][1]
 
 	stringHyperList.append(("i", volume(hyperRectangle)))
 
@@ -302,14 +302,14 @@ def addToSolutions(model, allHypers, solutionsFoundSoFar, solHyper):
 
 
 def findAndIgnoreNewtonSoln(model, minVal, maxVal, numSolutions, numTrials = 10):
-	lenV = len(model.boundMap)
+	lenV = len(model.bounds)
 	allHypers = []
 	solutionsFoundSoFar = []
-	boundMap = model.boundMap
+	bounds = model.bounds
 	overallHyper = np.zeros((lenV,2))
 	for i in range(lenV):
-		overallHyper[i,0] = boundMap[i][0][0]
-		overallHyper[i,1] = boundMap[i][1][1]
+		overallHyper[i,0] = bounds[i][0]
+		overallHyper[i,1] = bounds[i][1]
 	#print ("numTrials in newtons preprocessing", numTrials)
 	start = time.time()
 	numFailures = 0
@@ -347,7 +347,6 @@ def findAndIgnoreNewtonSoln(model, minVal, maxVal, numSolutions, numTrials = 10)
 						allHypers.append(hyperWithUniqueSoln)
 						if model.solver is not None:
 							model.ignoreHyperInZ3(hyperWithUniqueSoln)
-						#model.linearConstraints(hyperWithUniqueSoln)
 						break
 	#print ("total num hypers found in ", numTrials, " trials is ", len(allHypers))
 	return (allHypers, solutionsFoundSoFar)
@@ -376,8 +375,8 @@ def schmittTrigger(inputVoltage, lpThreshold, numSolutions = "all", newtonHypers
 	for i in range(lenV):
 		indexChoiceArray.append(i)
 	print ("indexChoiceArray", indexChoiceArray)
-	boundMap = model.boundMap
-	print ("boundMap ", boundMap)
+	bounds = model.bounds
+	print ("bounds ", bounds)
 
 	numStages = 1
 
@@ -385,7 +384,7 @@ def schmittTrigger(inputVoltage, lpThreshold, numSolutions = "all", newtonHypers
 	allHypers = []
 	solutionsFoundSoFar = []
 	if newtonHypers:
-		allHypers, solutionsFoundSoFar = findAndIgnoreNewtonSoln(model, boundMap[0][0][0], boundMap[0][1][1], numSolutions=numSolutions, numTrials = numStages*100)
+		allHypers, solutionsFoundSoFar = findAndIgnoreNewtonSoln(model, bounds[0][0], bounds[0][1], numSolutions=numSolutions, numTrials = numStages*100)
 		newtonHypers = np.copy(allHypers)
 
 	#the solver's main loop
@@ -474,8 +473,8 @@ def rambusOscillator(modelType, numStages, g_cc, lpThreshold, numSolutions="all"
 			indexChoiceArray.append(secondIndex)
 			secondIndex -= 1
 	#print ("indexChoiceArray", indexChoiceArray)
-	boundMap = model.boundMap
-	#print ("boundMap ", boundMap)
+	bounds = model.bounds
+	#print ("bounds ", bounds)
 
 	'''hyper = np.array([[ 1.4031211 ,  1.4031212],
        [ 0.2507801,  0.2507804],
@@ -489,7 +488,7 @@ def rambusOscillator(modelType, numStages, g_cc, lpThreshold, numSolutions="all"
 	allHypers = []
 	solutionsFoundSoFar = []
 	if newtonHypers:
-		allHypers, solutionsFoundSoFar = findAndIgnoreNewtonSoln(model, boundMap[0][0][0], boundMap[0][1][1], numSolutions=numSolutions, numTrials = numStages*100)
+		allHypers, solutionsFoundSoFar = findAndIgnoreNewtonSoln(model, bounds[0][0], bounds[0][1], numSolutions=numSolutions, numTrials = numStages*100)
 		newtonHypers = np.copy(allHypers)
 
 	solverLoop(allHypers, solutionsFoundSoFar, model, lpThreshold, bisectFun=bisectMax, orderingArray=indexChoiceArray, useLp=useLp)
@@ -535,7 +534,7 @@ def rambusOscillator(modelType, numStages, g_cc, lpThreshold, numSolutions="all"
 	return allHypers, globalVars
 
 def validSingleVariableInterval(allHypers, model):
-	xBound = [model.boundMap[0][0][0], model.boundMap[0][1][1]]
+	xBound = [model.bounds[0][0], model.bounds[0][1]]
 	sampleSols, rotatedSols, stableSols, unstableSols = rUtils.categorizeSolutions(allHypers,model)
 
 	for hi in range(len(sampleSols)):
@@ -659,10 +658,10 @@ def singleVariableInequalities(problemType, volRedThreshold, numSolutions="all",
 
 if __name__ == "__main__":
 	start = time.time()
-	#allHypers, globalVars = rambusOscillator(modelType="tanh", numStages=6, g_cc=4.0, lpThreshold=1.0, numSolutions="all" , newtonHypers=None, useLp=True)
+	allHypers, globalVars = rambusOscillator(modelType="mosfet", numStages=4, g_cc=4.0, lpThreshold=1.0, numSolutions="all" , newtonHypers=None, useLp=False)
 	#print ("allHypers", allHypers)
-	#schmittTrigger(inputVoltage = 1.8, lpThreshold = 1.0, numSolutions = "all", newtonHypers = False, useLp = False)
-	singleVariableInequalities(problemType="flyspeck172", volRedThreshold=1.0, numSolutions="all", newtonHypers=False, useLp=True)
+	#schmittTrigger(inputVoltage = 1.0, lpThreshold = 1.0, numSolutions = "all", newtonHypers = False, useLp = False)
+	#singleVariableInequalities(problemType="flyspeck172", volRedThreshold=1.0, numSolutions="all", newtonHypers=False, useLp=True)
 	#print(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss)
 	#print ("numSolutions", len(allHypers))
 	end = time.time()

@@ -43,11 +43,10 @@ class SchmittMosfetMark:
 
 		self.c = circuit.Circuit([m0, m1, m2, m3, m4, m5])
 
-		self.boundMap = []
+		self.bounds = []
 		for i in range(3):
-			self.boundMap.append({0:[0.0,self.Vdd/2.0],1:[self.Vdd/2.0,self.Vdd]})
+			self.bounds.append([0.0,self.Vdd])
 
-		self.solver = None
 
 	def f(self,V):
 		myV = [0.0, self.Vdd, self.inputVoltage] + [x for x in V]

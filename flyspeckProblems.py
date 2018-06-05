@@ -8,7 +8,6 @@ from intervalBasics import *
 
 class Flyspeck172:
 	def __init__(self, lowBound, upperBound, sign):
-		self.solver = None
 		self.x = "x" # main variable
 		self.a = "a" # a = 1/x
 		self.b = "b" # b = sin(pi*a)
@@ -16,9 +15,7 @@ class Flyspeck172:
 		self.d = "d" # d = 2*x*c - 0.0331*x - 2*pi + 2.097
 		self.constant = -2*math.pi + 2.097
 		self.sign = sign
-		self.boundMap = []
-		midVal = (lowBound + upperBound)/2.0
-		self.boundMap.append({0:[lowBound,midVal],1:[midVal,upperBound]})
+		self.bounds = [[lowBound,upperBound]]
 
 
 	def f(self, V):
@@ -269,26 +266,25 @@ class Flyspeck172:
 				allConstraints += allConstraintList[i] + "\n"
 		print ("numConstraints ", len(allConstraintList))'''
 
-		if self.solver is None:
-			variableDict, A, B = lpUtils.constructCoeffMatrices(allConstraints)
-			newHyperRectangle = np.copy(hyperRectangle)
-			feasible = True
+		variableDict, A, B = lpUtils.constructCoeffMatrices(allConstraints)
+		newHyperRectangle = np.copy(hyperRectangle)
+		feasible = True
 
-			minObjConstraint = "min 1 " + self.x
-			maxObjConstraint = "max 1 " + self.x
-			Cmin = lpUtils.constructObjMatrix(minObjConstraint,variableDict)
-			Cmax = lpUtils.constructObjMatrix(maxObjConstraint,variableDict)
-			minSol = solvers.lp(Cmin,A,B)
-			maxSol = solvers.lp(Cmax,A,B)
-			if minSol["status"] == "primal infeasible" and maxSol["status"] == "primal infeasible":
-				feasible = False
-			else:
-				if minSol["status"] == "optimal":
-					newHyperRectangle[0,0] = minSol['x'][variableDict[self.x]] - 1e-6
-				if maxSol["status"] == "optimal":
-					newHyperRectangle[0,1] = maxSol['x'][variableDict[self.x]] + 1e-6
+		minObjConstraint = "min 1 " + self.x
+		maxObjConstraint = "max 1 " + self.x
+		Cmin = lpUtils.constructObjMatrix(minObjConstraint,variableDict)
+		Cmax = lpUtils.constructObjMatrix(maxObjConstraint,variableDict)
+		minSol = solvers.lp(Cmin,A,B)
+		maxSol = solvers.lp(Cmax,A,B)
+		if minSol["status"] == "primal infeasible" and maxSol["status"] == "primal infeasible":
+			feasible = False
+		else:
+			if minSol["status"] == "optimal":
+				newHyperRectangle[0,0] = minSol['x'][variableDict[self.x]] - 1e-6
+			if maxSol["status"] == "optimal":
+				newHyperRectangle[0,1] = maxSol['x'][variableDict[self.x]] + 1e-6
 
-			return [feasible, newHyperRectangle]
+		return [feasible, newHyperRectangle]
 
 
 

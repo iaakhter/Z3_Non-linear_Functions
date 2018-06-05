@@ -2,13 +2,11 @@ import numpy as np
 import lpUtils
 from cvxopt import matrix,solvers
 import funCompUtils as fcUtils
-#from z3 import *
 from intervalBasics import *
 
 class RambusTanh:
-	def __init__(self, modelParam, g_cc, g_fwd, numStages, solver = None):
+	def __init__(self, modelParam, g_cc, g_fwd, numStages):
 		# gradient of tanh -- y = tanh(modelParam*x)
-		self.solver = solver
 		self.modelParam = modelParam
 		self.g_cc = g_cc
 		self.g_fwd = g_fwd
@@ -16,19 +14,14 @@ class RambusTanh:
 		self.xs = []
 		self.ys = []
 		self.zs = []
-		if solver is None:
-			for i in range(numStages*2):
-				self.xs.append("x" + str(i))
-				self.ys.append("y" + str(i))
-				self.zs.append("z" + str(i))
-		else:
-			self.xs = RealVector("x", numStages*2)
-			self.ys = RealVector("y", numStages*2)
-			self.zs = RealVector("z", numStages*2)
-
-		self.boundMap = []
 		for i in range(numStages*2):
-			self.boundMap.append({0:[-1.0,0.0],1:[0.0,1.0]})
+			self.xs.append("x" + str(i))
+			self.ys.append("y" + str(i))
+			self.zs.append("z" + str(i))
+
+		self.bounds = []
+		for i in range(numStages*2):
+			self.bounds.append([-1.0,1.0])
 
 	def f(self, V):
 		intervalVal = any([interval_p(x) for x in V])
@@ -72,52 +65,6 @@ class RambusTanh:
 		return jac
 
 
-	def ignoreHyperInZ3(self, hyperRectangle):
-		lenV = hyperRectangle.shape[0]
-		constraintList = []
-		for i in range(lenV):
-			constraintList.append(self.xs[i] < hyperRectangle[i][0])
-			constraintList.append(self.xs[i] > hyperRectangle[i][1])
-		self.solver.add(Or(*constraintList))
-
-	def ignoreSolInZ3(self, sol):
-		lenV = len(sol)
-		self.solver.add(Or(*[self.xs[i] != sol[i] for i in range(lenV)]))
-
-	def addDomainConstraint(self):
-		lenV = self.numStages*2
-		for i in range(lenV):
-			self.solver.add(self.xs[i] >= -1.0)
-			self.solver.add(self.xs[i] <= 1.0)
-		'''for numStage in range(self.numStages):
-			lastStage = self.numStages - numStage-1
-			if lastStage == 0:
-				break
-			secondLastStage = lastStage - 1
-			lastStageIndex1 = lastStage
-			lastStageIndex2 = (lastStage + lenV//2) % lenV
-			secondLastStageIndex1 = secondLastStage
-			secondLastStageIndex2 = (secondLastStage + lenV//2) % lenV
-			print ("lastStageIndex1", lastStageIndex1, "lastStageIndex2", lastStageIndex2)
-			print ("secondLastStageIndex1", secondLastStageIndex1, "secondLastStageIndex2", secondLastStageIndex2)
-			self.solver.add(Implies(And(self.xs[lastStageIndex1] >= 0,  self.xs[lastStageIndex2] >= 0),
-							And(self.xs[secondLastStageIndex1] <= 0, self.xs[secondLastStageIndex2] <= 0)))
-			self.solver.add(Implies(And(self.xs[lastStageIndex1] <= 0,  self.xs[lastStageIndex2] <= 0),
-							And(self.xs[secondLastStageIndex1] >= 0, self.xs[secondLastStageIndex2] >= 0)))'''
-
-		for i in range(lenV):
-			self.solver.add(self.g_fwd*self.ys[i] + (-self.g_fwd - self.g_cc)*self.xs[i] + self.g_cc*self.zs[i] == 0 )
-
-	def pickVariableRangeConstraint(self, index, interval):
-		self.solver.add(self.xs[index] >= interval[0])
-		self.solver.add(self.xs[index] <= interval[1])
-
-	def thisOrThatHyperConstraint(self, hyper1, hyper2):
-		lenV = self.numStages*2
-		for i in range(lenV):
-			if i == self.numStages - 1 or i == lenV - 1:
-				self.solver.add(self.xs[i] >= hyper1[i][0])
-				self.solver.add(self.xs[i] <= hyper2[i][1])
 
 	def linearConstraints(self, hyperRectangle):
 		solvers.options["show_progress"] = False
@@ -131,58 +78,46 @@ class RambusTanh:
 			#print "fwdInd ", fwdInd, " ccInd ", ccInd
 			#print "hyperRectangle[fwdInd][0]", hyperRectangle[fwdInd][0], "hyperRectangle[fwdInd][1]", hyperRectangle[fwdInd][1]
 			
-			if self.solver is None:
-				triangleClaimFwd = fcUtils.tanhLinearConstraints(self.modelParam, self.xs[fwdInd], self.ys[i], hyperRectangle[fwdInd,0],hyperRectangle[fwdInd,1])
-				allConstraints += triangleClaimFwd
+			triangleClaimFwd = fcUtils.tanhLinearConstraints(self.modelParam, self.xs[fwdInd], self.ys[i], hyperRectangle[fwdInd,0],hyperRectangle[fwdInd,1])
+			allConstraints += triangleClaimFwd
 
-				triangleClaimCc = fcUtils.tanhLinearConstraints(self.modelParam, self.xs[ccInd], self.zs[i], hyperRectangle[ccInd,0],hyperRectangle[ccInd,1])
-				allConstraints += triangleClaimCc
-					
-				allConstraints += str(self.g_fwd) + " " + self.ys[i] + " + " + str(-self.g_fwd-self.g_cc) + \
-				" " + self.xs[i] + " + " + str(self.g_cc) + " "  + self.zs[i] + " >= 0.0\n"
-				allConstraints += str(self.g_fwd) + " " + self.ys[i] + " + " + str(-self.g_fwd-self.g_cc) + \
-				" " + self.xs[i] + " + " + str(self.g_cc) + " "  + self.zs[i] + " <= 0.0\n"
-			else:
+			triangleClaimCc = fcUtils.tanhLinearConstraints(self.modelParam, self.xs[ccInd], self.zs[i], hyperRectangle[ccInd,0],hyperRectangle[ccInd,1])
+			allConstraints += triangleClaimCc
 				
-				if hyperRectangle[fwdInd,0] < 0 and hyperRectangle[fwdInd,1] > 0:
-					self.triangleConvexHullBounds(self.xs[fwdInd],self.ys[i],hyperRectangle[fwdInd,0],hyperRectangle[fwdInd,1])
-				else:
-					self.triangleBounds(self.xs[fwdInd],self.ys[i],hyperRectangle[fwdInd,0],hyperRectangle[fwdInd,1])
+			allConstraints += str(self.g_fwd) + " " + self.ys[i] + " + " + str(-self.g_fwd-self.g_cc) + \
+			" " + self.xs[i] + " + " + str(self.g_cc) + " "  + self.zs[i] + " >= 0.0\n"
+			allConstraints += str(self.g_fwd) + " " + self.ys[i] + " + " + str(-self.g_fwd-self.g_cc) + \
+			" " + self.xs[i] + " + " + str(self.g_cc) + " "  + self.zs[i] + " <= 0.0\n"
+		
 
-				if hyperRectangle[ccInd,0] < 0 and hyperRectangle[ccInd,1] > 0:
-					self.triangleConvexHullBounds(self.xs[ccInd],self.zs[i],hyperRectangle[ccInd,0],hyperRectangle[ccInd,1])
-				else:
-					self.triangleBounds(self.xs[ccInd],self.zs[i],hyperRectangle[ccInd,0],hyperRectangle[ccInd,1])
+		'''allConstraintList = allConstraints.splitlines()
+		allConstraints = ""
+		for i in range(len(allConstraintList)):
+			allConstraints += allConstraintList[i] + "\n"
+		print "numConstraints ", len(allConstraintList)'''
+		#print "allConstraints"
+		#print allConstraints
+		variableDict, A, B = lpUtils.constructCoeffMatrices(allConstraints)
+		newHyperRectangle = np.copy(hyperRectangle)
+		feasible = True
+		for i in range(lenV):
+			#print "min max ", i
+			minObjConstraint = "min 1 " + self.xs[i]
+			maxObjConstraint = "max 1 " + self.xs[i]
+			Cmin = lpUtils.constructObjMatrix(minObjConstraint,variableDict)
+			Cmax = lpUtils.constructObjMatrix(maxObjConstraint,variableDict)
+			minSol = solvers.lp(Cmin,A,B)
+			maxSol = solvers.lp(Cmax,A,B)
+			if minSol["status"] == "primal infeasible" and maxSol["status"] == "primal infeasible":
+				feasible = False
+				break
+			else:
+				if minSol["status"] == "optimal":
+					newHyperRectangle[i,0] = minSol['x'][variableDict[self.xs[i]]] - 1e-6
+				if maxSol["status"] == "optimal":
+					newHyperRectangle[i,1] = maxSol['x'][variableDict[self.xs[i]]] + 1e-6
 
-		if self.solver is None:
-			'''allConstraintList = allConstraints.splitlines()
-			allConstraints = ""
-			for i in range(len(allConstraintList)):
-				allConstraints += allConstraintList[i] + "\n"
-			print "numConstraints ", len(allConstraintList)'''
-			#print "allConstraints"
-			#print allConstraints
-			variableDict, A, B = lpUtils.constructCoeffMatrices(allConstraints)
-			newHyperRectangle = np.copy(hyperRectangle)
-			feasible = True
-			for i in range(lenV):
-				#print "min max ", i
-				minObjConstraint = "min 1 " + self.xs[i]
-				maxObjConstraint = "max 1 " + self.xs[i]
-				Cmin = lpUtils.constructObjMatrix(minObjConstraint,variableDict)
-				Cmax = lpUtils.constructObjMatrix(maxObjConstraint,variableDict)
-				minSol = solvers.lp(Cmin,A,B)
-				maxSol = solvers.lp(Cmax,A,B)
-				if minSol["status"] == "primal infeasible" and maxSol["status"] == "primal infeasible":
-					feasible = False
-					break
-				else:
-					if minSol["status"] == "optimal":
-						newHyperRectangle[i,0] = minSol['x'][variableDict[self.xs[i]]] - 1e-6
-					if maxSol["status"] == "optimal":
-						newHyperRectangle[i,1] = maxSol['x'][variableDict[self.xs[i]]] + 1e-6
-
-			return [feasible, newHyperRectangle]
+		return [feasible, newHyperRectangle]
 
 
 if __name__ == "__main__":

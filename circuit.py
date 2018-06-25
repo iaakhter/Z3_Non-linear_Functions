@@ -89,7 +89,11 @@ class LP:
 	# to construct constraints that satisfy both LP
 	# return a new LP from the new constraints
 	def constraint_as_cost(self, otherLp):
-		#print ("start constraint_as_cost")
+		print ("start constraint_as_cost")
+		print ("selfLp")
+		print (self)
+		print ("otherLp")
+		print (otherLp)
 		newLp = LP()
 		# Use the normals of inequalities of
 		# self's as cost (minimize and maximize) 
@@ -98,9 +102,9 @@ class LP:
 		# that satisfies both the LPs
 		validConstraints = []
 		for i in range(len(self.A)):
-			#print ("constraint being considered")
-			#print (self.A[i])
-			#print (self.b[i])
+			print ("constraint being considered")
+			print (self.A[i])
+			print (self.b[i])
 			minCost = [ val*1.0 for val in self.A[i]]
 			maxCost = [-val*1.0 for val in self.A[i]]
 			possibleValidConstraints = []
@@ -114,10 +118,9 @@ class LP:
 			
 			# Minimize
 			otherLp.add_cost(minCost)
-			#print ("otherLp")
-			#print (otherLp)
 			minSol = otherLp.solve()
 			if minSol is not None:
+				print ("minSol['status']", minSol["status"])
 				#print ("minCost", minCost)
 				#print ("minSol['x']", np.array(minSol['x']))
 				minB = np.dot(np.array(minCost), np.array(minSol['x']))[0]
@@ -130,6 +133,7 @@ class LP:
 			otherLp.add_cost(maxCost)
 			maxSol = otherLp.solve()
 			if maxSol is not None:
+				print ("maxSol['status']", maxSol["status"])
 				#print ("maxCost", maxCost)
 				#print ("maxSol['x']", np.array(maxSol['x']))
 				maxB = np.dot(np.array(maxCost), np.array(maxSol['x']))[0]
@@ -141,9 +145,12 @@ class LP:
 			# Add the constraint with the highest absolute constant to the newLp
 			maxB = max(possibleBs)
 			maxBindex = possibleBs.index(maxB)
-			newLp.ineq_constraint(possibleValidConstraints[maxBindex][0], possibleValidConstraints[maxBindex][1])
+			if minSol is not None and maxSol is not None and minSol["status"] == "optimal" and maxSol["status"] == "optimal":
+				newLp.ineq_constraint(possibleValidConstraints[maxBindex][0], possibleValidConstraints[maxBindex][1])
 
 		
+		print ("newLp")
+		print (newLp)
 		return newLp
 
 
@@ -348,7 +355,7 @@ class Mosfet:
 		model = self.model
 		return(self.grad_ids_help(V[self.s], V[self.g], V[self.d], model.channelType, model.Vt, model.k*self.shape))
 			
-	def lp_grind(self, Vs, Vg, Vd, Vt, ks, cvx_flag):
+	'''def lp_grind(self, Vs, Vg, Vd, Vt, ks, cvx_flag):
 		if(not interval_p(Vs)): Vs = [Vs]
 		elif(Vs[0] == Vs[1]): Vs = [Vs[0]]
 		if(not interval_p(Vg)): Vg = [Vg]
@@ -444,7 +451,7 @@ class Mosfet:
 			lp.ineq_constraint([dv[0], dv[1], dv[2], -1.0], -b)
 
 		return lp
-	# end lp_grind
+	# end lp_grind'''
 
 	# This function constructs linear program
 	# in terms of src, gate, drain and Ids given the model
@@ -525,7 +532,7 @@ class Mosfet:
 						x0 = vert2[0]
 						x1 = (-v0[0]*x0)/v0[1]
 						#print ("x0", x0, "x1", x1)
-						if x0 >= vert1[0] and x0 <= vert2[0]:
+						if x1 >= vert1[1] and x1 <= vert2[1]:
 							intersectionPoints.append(np.array([x0, x1]))
 					else:
 						m = (vert2[1] - vert1[1])/(vert2[0] - vert1[0])
@@ -616,29 +623,46 @@ class Mosfet:
 		#print (lp)
 		return lp
 
+	# Construct linear constraints for the mosfet model
+	# depending on whatever region they belong to - cutoff,
+	# saturation or linear - Assume nfet at the point when
+	# function is called
+	def lp_grind(self, Vgse, Vds):
+		if interval_hi(Vgse) <= 0.0: # cutoff everywhere in the hyperrectangle
+			print ("if5")
+			A = (ks/2.0)*np.array([[0.0]])
+			vertList = [np.array([Vgse[0]]), \
+						np.array([Vgse[1]])]
+			return self.quad_lin_constraints(A, vertList, Vt, ks)
+
+		
+
+
+
 	
 	def lp_ids_help(self, Vs, Vg, Vd, channelType, Vt, ks):
 		#print ("Vs", Vs, "Vg", Vg, "Vd", Vd)
 		Vgs = interval_sub(Vg, Vs)
 		Vgse = Vgs - Vt
 		Vds = interval_sub(Vd, Vs)
+		print ("Vgse", Vgse, "Vds", Vds)
 		if(not(interval_p(Vs) or interval_p(Vg) or interval_p(Vd))):
-			#print ("if1")
+			print ("if1")
 			# Vs, Vg, and Vd are non-intervals -- they define a point
 			# Add an inequality that our Ids is the value for this point
 			return(LP(None, None, None, [[0,0,0,1.0]], self.ids_help(Vs, Vg, Vd, channelType, Vt, ks)))
 		elif(channelType == 'pfet'):
-			#print ("if2")
+			print ("if2")
 			LPnfet = self.lp_ids_help(interval_neg(Vs), interval_neg(Vg), interval_neg(Vd), 'nfet', -Vt, -ks)
 			return LPnfet.neg_A()
 		elif((interval_lo(Vs) <= interval_hi(Vd)) and (interval_hi(Vs) >= interval_lo(Vd))):
-			#print ("if3")
+			print ("if3")
 			# If the Vs interval overlaps the Vd interval, then Vds can change sign.
 			# That means we've got a saddle.  We won't try to generated LP constraints
 			# for the saddle.  So, we just return an empty LP.
 			return(LP())
 		elif(interval_lo(Vs) > interval_hi(Vd)):
-			#print ("if4")
+			print ("if4")
 			LPswap = self.lp_ids_help(Vd, Vg, Vs, channelType, Vt, ks)
 			A = []
 			for i in range(len(LPswap.A)):
@@ -650,25 +674,26 @@ class Mosfet:
 				Aeq.append([row[2], row[1], row[0], -row[3]])
 			return LP(LPswap.c, A, LPswap.b, Aeq, LPswap.beq)
 		
-		elif(interval_hi(Vg) - Vt <= interval_lo(Vd)):  # cut-off and/or saturation everywhere in the hyperrectangle
-			#print ("if5")
+		elif interval_hi(Vgse) <= 0.0: # cutoff everywhere in the hyperrectangle
+			print ("if5")
+			A = (ks/2.0)*np.array([[0.0]])
+			vertList = [np.array([Vgse[0]]), \
+						np.array([Vgse[1]])]
+			return self.quad_lin_constraints(A, vertList, Vt, ks)
+
+		elif(interval_lo(Vgse) >= 0 and interval_hi(Vg) - Vt <= interval_lo(Vd)):  # saturation everywhere in the hyperrectangle
+			print ("if6")
 			if(not(interval_p(Vs) or interval_p(Vg))):
 				idsVal = self.ids_help(Vs, Vg, Vd, channelType, Vt, ks)
 				return(LP(None, [[0,0,0,-1.0], [0,0,0,1.0]], [-idsVal[0], idsVal[1]], None, None))
 			else: 
 				A = (ks/2.0)*np.array([[1.0]])
-
-				# Change A matrix for cutogg
-				if(interval_hi(Vgse) <= 0.0):
-					#print ("cutoff")
-					A = (ks/2.0)*np.array([[0.0]])
-
 				vertList = [np.array([Vgse[0]]), \
 						np.array([Vgse[1]])]
 				return self.quad_lin_constraints(A, vertList, Vt, ks)
 				#return self.lp_grind(Vs, Vg, interval_hi(Vd), Vt, ks, True)
-		elif(interval_lo(Vg) - Vt >= interval_hi(Vd)):  # linear everywhere in the hyperrectangle
-			#print ("if6")
+		elif(interval_lo(Vgse) >= 0 and interval_lo(Vg) - Vt >= interval_hi(Vd)):  # linear everywhere in the hyperrectangle
+			print ("if7")
 			#return self.lp_grind(Vs, Vg, Vd, Vt, ks, False)
 			#TODO: Need to incorporate the leakage term in A here somehow
 			A = (ks/2.0)*np.array([[0.0, 1.0], [1.0, -1.0]])
@@ -679,8 +704,144 @@ class Mosfet:
 						np.array([Vgse[0], Vds[1]])]
 			return self.quad_lin_constraints(A, vertList, Vt, ks)
 		else:
-			#print ("if7")
-			return(LP())
+			print ("if8")
+			idsVal = self.ids_help(Vs, Vg, Vd, channelType, Vt, ks)
+			lp = LP()
+			# hyper constraints
+			lp.ineq_constraint([-1.0, 0.0, 0.0, 0.0], -Vs[0])
+			lp.ineq_constraint([1.0, 0.0, 0.0, 0.0], Vs[1])
+			lp.ineq_constraint([0.0, -1.0, 0.0, 0.0], -Vg[0])
+			lp.ineq_constraint([0.0, 1.0, 0.0, 0.0], Vg[1])
+			lp.ineq_constraint([0.0, 0.0, -1.0, 0.0], -Vd[0])
+			lp.ineq_constraint([0.0, 0.0, 1.0, 0.0], Vd[1])
+			lp.ineq_constraint([0.0, 0.0, 0.0, -1.0], -(idsVal[0] - 0.01))
+			lp.ineq_constraint([0.0, 0.0, 0.0, 1.0], (idsVal[1] + 0.01))
+			newVgse, newVds = Vgse, Vds
+			print ("newVgse", newVgse, "newVds", newVds)
+			if newVgse[0] < 0.0 and newVgse[1] > 0.0:
+				print ("first if")
+				A = (ks/2.0)*np.array([[0.0]])
+				vertList = [np.array([newVgse[0]]), \
+							np.array([0.0])]
+				regionLp = self.quad_lin_constraints(A, vertList, Vt, ks)
+				regionLp.ineq_constraint([-1.0, 0.0, 0.0, 0.0], -Vs[0])
+				regionLp.ineq_constraint([1.0, 0.0, 0.0, 0.0], Vs[1])
+				regionLp.ineq_constraint([0.0, -1.0, 0.0, 0.0], -Vg[0])
+				regionLp.ineq_constraint([0.0, 1.0, 0.0, 0.0], Vg[1])
+				regionLp.ineq_constraint([0.0, 0.0, -1.0, 0.0], -Vd[0])
+				regionLp.ineq_constraint([0.0, 0.0, 1.0, 0.0], Vd[1])
+				regionLp.ineq_constraint([0.0, 0.0, 0.0, -1.0], -(idsVal[0] - 0.01))
+				regionLp.ineq_constraint([0.0, 0.0, 0.0, 1.0], (idsVal[1] + 0.01))
+				print ("regionLp")
+				print (regionLp)
+				lp = lp.union(regionLp)
+				print ("lp after union with regionLp")
+				print (lp)
+				newVgse = np.array([0.0, newVgse[1]])
+
+			print ("newVgse", newVgse, "newVds", newVds)
+			# Find intersection between Vgse = Vds line and hyperrectangle
+			vertList = [np.array([newVgse[0], newVds[0]]), \
+						np.array([newVgse[1], newVds[0]]), \
+						np.array([newVgse[1], newVds[1]]), \
+						np.array([newVgse[0], newVds[1]])]
+			intersectionPoints = self.intersection([-1, 1, 0.0], vertList)
+			if len(intersectionPoints) == 0:
+				print ("second if")
+				if newVds[0] > newVgse[0]:
+					# saturation region
+					print ("saturation")
+					vertList = [np.array([newVgse[0]]), \
+								np.array([newVgse[1]])]
+					A = (ks/2.0)*np.array([[1.0]])
+				else:
+					# linear region
+					print ("linear")
+					A = (ks/2.0)*np.array([[0.0, 1.0], [1.0, -1.0]])
+				regionLp = self.quad_lin_constraints(A, vertList, Vt, ks)
+				regionLp.ineq_constraint([-1.0, 0.0, 0.0, 0.0], -Vs[0])
+				regionLp.ineq_constraint([1.0, 0.0, 0.0, 0.0], Vs[1])
+				regionLp.ineq_constraint([0.0, -1.0, 0.0, 0.0], -Vg[0])
+				regionLp.ineq_constraint([0.0, 1.0, 0.0, 0.0], Vg[1])
+				regionLp.ineq_constraint([0.0, 0.0, -1.0, 0.0], -Vd[0])
+				regionLp.ineq_constraint([0.0, 0.0, 1.0, 0.0], Vd[1])
+				regionLp.ineq_constraint([0.0, 0.0, 0.0, -1.0], -(idsVal[0] - 0.01))
+				regionLp.ineq_constraint([0.0, 0.0, 0.0, 1.0], (idsVal[1] + 0.01))
+				print ("regionLp")
+				print (regionLp)
+				lp = lp.union(regionLp)
+				print ("lp after union with regionLp")
+				print lp
+			else:
+				print ("third if")
+				# find the two polygons caused by the line Vgse = Vds line
+				# intersecting newVgse
+				vertList1 = []
+				vertList2 = []
+				leftI, rightI = intersectionPoints[0], intersectionPoints[1]
+
+				if leftI[1] > newVds[0]:
+					vertList1.append(leftI)
+					vertList1.append(np.array([newVgse[0], newVds[0]]))
+					vertList2.append(np.array([leftI[0]]))
+				else:
+					vertList1.append(leftI)
+					vertList2.append(np.array([newVgse[0]]))
+					vertList2.append(np.array([leftI[0]]))
+
+				vertList1.append(np.array([newVgse[1], newVds[0]]))
+
+				if rightI[1] < newVds[1]:
+					vertList1.append(rightI)
+					vertList2.append(np.array([rightI[0]]))
+					vertList2.append(np.array([newVgse[1]]))
+				else:
+					vertList1.append(np.array([newVgse[1], newVds[1]]))
+					vertList1.append(rightI)
+					vertList2.append(np.array([rightI[0]]))
+
+				vertList2.append(np.array([newVgse[0]]))
+				
+				# linear region
+				A = (ks/2.0)*np.array([[0.0, 1.0], [1.0, -1.0]])
+				regionLp = self.quad_lin_constraints(A, vertList1, Vt, ks)
+				lp = lp.union(regionLp)
+
+				# saturation region
+				A = (ks/2.0)*np.array([[1.0]])
+				regionLp = self.quad_lin_constraints(A, vertList2, Vt, ks)
+				lp = lp.union(regionLp)
+
+			return lp
+
+	# Find the intersection points between the line
+	# represented by [a, b, c] where a, b, and c represent
+	# the line ax + by = c and polygon represented by vertList
+	# a list of arrays where each array represents the vertex
+	def intersection(self, line, vertList):
+		intersectionPoints = []
+		for vi in range(len(vertList)):
+			vert1 = vertList[vi]
+			vert2 = vertList[(vi + 1)%len(vertList)]
+			#print ("vert1", vert1)
+			#print ("vert2", vert2)
+			if vert2[0] - vert1[0] == 0:
+				x0 = vert2[0]
+				x1 = (line[2] - line[0]*x0)/line[1]
+				#print ("x0", x0, "x1", x1)
+				if x1 >= vert1[1] and x0 <= vert2[1]:
+					intersectionPoints.append(np.array([x0, x1]))
+			else:
+				m = (vert2[1] - vert1[1])/(vert2[0] - vert1[0])
+				c = vert1[1] - m*vert1[0]
+				#print ("m", m, "c", c)
+				x0 = (line[2] - line[1]*c)/(line[0] + line[1]*m)
+				x1 = m*x0 + c
+				#print ("x0", x0, "x1", x1)
+				if x0 >= vert1[0] and x0 <= vert2[0] and x1 >= vert1[1] and x1 <= vert2[1]:
+					intersectionPoints.append(np.array([x0, x1]))
+
+		return intersectionPoints
 
 	def lp_ids(self, V):
 		model = self.model

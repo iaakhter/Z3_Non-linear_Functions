@@ -89,11 +89,11 @@ class LP:
 	# to construct constraints that satisfy both LP
 	# return a new LP from the new constraints
 	def constraint_as_cost(self, otherLp):
-		#print ("start constraint_as_cost")
-		#print ("selfLp")
-		#print (self)
-		#print ("otherLp")
-		#print (otherLp)
+		'''print ("start constraint_as_cost")
+		print ("selfLp")
+		print (self)
+		print ("otherLp")
+		print (otherLp)'''
 		newLp = LP()
 		# Use the normals of inequalities of
 		# self's as cost (minimize and maximize) 
@@ -157,6 +157,10 @@ class LP:
 	# The union of LPs should satisfy both
 	# the LPs
 	def union(self, otherLp):
+		'''print ("selfLp before", self.num_constraints())
+		print (self)
+		print ("otherLp before", otherLp.num_constraints())
+		print (otherLp)'''
 		newLp = LP()
 
 		# Use inequality constraints of self as 
@@ -175,6 +179,50 @@ class LP:
 		for i in range(len(otherLp.Aeq)):
 			newLp.eq_constraint([x for x in otherLp.Aeq[i]], otherLp.beq[i])
 
+		'''print ("newLp")
+		print (newLp)'''
+		# check if lowLp and unionLp are feasible
+		'''lpCheck1 = LP()
+		lpCheck1 = lpCheck1.concat(self)
+		lpCheck1 = lpCheck1.concat(newLp)
+		lpCheck1.add_cost([1.0,0,0.0,0.0])
+		lpSol1 = lpCheck1.solve()
+		if lpSol1["status"] == "primal infeasible":
+			print "oops self and newLp together are infeasible"
+			print "self"
+			print self
+			print "otherLp"
+			print otherLp
+			print "newLp"
+			print newLp
+			return
+
+		# check if highLp and unionLp are feasible
+		#otherLp.remove_ineq_constraint(13)
+		#newLp.A = newLp.A[:8]
+		#newLp.b = newLp.b[:8]
+		lpCheck2 = LP()
+		lpCheck2 = lpCheck2.concat(otherLp)
+		lpCheck2 = lpCheck2.concat(newLp)
+		lpCheck2.add_cost([1.0,0.0,0.0,0.0])
+		lpSol2 = lpCheck2.solve()
+		if lpSol2["status"] == "primal infeasible":
+			print "oops otherLp and newLp together are infeasible"
+			print "selfLp", self.num_constraints()
+			print self
+			print "otherLp", otherLp.num_constraints()
+			print otherLp
+			otherLp.A = otherLp.A[:17]
+			otherLp.b = otherLp.b[:17]
+			print "reduced otherLp"
+			print otherLp
+			otherLpSol = otherLp.solve()
+			print ("otherLpSol")
+			print (otherLpSol)
+			print "newLp"
+			print newLp
+			return
+		print ("success")'''
 		return newLp
 
 	# This will replace the current cost
@@ -510,33 +558,36 @@ class Mosfet:
 	# function is called
 	def lp_grind(self, Vgse, Vds, Vt, ks, hyperLp):
 		#TODO: Need to incorporate the leakage term in A here somehow
-		print ("lp_grind: Vgse", Vgse, "Vds", Vds)
+		#print ("lp_grind: Vgse", Vgse, "Vds", Vds)
+		#print ("lp_grind: hyperLp")
+		#print (hyperLp)
 
 		cutoffA = (ks/2.0)*np.array([[0.0]])
 		satA = (ks/2.0)*np.array([[1.0]])
 		linA = (ks/2.0)*np.array([[0.0, 1.0], [1.0, -1.0]])
 		if interval_hi(Vgse) <= 0.0: # cutoff everywhere in the hyperrectangle
-			print ("lp_grind: if1")
+			#print ("lp_grind: if1")
 			vertList = [np.array([Vgse[0]]), \
 						np.array([Vgse[1]])]
-			return hyperLp.concat(self.quad_lin_constraints(cutoffA, vertList, Vt))
+			return self.quad_lin_constraints(cutoffA, vertList, Vt).concat(hyperLp)
 
 		elif(interval_lo(Vgse) >= 0 and interval_lo(Vds) >= interval_hi(Vgse)):  # saturation everywhere in the hyperrectangle
-			print ("lp_grind: if2")
+			#print ("lp_grind: if2")
 			vertList = [np.array([Vgse[0]]), \
 					np.array([Vgse[1]])]
-			return hyperLp.concat(self.quad_lin_constraints(satA, vertList, Vt))
+			return self.quad_lin_constraints(satA, vertList, Vt).concat(hyperLp)
 
 		elif(interval_lo(Vgse) >= 0 and interval_hi(Vds) <= interval_lo(Vgse)):  # linear everywhere in the hyperrectangle
-			print ("lp_grind: if3")
+			#print ("lp_grind: if3")
 			vertList = [np.array([Vgse[0], Vds[0]]), \
 						np.array([Vgse[1], Vds[0]]), \
 						np.array([Vgse[1], Vds[1]]), \
 						np.array([Vgse[0], Vds[1]])]
-			return hyperLp.concat(self.quad_lin_constraints(linA, vertList, Vt))
+			return self.quad_lin_constraints(linA, vertList, Vt).concat(hyperLp)
 
 		else:
-			print ("lp_grind: if4")
+			#print ("lp_grind: if4: hyperLp")
+			#print (hyperLp)
 			# take the union of the separate region constraints
 			# When taking the union, it is important to bound each variable
 			# because of the way the union code works involves solving
@@ -570,6 +621,7 @@ class Mosfet:
 				#print ("lp after regionLp")
 				#print (lp)
 			else:
+				#print ("saturation + linear")
 				# find the two polygons caused by the line Vgse = Vds line
 				# intersecting newVgse
 				vertList1, vertList2 = [], []
@@ -598,41 +650,49 @@ class Mosfet:
 				vertList2.append(np.array([newVgse[0]]))
 				
 				# linear region
-				regionLp = self.quad_lin_constraints(linA, vertList1, Vt)
+				#print ("regionLp before concat")
+				#print (self.quad_lin_constraints(linA, vertList1, Vt))
+				regionLp = self.quad_lin_constraints(linA, vertList1, Vt).concat(hyperLp)
+				#print ("hyperLp")
+				#print (hyperLp)
 				#print ("regionLp")
 				#print (regionLp)
-				lp = lp.union(regionLp.concat(hyperLp))
+				#print ("union BETWEEN")
+				#print (lp)
+				#print ("AND")
+				#print (regionLp)
+				lp = lp.union(regionLp)
 
 				# saturation region
-				regionLp = self.quad_lin_constraints(satA, vertList2, Vt)
-				lp = lp.union(regionLp.concat(hyperLp))
+				regionLp = self.quad_lin_constraints(satA, vertList2, Vt).concat(hyperLp)
+				lp = lp.union(regionLp)
 
 			return lp
 
 	
 	def lp_ids_help(self, Vs, Vg, Vd, channelType, Vt, ks):
-		print ("Vs", Vs, "Vg", Vg, "Vd", Vd)
+		#print ("Vs", Vs, "Vg", Vg, "Vd", Vd, "channelType", channelType)
 		Vgs = interval_sub(Vg, Vs)
 		Vgse = Vgs - Vt
 		Vds = interval_sub(Vd, Vs)
-		print ("Vgse", Vgse, "Vds", Vds)
+		#print ("Vgse", Vgse, "Vds", Vds)
 		if(not(interval_p(Vs) or interval_p(Vg) or interval_p(Vd))):
-			print ("if1")
+			#print ("if1")
 			# Vs, Vg, and Vd are non-intervals -- they define a point
 			# Add an inequality that our Ids is the value for this point
 			return(LP(None, None, None, [[0,0,0,1.0]], self.ids_help(Vs, Vg, Vd, channelType, Vt, ks)))
 		elif(channelType == 'pfet'):
-			print ("if2")
+			#print ("if2")
 			LPnfet = self.lp_ids_help(interval_neg(Vs), interval_neg(Vg), interval_neg(Vd), 'nfet', -Vt, -ks)
 			return LPnfet.neg_A()
 		elif((interval_lo(Vs) <= interval_hi(Vd)) and (interval_hi(Vs) >= interval_lo(Vd))):
-			print ("if3")
+			#print ("if3")
 			# If the Vs interval overlaps the Vd interval, then Vds can change sign.
 			# That means we've got a saddle.  We won't try to generated LP constraints
 			# for the saddle.  So, we just return an empty LP.
 			return(LP())
 		elif(interval_lo(Vs) > interval_hi(Vd)):
-			print ("if4")
+			#print ("if4")
 			LPswap = self.lp_ids_help(Vd, Vg, Vs, channelType, Vt, ks)
 			A = []
 			for i in range(len(LPswap.A)):
@@ -645,18 +705,36 @@ class Mosfet:
 			return LP(LPswap.c, A, LPswap.b, Aeq, LPswap.beq)
 
 		else:
+			#print ("if5")
 			Ids = self.ids_help(Vs, Vg, Vd, channelType, Vt, ks)
 			# form the LP where the constraints for the Vgse and Vds
-			# bounds are added
+			# bounds are added. This is important to make sure we don't get
+			# unboundedness from our linear program
 			hyperLp = LP()
-			hyperLp.ineq_constraint([-1.0, 0.0, 0.0, 0.0], -Vs[0])
-			hyperLp.ineq_constraint([1.0, 0.0, 0.0, 0.0], Vs[1])
-			hyperLp.ineq_constraint([0.0, -1.0, 0.0, 0.0], -Vg[0])
-			hyperLp.ineq_constraint([0.0, 1.0, 0.0, 0.0], Vg[1])
-			hyperLp.ineq_constraint([0.0, 0.0, -1.0, 0.0], -Vd[0])
-			hyperLp.ineq_constraint([0.0, 0.0, 1.0, 0.0], Vd[1])
-			hyperLp.ineq_constraint([0.0, 0.0, 0.0, -1.0], -(Ids[0] - 0.01))
-			hyperLp.ineq_constraint([0.0, 0.0, 0.0, 1.0], (Ids[1] + 0.01))
+			if interval_p(Vs):
+				hyperLp.ineq_constraint([-1.0, 0.0, 0.0, 0.0], -Vs[0])
+				hyperLp.ineq_constraint([1.0, 0.0, 0.0, 0.0], Vs[1])
+			else:
+				hyperLp.ineq_constraint([-1.0, 0.0, 0.0, 0.0], -(Vs - 1e-5))
+				hyperLp.ineq_constraint([1.0, 0.0, 0.0, 0.0], Vs + 1e-5)
+			if interval_p(Vg):
+				hyperLp.ineq_constraint([0.0, -1.0, 0.0, 0.0], -Vg[0])
+				hyperLp.ineq_constraint([0.0, 1.0, 0.0, 0.0], Vg[1])
+			else:
+				hyperLp.ineq_constraint([0.0, -1.0, 0.0, 0.0], -(Vg - 1e-5))
+				hyperLp.ineq_constraint([0.0, 1.0, 0.0, 0.0], Vg + 1e-5)
+			if interval_p(Vd):
+				hyperLp.ineq_constraint([0.0, 0.0, -1.0, 0.0], -Vd[0])
+				hyperLp.ineq_constraint([0.0, 0.0, 1.0, 0.0], Vd[1])
+			else:
+				hyperLp.ineq_constraint([0.0, 0.0, -1.0, 0.0], -(Vd - 1e-5))
+				hyperLp.ineq_constraint([0.0, 0.0, 1.0, 0.0], Vd + 1e-5)
+			if interval_p(Ids):
+				hyperLp.ineq_constraint([0.0, 0.0, 0.0, -1.0], -(Ids[0] - 1e-3))
+				hyperLp.ineq_constraint([0.0, 0.0, 0.0, 1.0], (Ids[1] + 1e-3))
+			else:
+				hyperLp.ineq_constraint([0.0, 0.0, 0.0, -1.0], -(Ids - 1e-3))
+				hyperLp.ineq_constraint([0.0, 0.0, 0.0, 1.0], (Ids + 1e-3))
 			return self.lp_grind(Vgse, Vds, Vt, ks, hyperLp)
 
 	# Find the intersection points between the line
@@ -718,10 +796,10 @@ class Mosfet:
 		if interval_p(current):
 			constraint[3] = -1.0
 			#print ("ineq", [ e for e in constraint ], -voltage[0])
-			lp.ineq_constraint([ e for e in constraint ], -(current[0] - 0.01))
+			lp.ineq_constraint([ e for e in constraint ], -(current[0] - 1e-3))
 			constraint[3] = 1.0
 			#print ("ineq", [ e for e in constraint ], voltage[1])
-			lp.ineq_constraint([ e for e in constraint ], (current[1] + 0.01))
+			lp.ineq_constraint([ e for e in constraint ], (current[1] + 1e-3))
 		else:
 			constraint[3] = 1.0
 			#print ("eq", [ e for e in constraint ], voltage)
@@ -780,6 +858,7 @@ class Circuit:
 		nvars = len(V) + n_tr
 
 		#print ("nvars", nvars)
+		#print ("n_tr", n_tr)
 
 		eqCoeffs = np.zeros((n_nodes, nvars))
 		for i in range(n_tr):
@@ -793,30 +872,6 @@ class Circuit:
 		#print ("eqCoeffs")
 		#print (eqCoeffs)
 
-		'''testHyper = np.array([ [ 0.0435,  0.0437 ],
-       							[ 0.5698,  0.5700],
-       							[ 0.8018,  0.8020],
-      			 				[ 0.8328,  0.8330],
-       							[ 1.7766,  1.7768],
-       							[ 1.0396,  1.0398],
-      	 						[ 1.7455,  1.7457],
-       							[ 1.0310,  1.0312],
-       							[ 0.9144,  0.9146],
-       							[ 0.8611,  0.8613],
-       							[ 0.0162,  0.0164],
-       							[ 0.5562,  0.5564]])
-
-		idsCurrents = np.array([[0.0, 4.76e-06],
-								[-0.00020, -0.00018],
-								[0.00018741, 0.00018743],
-								[-1e-10, 1e-10],
-								[-1e-10, 1e-10],
-								[-0.000492377684838, -0.000492377684838],
-								[0.000639294744512, 0.000639294744512],
-								[-0.000146917052105, -0.000146917052105],
-								[1.16939696965e-05, 1.16939696965e-05],
-								[-0.000186037284398, -0.000186037284398],
-								[0.000428879582271, 0.000428879582271]])'''
 
 		# need to add equality constraints that the sum of the currents into each node is zero
 		for i in range(n_nodes):
@@ -825,21 +880,6 @@ class Circuit:
 				lp.ineq_constraint(list(-eqCoeffs[i]), 1e-3)
 				lp.ineq_constraint(list(eqCoeffs[i]), 1e-3)
 				#lp.eq_constraint(list(eqCoeffs[i]), 0.0)
-				'''if i < n_nodes:
-					negIneqConstraint = [0]*nvars
-					negIneqConstraint[i] = -1.0
-					posIneqConstraint = [0]*nvars
-					posIneqConstraint[i] = 1.0
-					lp.ineq_constraint(negIneqConstraint, -testHyper[i,0])
-					lp.ineq_constraint(posIneqConstraint, testHyper[i,1])'''
-
-		'''for ti in range(5):
-			negIneqConstraint = [0]*nvars
-			negIneqConstraint[n_nodes + ti] = -1.0
-			posIneqConstraint = [0]*nvars
-			posIneqConstraint[n_nodes + ti] = 1.0
-			lp.ineq_constraint(negIneqConstraint, -idsCurrents[ti,0])
-			lp.ineq_constraint(posIneqConstraint, idsCurrents[ti,1])'''
 
 		return lp
 
@@ -856,7 +896,10 @@ class Circuit:
 	
 		tighterHyper = [x for x in V]
 		feasible = True
+		numSuccessLp, numUnsuccessLp, numTotalLp = 0, 0, 0
 		for i in range(n_nodes):
+			if interval_p(tighterHyper[i]):
+				numTotalLp += 2
 			#print ("i", i)
 			cost = np.zeros((nvars))
 
@@ -871,6 +914,7 @@ class Circuit:
 			maxSol = lp.solve()
 
 			if minSol is None or maxSol is None:
+				numUnsuccessLp += 2
 				continue
 
 			#print ("minSol status", minSol["status"])
@@ -878,16 +922,24 @@ class Circuit:
 
 
 			if minSol["status"] == "primal infeasible" and maxSol["status"] == "primal infeasible":
+				numSuccessLp += 2
 				feasible = False
 				break
 			if interval_p(tighterHyper[i]):
 				if minSol["status"] == "optimal":
 					tighterHyper[i][0] = minSol['x'][i] - 1e-6
+					numSuccessLp += 1
+				else:
+					numUnsuccessLp += 1
 				if maxSol["status"] == "optimal":
 					tighterHyper[i][1] = maxSol['x'][i] + 1e-6
+					numSuccessLp += 1
+				else:
+					numUnsuccessLp += 1
 
 
-		return [feasible, tighterHyper]
+		#print ("numTotalLp", numTotalLp, "numSuccessLp", numSuccessLp, "numUnsuccessLp", numUnsuccessLp)
+		return [feasible, tighterHyper, numTotalLp, numSuccessLp, numUnsuccessLp]
 
 
 

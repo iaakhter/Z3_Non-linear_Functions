@@ -101,9 +101,9 @@ class LP:
 		# that satisfies both the LPs
 		validConstraints = []
 		for i in range(len(self.A)):
-			#print ("constraint being considered")
-			#print (self.A[i])
-			#print (self.b[i])
+			'''print ("constraint being considered")
+			print (self.A[i])
+			print (self.b[i])'''
 			minCost = [ val*1.0 for val in self.A[i]]
 			maxCost = [-val*1.0 for val in self.A[i]]
 			possibleValidConstraints = []
@@ -113,18 +113,8 @@ class LP:
 			# represent a constraint to be added to
 			# A and b respectively
 			possibleValidConstraints.append([[ val for val in self.A[i]], self.b[i]])
-			possibleBs.append(abs(self.b[i]))
+			possibleBs.append(self.b[i])
 			
-			# Minimize
-			otherLp.add_cost(minCost)
-			minSol = otherLp.solve()
-			if minSol is not None and minSol["status"] == "optimal":
-				#print ("minSol['status']", minSol["status"])
-				minB = np.dot(np.array(minCost), np.array(minSol['x']))[0]
-				#print ("minB", minB)
-				possibleValidConstraints.append([maxCost, -minB])
-				possibleBs.append(abs(minB))
-				#print ("constraint being added", possibleValidConstraints[-1])
 
 			# Maximize
 			otherLp.add_cost(maxCost)
@@ -136,13 +126,17 @@ class LP:
 				maxB = np.dot(np.array(maxCost), np.array(maxSol['x']))[0]
 				#print ("maxB", maxB)
 				possibleValidConstraints.append([minCost, -maxB])
-				possibleBs.append(abs(maxB))
+				possibleBs.append(-maxB)
 				#print ("constraint being added", possibleValidConstraints[-1])
+
+
 
 			# Add the constraint with the highest absolute constant to the newLp
 			maxB = max(possibleBs)
 			maxBindex = possibleBs.index(maxB)
-			if minSol is not None and maxSol is not None and minSol["status"] == "optimal" and maxSol["status"] == "optimal":
+			if maxSol is not None and maxSol["status"] == "optimal":
+				#print ("possibleValidConstraints", possibleValidConstraints)
+				#print ("maxBindex", maxBindex)
 				newLp.ineq_constraint(possibleValidConstraints[maxBindex][0], possibleValidConstraints[maxBindex][1])
 
 		
@@ -178,7 +172,40 @@ class LP:
 		for i in range(len(otherLp.Aeq)):
 			newLp.eq_constraint([x for x in otherLp.Aeq[i]], otherLp.beq[i])
 
+		'''lpCheck1 = LP()
+		lpCheck1 = lpCheck1.concat(self)
+		lpCheck1 = lpCheck1.concat(newLp)
+		lpCheck1.add_cost([1.0,0.0,0.0, 0.0])
+		lpSol1 = lpCheck1.solve()
+		if lpSol1["status"] == "primal infeasible":
+			print "oops selfLp and unionLp together are infeasible"
+			print "selfLp"
+			print self
+			print "otherLp"
+			print otherLp
+			print "newLp"
+			print newLp
+			return
+
+		# check if highLp and unionLp are feasible
+		lpCheck2 = LP()
+		lpCheck2 = lpCheck2.concat(otherLp)
+		lpCheck2 = lpCheck2.concat(newLp)
+		lpCheck2.add_cost([1.0,0.0,0.0, 0.0])
+		lpSol2 = lpCheck2.solve()
+		if lpSol2["status"] == "primal infeasible":
+			print "oops Lp and unionLp together are infeasible"
+			print "selfLp"
+			print self
+			print "otherLp"
+			print otherLp
+			print "newLp"
+			print newLp
+			return'''
+
 		
+		#print ("newLp")
+		#print (newLp)
 		return newLp
 
 	# This will replace the current cost
@@ -215,7 +242,7 @@ class LP:
 		print (bMatrix)
 		print ("cMatrix")
 		print (cMatrix)'''
-		
+
 		try:
 			sol = solvers.lp(cMatrix, AMatrix, bMatrix)
 			return sol

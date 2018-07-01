@@ -254,6 +254,7 @@ def checkExistenceOfSolution(model,hyperRectangle, alpha = 1.0):
 				intersect[i] = startBounds[i]
 			else:
 				# no solution
+				#print ("problem index", i)
 				return (False, None)
 
 		#print ("intersect")

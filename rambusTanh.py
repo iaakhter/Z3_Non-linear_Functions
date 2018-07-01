@@ -122,8 +122,9 @@ class RambusTanh:
 
 if __name__ == "__main__":
 	# do some testing to check if the interval function makes sense
-	model = TanhModel(modelParam = -5, g_cc = 0.5, g_fwd = 1.0, numStages = 2)
-	V0 = np.linspace(-1.0, 1.0, 10)
+	model = RambusTanh(modelParam = -5, g_cc = 0.5, g_fwd = 1.0, numStages = 2)
+	print (model.jacobian(np.array([[-0.3, 0.0],[0.0, 0.3],[-0.3, 0.0],[0.0, 0.3]])))
+	'''V0 = np.linspace(-1.0, 1.0, 10)
 	V1 = np.linspace(-1.0, 1.0, 10)
 	V2 = np.linspace(-1.0, 1.0, 10)
 	V3 = np.linspace(-1.0, 1.0, 10)
@@ -152,7 +153,7 @@ if __name__ == "__main__":
 									if np.less(inum, INum[:,0]).any() or np.greater(inum, INum[:,1]).any():
 										print ("oops interval weird for ", v, " in interval ", vInterval)
 										print ("inum ", inum, " INum ", INum)
-										exit()
+										exit()'''
 									
 
 

@@ -52,10 +52,11 @@ def cosFunder(x,const):
 
 def tanhFun(x, const):
 	tanhVal = np.tanh(const*x)
+	#tanhVal = (np.exp(const*x) - np.exp(-const*x))/(np.exp(const*x) + np.exp(-const*x))
 	if interval_p(x):
 		return np.array([min(tanhVal[0], tanhVal[1]), max(tanhVal[0], tanhVal[1])])
 	return tanhVal
-	#return -(exp(a*val) - exp(-a*val))/(exp(a*val) + exp(-a*val))
+	#return (exp(a*val) - exp(-a*val))/(exp(a*val) + exp(-a*val))
 
 
 def tanhFunder(x, const):

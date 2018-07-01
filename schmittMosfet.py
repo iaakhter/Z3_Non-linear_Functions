@@ -62,3 +62,14 @@ class SchmittMosfetMark:
 		#print ("jac before")
 		#print (jac)
 		return jac[3:,3:]
+
+
+	def linearConstraints(self, hyperRectangle):
+		lenV = len(hyperRectangle)
+		cHyper = [0.0, self.Vdd, self.inputVoltage] + [x for x in hyperRectangle]
+		[feasible, newHyper] = self.c.linearConstraints(cHyper, [0, 1])
+		newHyper = newHyper[3:]
+		newHyperMat = np.zeros((lenV,2))
+		for i in range(lenV):
+			newHyperMat[i,:] = [newHyper[i][0], newHyper[i][1]]
+		return [feasible, newHyperMat]

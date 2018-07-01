@@ -120,8 +120,8 @@ def precompute(filename, mosTrans, ulVert, lrVert, numDivisions, numDivSmall):
 		recEndInty += 1
 		
 		while recEndInty <= endInty:
-			#print ("ul corner", (recStartIntx, recStartInty), (recStartx, recStarty))
-			#print ("lr corner", (recEndIntx, recEndInty), (recEndx, recEndy))
+			print ("ul corner", (recStartIntx, recStartInty), (recStartx, recStarty))
+			print ("lr corner", (recEndIntx, recEndInty), (recEndx, recEndy))
 			hyper = np.array([[recEndx - unitDiffx, recEndx], [recEndy - unitDiffy, recEndy]])
 			#print ("hyper", hyper)
 			lp, points = convexHullFromIdsSample(mosTrans, hyper, numDivSmall)

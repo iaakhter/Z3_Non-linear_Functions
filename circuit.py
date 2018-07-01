@@ -1,5 +1,6 @@
 #@author: Mark Greenstreet
-
+import pickle
+import math
 import numpy as np
 from cvxopt import matrix,solvers
 from scipy.spatial import ConvexHull
@@ -48,6 +49,28 @@ class Mosfet:
 			i0 = ks*(Vgse - Vds/2.0)*Vds
 		return(i0 + i_leak)
 
+	# Calculate ids given Vgse (Vg - Vs - Vt) and Vds (Vd - Vs)
+	def ids_help_var2(self, Vgse, Vds, channelType, ks):
+		if(channelType == 'pfet'):
+			return -self.ids_help_var2(-Vgse, -Vds, 'nfet', -ks)
+		elif(Vds < 0.0):
+			return -self.ids_help_var2(Vgse - Vds, -Vds, channelType, ks)
+		i_leak = Vds*self.model.gds
+		if(Vgse < 0):  # cut-off
+			i0 = 0
+		elif(Vgse < Vds): # saturation
+			i0 = (ks/2.0)*Vgse*Vgse
+		else: # linear
+			i0 = ks*(Vgse - Vds/2.0)*Vds
+		return(i0 + i_leak)
+
+	#TODO: Need a better way to frame this - more like ids
+	def ids_var2(self, Vgs, Vds):
+		model = self.model
+		Vgse = Vgs - model.Vt
+		return self.ids_help_var2(Vgse, Vds, model.channelType, model.k*self.shape )
+
+	
 	def ids(self, V):
 		model = self.model
 		return(self.ids_help(V[self.s], V[self.g], V[self.d], model.channelType, model.Vt, model.k*self.shape))
@@ -271,15 +294,12 @@ class Mosfet:
 		#print ("lp_grind: hyperLp")
 		#print (hyperLp)
 
-		cutoffA = (ks/2.0)*np.array([[0.0]])
 		satA = (ks/2.0)*np.array([[1.0]])
 		linA = (ks/2.0)*np.array([[0.0, 1.0], [1.0, -1.0]])
 
 		if interval_hi(Vgse) <= 0.0: # cutoff everywhere in the hyperrectangle
 			#print ("lp_grind: if1")
-			vertList = [np.array([Vgse[0]]), \
-						np.array([Vgse[1]])]
-			return self.quad_lin_constraints(cutoffA, vertList, Vt).concat(hyperLp)
+			return hyperLp
 
 		elif(interval_lo(Vgse) >= 0 and interval_lo(Vds) >= interval_hi(Vgse)):  # saturation everywhere in the hyperrectangle
 			#print ("lp_grind: if2")
@@ -365,7 +385,96 @@ class Mosfet:
 
 			return lp
 
+	def lp_grind_pre(self, Vgs, Vds):
+		filename = "precompConvexHull.pkl"
+		theFile = open(filename, "rb")
+		numDivisions, mainDict = pickle.load(theFile)
+		theFile.close()
+
+		minVal, maxVal = -1.8, 1.8
+		unitDiff = (maxVal - minVal)/numDivisions
+
+		dictVgsEntry = np.array([math.floor((Vgs[0] - minVal)/unitDiff), math.ceil((Vgs[1] - minVal)/unitDiff)])
+		dictVdsEntry = np.array([math.floor((Vds[0] - minVal)/unitDiff), math.ceil((Vds[1] - minVal)/unitDiff)])
+		print ("Vgs", Vgs, "Vds", Vds)
+		print ("dictVgsEntry", dictVgsEntry)
+		print ("dictVdsEntry", dictVdsEntry)
+		lp = mainDict[(int(dictVgsEntry[0]), int(dictVdsEntry[0]))][(int(dictVgsEntry[1]), int(dictVdsEntry[1]))]
+		newLp = LP()
+		for i in range(len(lp.A)):
+			newLp.ineq_constraint([-lp.A[i][0]-lp.A[i][1], lp.A[i][0], lp.A[i][1], lp.A[i][2]], lp.b[i])
+		return newLp
+
+
 	
+	def lp_ids_help_pre(self, Vs, Vg, Vd, channelType, Vt, ks):
+		Vgs = interval_sub(Vg, Vs)
+		Vgse = Vgs - Vt
+		Vds = interval_sub(Vd, Vs)
+		#print ("Vgse", Vgse, "Vds", Vds)
+		if(not(interval_p(Vs) or interval_p(Vg) or interval_p(Vd))):
+			#print ("if1")
+			# Vs, Vg, and Vd are non-intervals -- they define a point
+			# Add an inequality that our Ids is the value for this point
+			return(LP(None, None, None, [[0,0,0,1.0]], self.ids_help(Vs, Vg, Vd, channelType, Vt, ks)))
+		elif(channelType == 'pfet'):
+			#print ("if2")
+			LPnfet = self.lp_ids_help(interval_neg(Vs), interval_neg(Vg), interval_neg(Vd), 'nfet', -Vt, -ks)
+			return LPnfet.neg_A()
+		elif((interval_lo(Vs) <= interval_hi(Vd)) and (interval_hi(Vs) >= interval_lo(Vd))):
+			#print ("if3")
+			# If the Vs interval overlaps the Vd interval, then Vds can change sign.
+			# That means we've got a saddle.  We won't try to generated LP constraints
+			# for the saddle.  So, we just return an empty LP.
+			return(LP())
+		elif(interval_lo(Vs) > interval_hi(Vd)):
+			#print ("if4")
+			LPswap = self.lp_ids_help(Vd, Vg, Vs, channelType, Vt, ks)
+			A = []
+			for i in range(len(LPswap.A)):
+				row = LPswap.A[i]
+				A.append([row[2], row[1], row[0], -row[3]])
+			Aeq = []
+			for i in range(len(LPswap.Aeq)):
+				row = LPswap.Aeq[i]
+				Aeq.append([row[2], row[1], row[0], -row[3]])
+			return LP(LPswap.c, A, LPswap.b, Aeq, LPswap.beq)
+
+		else:
+			#print ("if5")
+			#return LP()
+			Ids = self.ids_help(Vs, Vg, Vd, channelType, Vt, ks)
+			# form the LP where the constraints for the Vgse and Vds
+			# bounds are added. This is important to make sure we don't get
+			# unboundedness from our linear program
+			hyperLp = LP()
+			if interval_p(Vs):
+				hyperLp.ineq_constraint([-1.0, 0.0, 0.0, 0.0], -Vs[0])
+				hyperLp.ineq_constraint([1.0, 0.0, 0.0, 0.0], Vs[1])
+			else:
+				hyperLp.ineq_constraint([-1.0, 0.0, 0.0, 0.0], -(Vs - 1e-5))
+				hyperLp.ineq_constraint([1.0, 0.0, 0.0, 0.0], Vs + 1e-5)
+			if interval_p(Vg):
+				hyperLp.ineq_constraint([0.0, -1.0, 0.0, 0.0], -Vg[0])
+				hyperLp.ineq_constraint([0.0, 1.0, 0.0, 0.0], Vg[1])
+			else:
+				hyperLp.ineq_constraint([0.0, -1.0, 0.0, 0.0], -(Vg - 1e-5))
+				hyperLp.ineq_constraint([0.0, 1.0, 0.0, 0.0], Vg + 1e-5)
+			if interval_p(Vd):
+				hyperLp.ineq_constraint([0.0, 0.0, -1.0, 0.0], -Vd[0])
+				hyperLp.ineq_constraint([0.0, 0.0, 1.0, 0.0], Vd[1])
+			else:
+				hyperLp.ineq_constraint([0.0, 0.0, -1.0, 0.0], -(Vd - 1e-5))
+				hyperLp.ineq_constraint([0.0, 0.0, 1.0, 0.0], Vd + 1e-5)
+			if interval_p(Ids):
+				hyperLp.ineq_constraint([0.0, 0.0, 0.0, -1.0], -(Ids[0] - 1e-3))
+				hyperLp.ineq_constraint([0.0, 0.0, 0.0, 1.0], (Ids[1] + 1e-3))
+			else:
+				hyperLp.ineq_constraint([0.0, 0.0, 0.0, -1.0], -(Ids - 1e-3))
+				hyperLp.ineq_constraint([0.0, 0.0, 0.0, 1.0], (Ids + 1e-3))
+			return self.lp_grind_pre(Vgs, Vds).concat(hyperLp)
+
+
 	def lp_ids_help(self, Vs, Vg, Vd, channelType, Vt, ks):
 		#print ("Vs", Vs, "Vg", Vg, "Vd", Vd, "channelType", channelType)
 		Vgs = interval_sub(Vg, Vs)
@@ -402,6 +511,7 @@ class Mosfet:
 
 		else:
 			#print ("if5")
+			#return LP()
 			Ids = self.ids_help(Vs, Vg, Vd, channelType, Vt, ks)
 			# form the LP where the constraints for the Vgse and Vds
 			# bounds are added. This is important to make sure we don't get
@@ -462,10 +572,9 @@ class Mosfet:
 
 	def lp_ids(self, V):
 		model = self.model
-		idsLp = self.lp_ids_help(V[self.s], V[self.g], V[self.d], model.channelType, model.Vt, model.k*self.shape)
-		'''if idsLp.num_constraints() == 0:
-			return idsLp'''
-
+		#idsLp = self.lp_ids_help(V[self.s], V[self.g], V[self.d], model.channelType, model.Vt, model.k*self.shape)
+		idsLp = self.lp_ids_help_pre(V[self.s], V[self.g], V[self.d], model.channelType, model.Vt, model.k*self.shape)
+	
 		#print ("idsLp")
 		#print (idsLp)
 		lp = LP()

@@ -193,7 +193,7 @@ if __name__ == "__main__":
 	nfet = MosfetModel(channelType = 'nfet', Vt =0.4, k = 270.0e-6)
 	m1 = Mosfet(0, 1, 2, nfet)
 	#mainDict = precompute("precompConvexHull.pkl", m1, (0.0,0.0), (1.8, 1.8), 18, 10)
-	mainDict = precompute("precompConvexHull.pkl", m1, (-1.8,-1.8), (1.8, 1.8), 36, 10)
+	mainDict = precompute("precompConvexHull.pkl", m1, (-1.8,-1.8), (1.8, 1.8), 18, 10)
 	numDivisions, mainDict = loadMainDict("precompConvexHull.pkl")
 	print ("numDivisions", numDivisions)
 	'''print ("mainDict")

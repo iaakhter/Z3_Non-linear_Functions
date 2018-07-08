@@ -24,6 +24,26 @@ def convexHullFromIdsSample(mosTrans, hyper, numDivisions):
 	#print ("lp", lp.A)
 	return lp, points
 
+# This function samples Is calculated by an inverter inv. 
+# hyper is defined by input voltage (dim 1) and output voltage (dim 2).
+# numDivisions gives the number of divisions by which each axis is divided
+def convexHullFromISampleTransistor(inv, hyper, numDivisions):
+	VinVals = np.linspace(hyper[0,0], hyper[0,1], numDivisions)
+	VoutVals = np.linspace(hyper[1,0], hyper[1,1], numDivisions)
+	Is = np.zeros((len(VinVals), len(VoutVals)))
+	points = []
+	for i in range(len(VinVals)):
+		for j in range(len(VoutVals)):
+			# transistor circuit structure is [Vin, Vout, grnd, Vdd]
+			Is[i,j] = inv.f(np.array([VinVals[i], VoutVals[j], 0.0, 1.8]))[1]
+			points.append([VinVals[i], VoutVals[j], Is[i,j]])
+
+	points = np.array(points)
+	#print ("points", points)
+	lp = convexHullConstraints(points)
+	return lp, points
+
+
 def convexHullConstraints(points):
 	lp = LP()
 	try:
@@ -83,7 +103,98 @@ def addToMainDict(mainDict, ulEntry, lrEntry, lp, points):
 		mainDict[ulEntry][lrEntry] = (lp, points)
 	else:
 		mainDict[ulEntry] = {}
-		mainDict[ulEntry][lrEntry] = (lp, points)	
+		mainDict[ulEntry][lrEntry] = (lp, points)
+
+
+# precompute inverter currents
+def precomputeInvI(filename, inv, ulVert, lrVert, numDivisions, numDivSmall):
+	unitDiffx = (lrVert[0] - ulVert[0])/(numDivisions*1.0)
+	unitDiffy = (lrVert[1] - ulVert[1])/(numDivisions*1.0)
+	startx, starty = ulVert
+	endx, endy = lrVert
+	startIntx, startInty = 0,0
+	endIntx, endInty = numDivisions, numDivisions
+
+
+	mainDict = {}
+	
+	while startIntx < endIntx and startInty < endInty:
+		recStartx, recStarty = startx, starty
+		recEndx, recEndy = startx, starty
+		recStartIntx, recStartInty = startIntx, startInty
+		recEndIntx, recEndInty = startIntx, startInty
+		if recEndIntx == endIntx:
+			recEndx = ulVert[0]
+			recEndIntx = 0
+		else:
+			recEndx += unitDiffx
+			recEndIntx += 1
+		recEndy += unitDiffy
+		recEndInty += 1
+		
+		while recEndInty <= endInty:
+			print ("ul corner", (recStartIntx, recStartInty), (recStartx, recStarty))
+			print ("lr corner", (recEndIntx, recEndInty), (recEndx, recEndy))
+			hyper = np.array([[recEndx - unitDiffx, recEndx], [recEndy - unitDiffy, recEndy]])
+			#print ("hyper", hyper)
+			lp, points = convexHullFromISampleTransistor(inv, hyper, numDivSmall)
+			ulEntry = (recEndIntx - 1, recEndInty - 1)
+			lrEntry = (recEndIntx, recEndInty)
+			addToMainDict(mainDict, ulEntry, lrEntry, lp, points)
+
+			#print ("lp", str(lp))
+			allPoints = [points]
+			if recEndInty - recStartInty > 1:
+				#print ("adding points for ", (recEndIntx - 1, recStartInty), (recEndIntx, recEndInty-1))
+				_, existingPoints = mainDict[(recEndIntx - 1, recStartInty)][(recEndIntx, recEndInty-1)]
+				allPoints += [existingPoints]
+				lp, points = convexHullFrom2ConvexHulls(allPoints)
+				ulEntry = (recEndIntx - 1, recStartInty)
+				lrEntry = (recEndIntx, recEndInty)
+				addToMainDict(mainDict, ulEntry, lrEntry, lp, points)
+
+			if recEndIntx - recStartIntx > 1:
+				#print ("adding points for ", (recStartIntx, recStartInty), (recEndIntx - 1, recEndInty))
+				_, existingPoints = mainDict[(recStartIntx, recStartInty)][(recEndIntx - 1, recEndInty)]
+				allPoints += [existingPoints]
+			
+			if len(allPoints) > 1:
+				lp, points = convexHullFrom2ConvexHulls(allPoints)
+			
+			ulEntry = (recStartIntx, recStartInty)
+			lrEntry = (recEndIntx, recEndInty)
+			addToMainDict(mainDict, ulEntry, lrEntry, lp, points)
+			
+			if recEndIntx == endIntx:
+				recEndx = recStartx + unitDiffx
+				recEndIntx = recStartIntx + 1
+				recEndy += unitDiffy
+				recEndInty += 1
+			else:
+				recEndx += unitDiffx
+				recEndIntx += 1
+			#print ("")
+
+		if startIntx == endIntx-1:
+			startx = ulVert[0]
+			starty += unitDiffy
+			startIntx = 0
+			startInty += 1
+		else:
+			startx += unitDiffx
+			startIntx += 1
+
+	# do not need to save the points in the file
+	# only lp. So get rid of the points
+	for key in mainDict:
+		for val in mainDict[key]:
+			mainDict[key][val] = mainDict[key][val][0]
+
+	allInfo = [numDivisions, mainDict]
+	theFile = open(filename, "wb")
+	pickle.dump(allInfo, theFile)
+	theFile.close()
+	return mainDict
 
 
 # precompute convexhulls of each possible rectangle
@@ -191,18 +302,25 @@ def loadMainDict(filename):
 
 if __name__ == "__main__":
 	nfet = MosfetModel(channelType = 'nfet', Vt =0.4, k = 270.0e-6)
-	m1 = Mosfet(0, 1, 2, nfet)
-	#mainDict = precompute("precompConvexHull.pkl", m1, (0.0,0.0), (1.8, 1.8), 18, 10)
-	mainDict = precompute("precompConvexHull.pkl", m1, (-1.8,-1.8), (1.8, 1.8), 18, 10)
-	numDivisions, mainDict = loadMainDict("precompConvexHull.pkl")
-	print ("numDivisions", numDivisions)
-	'''print ("mainDict")
+	'''m1 = Mosfet(0, 1, 2, nfet)
+	precompute("precompConvexHull20div.pkl", m1, (-1.8,-1.8), (1.8, 1.8), 9, 20)
+	print ("done")
+	#numDivisions, mainDict = loadMainDict("precompConvexHull.pkl")
+	#print ("numDivisions", numDivisions)'''
+
+	m1 = Mosfet(2, 0, 1, nfet)
+	pfet = MosfetModel(channelType = 'pfet', Vt = -0.4, k = -90.0e-6)
+	m2 = Mosfet(3, 0, 1, pfet)
+	inv = Circuit([m1, m2])
+
+	mainDict = precomputeInvI("precompConvexHullInv18_20.pkl", inv, (0.0, 0.0), (1.8,1.8), 18, 20)
+	print ("mainDict")
 	for key in mainDict:
 		print ("ul corner", key)
 		for val in mainDict[key]:
 			print ("lr corner", val)
 			#print ("lp ", str(mainDict[key][val]))
-		print ("")'''
+		print ("")
 
 
 

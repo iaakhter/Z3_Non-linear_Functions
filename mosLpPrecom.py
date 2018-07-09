@@ -313,7 +313,7 @@ if __name__ == "__main__":
 	m2 = Mosfet(3, 0, 1, pfet)
 	inv = Circuit([m1, m2])
 
-	mainDict = precomputeInvI("precompConvexHullInv18_20.pkl", inv, (0.0, 0.0), (1.8,1.8), 18, 20)
+	mainDict = precomputeInvI("precompConvexHullInv9_40.pkl", inv, (0.0, 0.0), (1.8,1.8), 9, 40)
 	print ("mainDict")
 	for key in mainDict:
 		print ("ul corner", key)

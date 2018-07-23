@@ -16,8 +16,11 @@ class SchmittMosfetMark:
 		#self.Sp = self.Sn*2.0
 		self.inputVoltage = inputVoltage
 
-		nfet = circuit.MosfetModel('nfet', self.Vtn, self.Kn, "default")
-		pfet = circuit.MosfetModel('pfet', self.Vtp, self.Kp, "default")
+		#nfet = circuit.MosfetModel('nfet', self.Vtn, self.Kn, "default")
+		#pfet = circuit.MosfetModel('pfet', self.Vtp, self.Kp, "default")
+
+		nfet = circuit.MosfetModel('nfet', self.Vtn, self.Kn)
+		pfet = circuit.MosfetModel('pfet', self.Vtp, self.Kp)
 
 		# with the voltage array containing [grnd, Vdd, input, X[0], X[1], X[2]]
 		# where X[0] is the output voltage and X[1] is the voltage at node with 
@@ -67,9 +70,11 @@ class SchmittMosfetMark:
 	def linearConstraints(self, hyperRectangle):
 		lenV = len(hyperRectangle)
 		cHyper = [0.0, self.Vdd, self.inputVoltage] + [x for x in hyperRectangle]
-		[feasible, newHyper] = self.c.linearConstraints(cHyper, [0, 1])
+		[feasible, newHyper, numTotalLp, numSuccessLp, numUnsuccessLp, numSaddle, numAnyRegion]  = self.c.linearConstraints(cHyper, [0, 1])
 		newHyper = newHyper[3:]
 		newHyperMat = np.zeros((lenV,2))
 		for i in range(lenV):
 			newHyperMat[i,:] = [newHyper[i][0], newHyper[i][1]]
-		return [feasible, newHyperMat]
+		return [feasible, newHyperMat, numTotalLp, numSuccessLp, numUnsuccessLp, numSaddle, numAnyRegion]
+
+		

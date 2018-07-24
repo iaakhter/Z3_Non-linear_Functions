@@ -897,7 +897,7 @@ def separateHyperSpaceTest():
 
 if __name__ == "__main__":
 	global runOptions
-	runOptions = []
+	runOptions = ['trace']
 	statVars = {}
 	start = time.time()
 	allHypers = rambusOscillator(modelType="mosfet", numStages=2, g_cc=4.0, volRedThreshold=1.0, statVars=statVars, numSolutions="all" , newtonHypers=None, useLp=False)

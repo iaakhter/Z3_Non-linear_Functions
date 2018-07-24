@@ -97,6 +97,7 @@ class Meti25:
 		newHyperRectangle = np.copy(hyperRectangle)
 		feasible = True
 
+		numSuccessLp, numUnsuccessLp, numTotalLp = 0, 0, 2
 		minObjConstraint = "min 1 " + self.x
 		maxObjConstraint = "max 1 " + self.x
 		Cmin = lpUtils.constructObjMatrix(minObjConstraint,variableDict)
@@ -105,13 +106,20 @@ class Meti25:
 		maxSol = solvers.lp(Cmax,A,B)
 		if minSol["status"] == "primal infeasible" and maxSol["status"] == "primal infeasible":
 			feasible = False
+			numSuccessLp += 2
 		else:
 			if minSol["status"] == "optimal":
 				newHyperRectangle[0,0] = minSol['x'][variableDict[self.x]] - 1e-6
+				numSuccessLp += 1
+			else:
+				numUnsuccessLp += 1
 			if maxSol["status"] == "optimal":
 				newHyperRectangle[0,1] = maxSol['x'][variableDict[self.x]] + 1e-6
+				numSuccessLp += 1
+			else:
+				numUnsuccessLp += 1
 
-		return [feasible, newHyperRectangle]
+		return [feasible, newHyperRectangle, numTotalLp, numSuccessLp, numUnsuccessLp]
 
 
 class Meti18:
@@ -201,6 +209,7 @@ class Meti18:
 		newHyperRectangle = np.copy(hyperRectangle)
 		feasible = True
 
+		numSuccessLp, numUnsuccessLp, numTotalLp = 0, 0, 2
 		minObjConstraint = "min 1 " + self.x
 		maxObjConstraint = "max 1 " + self.x
 		Cmin = lpUtils.constructObjMatrix(minObjConstraint,variableDict)
@@ -209,13 +218,20 @@ class Meti18:
 		maxSol = solvers.lp(Cmax,A,B)
 		if minSol["status"] == "primal infeasible" and maxSol["status"] == "primal infeasible":
 			feasible = False
+			numSuccessLp += 2
 		else:
 			if minSol["status"] == "optimal":
 				newHyperRectangle[0,0] = minSol['x'][variableDict[self.x]] - 1e-6
+				numSuccessLp += 1
+			else:
+				numUnsuccessLp += 1
 			if maxSol["status"] == "optimal":
 				newHyperRectangle[0,1] = maxSol['x'][variableDict[self.x]] + 1e-6
+				numSuccessLp += 1
+			else:
+				numUnsuccessLp += 1
 
-		return [feasible, newHyperRectangle]
+		return [feasible, newHyperRectangle, numTotalLp, numSuccessLp, numUnsuccessLp]
 
 
 
@@ -233,8 +249,8 @@ if __name__ == "__main__":
 		for xs in xSamples:
 			f = model.oscNum(xs)[2]
 			if f < fVal[0] or f > fVal[1]:
-				print "oops x ", xs, "for interval", xBound
-				print "actual f", f, "should be in", fVal
+				print ("oops x ", xs, "for interval", xBound)
+				print ("actual f", f, "should be in", fVal)
 
 	model = Meti18(0.0, 100.0, ">")
 	#print (example1.oscNum(20))
@@ -249,6 +265,6 @@ if __name__ == "__main__":
 		for xs in xSamples:
 			f = model.oscNum(xs)[2]
 			if f < fVal[0] or f > fVal[1]:
-				print "oops x ", xs, "for interval", xBound
-				print "actual f", f, "should be in", fVal
+				print ("oops x ", xs, "for interval", xBound)
+				print ("actual f", f, "should be in", fVal)
 

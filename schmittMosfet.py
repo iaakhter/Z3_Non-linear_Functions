@@ -70,11 +70,11 @@ class SchmittMosfetMark:
 	def linearConstraints(self, hyperRectangle):
 		lenV = len(hyperRectangle)
 		cHyper = [0.0, self.Vdd, self.inputVoltage] + [x for x in hyperRectangle]
-		[feasible, newHyper, numTotalLp, numSuccessLp, numUnsuccessLp, numSaddle, numAnyRegion]  = self.c.linearConstraints(cHyper, [0, 1])
+		[feasible, newHyper, numTotalLp, numSuccessLp, numUnsuccessLp]  = self.c.linearConstraints(cHyper, [0, 1])
 		newHyper = newHyper[3:]
 		newHyperMat = np.zeros((lenV,2))
 		for i in range(lenV):
 			newHyperMat[i,:] = [newHyper[i][0], newHyper[i][1]]
-		return [feasible, newHyperMat, numTotalLp, numSuccessLp, numUnsuccessLp, numSaddle, numAnyRegion]
+		return [feasible, newHyperMat, numTotalLp, numSuccessLp, numUnsuccessLp]
 
 		

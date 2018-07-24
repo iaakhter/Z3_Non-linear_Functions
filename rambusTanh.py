@@ -100,7 +100,9 @@ class RambusTanh:
 		variableDict, A, B = lpUtils.constructCoeffMatrices(allConstraints)
 		newHyperRectangle = np.copy(hyperRectangle)
 		feasible = True
+		numSuccessLp, numUnsuccessLp, numTotalLp = 0, 0, 0
 		for i in range(lenV):
+			numTotalLp += 2
 			#print "min max ", i
 			minObjConstraint = "min 1 " + self.xs[i]
 			maxObjConstraint = "max 1 " + self.xs[i]
@@ -110,14 +112,23 @@ class RambusTanh:
 			maxSol = solvers.lp(Cmax,A,B)
 			if minSol["status"] == "primal infeasible" and maxSol["status"] == "primal infeasible":
 				feasible = False
+				numSuccessLp += 2
 				break
 			else:
 				if minSol["status"] == "optimal":
 					newHyperRectangle[i,0] = minSol['x'][variableDict[self.xs[i]]] - 1e-6
+					numSuccessLp += 1
+				else:
+					numUnsuccessLp += 1
+					#print ("min lp not optimal", minSol["status"])
+					#print (allConstraints)
 				if maxSol["status"] == "optimal":
 					newHyperRectangle[i,1] = maxSol['x'][variableDict[self.xs[i]]] + 1e-6
+					numSuccessLp += 1
+				else:
+					numUnsuccessLp += 1
 
-		return [feasible, newHyperRectangle]
+		return [feasible, newHyperRectangle, numTotalLp, numSuccessLp, numUnsuccessLp]
 
 
 if __name__ == "__main__":

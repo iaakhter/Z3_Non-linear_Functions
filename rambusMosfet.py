@@ -30,15 +30,16 @@ class RambusMosfetMark:
 		for i in range(lenV):
 			fwdInd = (i-1)%(lenV)
 			ccInd = (i+lenV//2)%(lenV)
-			if i == 3 or fwdInd == 3 or ccInd == 3:
-				print ("faulty node involved in transistors", len(transistorList),
-					len(transistorList) + 1, len(transistorList) + 2, len(transistorList)+3)
+			#if i == 3 or fwdInd == 3 or ccInd == 3:
+			#	print ("faulty node involved in transistors", len(transistorList),
+			#		len(transistorList) + 1, len(transistorList) + 2, len(transistorList)+3)
 			transistorList.append(circuit.Mosfet(lenV, fwdInd, i, nfet, s0*g_fwd))
 			transistorList.append(circuit.Mosfet(lenV+1, fwdInd, i, pfet, 2.0*s0*g_fwd))
 			transistorList.append(circuit.Mosfet(lenV, ccInd, i, nfet, s0*g_cc))
 			transistorList.append(circuit.Mosfet(lenV+1, ccInd, i, pfet, 2.0*s0*g_cc))
 
 		self.c = circuit.Circuit(transistorList)
+		#self.c = circuit.TransistorCircuit(transistorList)
 
 
 		self.bounds = []

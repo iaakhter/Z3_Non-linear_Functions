@@ -25,7 +25,8 @@ def categorizeSolutions(allHypers,model):
 	stableSols = []
 	unstableSols = []
 	allSols = []
-	for hyper in allHypers:
+	for hyperDim in allHypers:
+		hyper = hyperDim[0]
 		exampleSoln = (hyper[:,0] + hyper[:,1])/2.0
 		lenV = len(exampleSoln)
 		finalSoln = intervalUtils.newton(model,exampleSoln)

@@ -13,6 +13,7 @@ import random
 import math
 import circuit
 import pickle
+import logging
 from solverAnalysis import *
 
 
@@ -135,7 +136,7 @@ def solverLoop2(uniqueHypers, model, volRedThreshold, bisectFun, numSolutions = 
 	stackList.append(feas[1])
 	numNewtonUsed = 0
 	while len(stackList) > 0:
-		print ("len stack", len(stackList))
+		#print ("len stack", len(stackList))
 
 		#pop the hyperrectangle
 		hyperPopped = stackList.pop(-1)
@@ -277,14 +278,13 @@ def solverLoop(uniqueHypers, model, statVars, volRedThreshold, bisectFun, numSol
 	stackList = [feas[1]]
 
 	while len(stackList) > 0:
-		#print ("len stack", len(stackList))
+		logging.info("len stack" + str(len(stackList)))
 
 		#pop the hyperrectangle
 		hyperPopped = stackList.pop(-1)
-		#print ("hyperPopped", hyperPopped)
-		print ("hyperPopped")
+		logging.info("hyperPopped")
 		for i in range(lenV):
-			print (hyperPopped[i][0], hyperPopped[i][1])
+			logging.info(str(hyperPopped[i][0]) + str(hyperPopped[i][1]))
 		
 		#if the popped hyperrectangle is contained in a hyperrectangle
 		#that is already known to contain a unique solution, then do not
@@ -304,7 +304,6 @@ def solverLoop(uniqueHypers, model, statVars, volRedThreshold, bisectFun, numSol
 			#If the Gauss_Seidel + Lp loop indicate uniqueness, then add the hyperrectangle
 			#to our list
 			if numSolutions == "all" or len(uniqueHypers) < numSolutions:
-				#print ("feasibility[1:]", feasibility[1:])
 				addToSolutions(model, uniqueHypers, feasibility[1:])
 
 		elif feasibility[0] == False and feasibility[1] is not None:
@@ -314,21 +313,20 @@ def solverLoop(uniqueHypers, model, statVars, volRedThreshold, bisectFun, numSol
 			#solution or no solution. Otherwise, add the two halves to
 			#the stackList to be processed again.
 			hypForBisection = feasibility[1]
-			#print (hypForBisection[:,1] - hypForBisection[:,0])
 			while hypForBisection is not None:
-				#print ("hypForBisection", hypForBisection)
+				logging.debug("hypForBisection" + str(hypForBisection))
 				lHyp, rHyp = bisectFun(hypForBisection)
 				statVars['numBisection'] += 1
 				statVars['stringHyperList'].append(("b", [intervalUtils.volume(lHyp), intervalUtils.volume(rHyp)]))
-				#print ("lHyp", lHyp)
+				logging.debug("lHyp" + str(lHyp))
 				start = time.time()
 				lFeas = intervalUtils.checkExistenceOfSolution(model, lHyp.transpose(), kAlpha)
 				end = time.time()
 				statVars['totalGSTime'] += end - start
 				statVars['numGs'] += 1
 				statVars['stringHyperList'].append(("g", intervalUtils.volume(lFeas[1])))
-				#print ("lFeas", lFeas)
-				#print ("rHyp", rHyp)
+				logging.debug("lFeas" + str(lFeas))
+				logging.debug("rHyp" + str(rHyp))
 				start = time.time()
 				rFeas = intervalUtils.checkExistenceOfSolution(model, rHyp.transpose(), kAlpha)
 				end = time.time()
@@ -336,7 +334,7 @@ def solverLoop(uniqueHypers, model, statVars, volRedThreshold, bisectFun, numSol
 
 				statVars['numGs'] += 1
 				statVars['stringHyperList'].append(("g", intervalUtils.volume(rFeas[1])))
-				#print ("rFeas", rFeas)
+				logging.debug("rFeas" + str(rFeas))
 				if lFeas[0] or rFeas[0] or (lFeas[0] == False and lFeas[1] is None) or (rFeas[0] == False and rFeas[1] is None):
 					if lFeas[0] and rFeas[0]:
 						statVars['numDoubleKill'] += 1
@@ -346,14 +344,10 @@ def solverLoop(uniqueHypers, model, statVars, volRedThreshold, bisectFun, numSol
 						statVars['numSingleKill'] += 1
 					
 					if lFeas[0]:
-						#print ("addedHyper", lHyp)
 						if numSolutions == "all" or len(uniqueHypers) < numSolutions:
-							#print ("lFeas[1:]", lFeas[1:])
 							addToSolutions(model, uniqueHypers, lFeas[1:])
 					if rFeas[0]:
-						#print ("addedHyper", rHyp)
 						if numSolutions == "all" or len(uniqueHypers) < numSolutions:
-							#print ("rFeas", rFeas[1:])
 							addToSolutions(model, uniqueHypers, rFeas[1:])
 
 					if lFeas[0] == False and lFeas[1] is not None:
@@ -380,18 +374,13 @@ def solverLoop(uniqueHypers, model, statVars, volRedThreshold, bisectFun, numSol
 # than 1 solution and hyper maybe smaller than hyperRectangle containing the solutions
 def ifFeasibleHyper(hyperRectangle, statVars, volRedThreshold, model, kAlpha = 1.0, useLp = True):
 	lenV = hyperRectangle.shape[0]
-	#print ("hyperRectangle")
-	#print (hyperRectangle)
 	iterNum = 0
 	while True:
-		#print ("iterNum", iterNum)
-		print ("hyperRectangle")
-		print (hyperRectangle)
+		logging.info(("hyperRectangle" + str(hyperRectangle)))
 
 		newHyperRectangle = np.copy(hyperRectangle)
 
 		if useLp:
-			#print ("startlp")
 			start = time.time()
 			feasible, newHyperRectangle, numTotalLp, numSuccessLp, numUnsuccessLp = model.linearConstraints(newHyperRectangle)
 			end = time.time()
@@ -399,21 +388,16 @@ def ifFeasibleHyper(hyperRectangle, statVars, volRedThreshold, model, kAlpha = 1
 			statVars['numLpCalls'] += numTotalLp
 			statVars['numSuccessLpCalls'] += numSuccessLp
 			statVars['numUnsuccessLpCalls'] += numUnsuccessLp
-			#print ("endlp")
 			statVars['numLp'] += 1
 			if feasible:
 				vol = intervalUtils.volume(newHyperRectangle)
 			else:
 				vol = None
 			statVars['stringHyperList'].append(("l", vol))
-			#print ("newHyperRectangle ", newHyperRectangle)
-			#print ("feasible", feasible)
-			print ("newHyperRectangle")
+			logging.info("newHyperRectangle")
 			for i in range(lenV):
-				print (newHyperRectangle[i][0], newHyperRectangle[i][1])
-			#print ("newHyperRectangle ", newHyperRectangle)
+				logging.info(str(newHyperRectangle[i][0]) + str(newHyperRectangle[i][1]))
 			if feasible == False:
-				#print ("LP not feasible", hyperRectangle)
 				return (False, None)
 
 			for i in range(lenV):
@@ -424,16 +408,12 @@ def ifFeasibleHyper(hyperRectangle, statVars, volRedThreshold, model, kAlpha = 1
 
 
 		start = time.time()
-		#First apply gauss seidel
-		#print ("applying gauss-seidel")
+		#First apply Krawczyk
 		kResult = intervalUtils.checkExistenceOfSolution(model, newHyperRectangle.transpose(), kAlpha)
 		end = time.time()
 		statVars['totalGSTime'] += (end - start)
 		statVars['numGs'] += 1
 		statVars['stringHyperList'].append(("g", intervalUtils.volume(kResult[1])))
-		#print ("kResult")
-		#print (kResult)
-		
 		#If gauss-seidel interval says there is unique solution
 		#in hyperrectangle or no solution, then return
 		
@@ -442,20 +422,14 @@ def ifFeasibleHyper(hyperRectangle, statVars, volRedThreshold, model, kAlpha = 1
 			#print ("uniqueHyper", hyperRectangle)
 			return kResult
 
-		#print "kResult"
-		#print kResult
-		
 		#If Gauss-Seidel cannot make a decision apply linear programming
 		newHyperRectangle = kResult[1]			 
 
 		hyperVol = intervalUtils.volume(hyperRectangle)
-		#hyperVol = hyperVol**(1.0/lenV)
 
 		newHyperVol = intervalUtils.volume(newHyperRectangle)
-		#newHyperVol = newHyperVol**(1.0/lenV)
 
 		propReduc = (hyperVol - newHyperVol)/hyperVol
-		#print ("propReduc", propReduc)
 		
 		# If the proportion of volume reduction is not atleast
 		# volRedThreshold then return
@@ -871,10 +845,11 @@ def separateHyperSpaceTest():
 
 if __name__ == "__main__":
 	global runOptions
-	runOptions = ['trace']
+	runOptions = []
 	statVars = {}
+	logging.basicConfig(level=logging.DEBUG)
 	start = time.time()
-	allHypers = rambusOscillator(modelType="mosfet", numStages=2, g_cc=4.0, volRedThreshold=1.0, statVars=statVars, numSolutions="all" , useLp=False)
+	allHypers = rambusOscillator(modelType="tanh", numStages=2, g_cc=4.0, volRedThreshold=1.0, statVars=statVars, numSolutions="all" , useLp=True)
 	#print ("allHypers", allHypers)
 	#schmittTrigger(inputVoltage = 1.0, volRedThreshold = 1.0, statVars = statVars, numSolutions = "all", useLp = True)
 	#singleVariableInequalities(problemType="flyspeck172", volRedThreshold=1.0, statVars=statVars, useLp=True)

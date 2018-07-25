@@ -242,7 +242,7 @@ def ifFeasibleHyperTrace(hyperRectangle, statVars, volRedThreshold, model, kAlph
 			statVars['numSuccessLpCalls'] += numSuccessLp
 			statVars['numUnsuccessLpCalls'] += numUnsuccessLp
 			#print ("endlp")
-			startVars['numLp'] += 1
+			statVars['numLp'] += 1
 			if feasible:
 				vol = intervalUtils.volume(newHyperRectangle)
 			else:

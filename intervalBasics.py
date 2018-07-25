@@ -1,6 +1,7 @@
 # @author Mark Greenstreet
 
 import numpy as np
+import functools
 
 def my_reduce_last_dim_help(op, src, dst):
 	if(src.ndim == 2):
@@ -14,7 +15,7 @@ def my_reduce_last_dim(op, x):
 	if(not hasattr(x, 'ndim')):
 		return x
 	if(x.ndim == 1):
-		return(np.array(reduce(op, x)))
+		return(np.array(functools.reduce(op, x)))
 	dims = [];
 	xx = x;
 	for i in range(x.ndim - 1):
@@ -121,6 +122,8 @@ def interval_intersect(x, y):
 	if((x is None) or (y is None)):
 		r = None
 	else:
+		#print ("x", x)
+		#print ("y", y)
 		lo = max(x[0], y[0])
 		hi = min(x[1], y[1])
 		if(lo <= hi):

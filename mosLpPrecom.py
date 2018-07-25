@@ -40,8 +40,8 @@ def convexHullFromISampleTransistor(inv, hyper, numDivisions):
 
 	points = np.array(points)
 	#print ("points", points)
-	lp = convexHullConstraints(points)
-	return lp, points
+	lp, cvPoints = convexHullConstraints(points)
+	return lp, cvPoints
 
 
 def convexHullConstraints(points):
@@ -57,12 +57,14 @@ def convexHullConstraints(points):
 		convexHullMiddle = convexHullMiddle/(numPoints*1.0)
 		#print ("hull simplices", hull.simplices)
 
+		convexHullPoints = []
 		for si in range(len(hull.simplices)):
 			simplex = hull.simplices[si]
 			#print ("simplex", simplex)
 			pointsFromSimplex = np.zeros((len(simplex),len(simplex)))
 			for ii in range(len(simplex)):
 				pointsFromSimplex[ii] = points[simplex[ii]]
+				convexHullPoints.append(pointsFromSimplex[ii])
 			
 			#print ("pointsFromSimplex", pointsFromSimplex)
 			normal = np.cross(pointsFromSimplex[1] - pointsFromSimplex[0], pointsFromSimplex[2] - pointsFromSimplex[0])
@@ -82,10 +84,12 @@ def convexHullConstraints(points):
 			#print ("normal", normal)
 			#print ("pointInPlane", pointInPlane)
 			
-		return lp
+		convexHullPoints = np.array(convexHullPoints)
+		convexHullPoints = np.unique(convexHullPoints, axis=0)
+		return lp, convexHullPoints
 	except scipy.spatial.qhull.QhullError:
 		#print ("convex hull not working")
-		return lp
+		return lp, points
 
 
 # Take the convex hull of the sets of points passed as a list
@@ -95,8 +99,8 @@ def convexHullFrom2ConvexHulls(pointsSet):
 		allPoints += list(points)
 	allPoints = np.array(allPoints)
 	allPoints = np.unique(allPoints, axis = 0)
-	lp = convexHullConstraints(allPoints)
-	return lp, allPoints
+	lp, cvPoints = convexHullConstraints(allPoints)
+	return lp, cvPoints
 
 def addToMainDict(mainDict, ulEntry, lrEntry, lp, points):
 	if ulEntry in mainDict:

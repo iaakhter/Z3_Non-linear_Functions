@@ -36,7 +36,7 @@ def testLPUnionTanh(low, high):
 	lowLp.add_cost([1.0,0.0])
 	lowSol = lowLp.solve()
 	if lowSol["status"] == "primal_infeasible":
-		print "oops lowLp is infeasible"
+		print ("oops lowLp is infeasible")
 		return
 
 
@@ -66,7 +66,7 @@ def testLPUnionTanh(low, high):
 	highLp.add_cost([1.0,0.0])
 	highSol = highLp.solve()
 	if highSol["status"] == "primal_infeasible":
-		print "oops highLp is infeasible"
+		print ("oops highLp is infeasible")
 		return
 
 
@@ -87,13 +87,13 @@ def testLPUnionTanh(low, high):
 	lpCheck1.add_cost([1.0,0])
 	lpSol1 = lpCheck1.solve()
 	if lpSol1["status"] == "primal infeasible":
-		print "oops lowLp and unionLp together are infeasible"
-		print "lowLp"
-		print lowLp
-		print "highLp"
-		print highLp
-		print "unionLp"
-		print unionLp
+		print ("oops lowLp and unionLp together are infeasible")
+		print ("lowLp")
+		print (lowLp)
+		print ("highLp")
+		print (highLp)
+		print ("unionLp")
+		print (unionLp)
 		return
 
 	# check if highLp and unionLp are feasible
@@ -103,19 +103,19 @@ def testLPUnionTanh(low, high):
 	lpCheck2.add_cost([1.0,0])
 	lpSol2 = lpCheck2.solve()
 	if lpSol2["status"] == "primal infeasible":
-		print "oops highLp and unionLp together are infeasible"
-		print "lowLp"
-		print lowLp
-		print "highLp"
-		print highLp
-		print "unionLp"
-		print unionLp
+		print ("oops highLp and unionLp together are infeasible")
+		print ("lowLp")
+		print (lowLp)
+		print ("highLp")
+		print (highLp)
+		print ("unionLp")
+		print (unionLp)
 		return
 
 
 
 
-def testLpTransistorHelp(m1, Vs, Vg, Vd):
+def testLpTransistorHelp(m1, Vs, Vg, Vd, numDivisions = None, mainDict = None):
 	print ("testing", m1.model.channelType, "Vs", Vs, "Vg", Vg, "Vd", Vd)
 	if m1.model.channelType == "nfet":
 		v = np.array([Vs, Vg, Vd, np.array([1.8])])
@@ -142,10 +142,13 @@ def testLpTransistorHelp(m1, Vs, Vg, Vd):
 	#print (maxsol['x'])
 	
 	if minsol["status"] == "primal infeasible" or maxsol["status"] == "primal infeasible":
-		print "oops infeasible lp"
-		print "intervalVs", Vs, "intervalVg", Vg, "intervalVd", Vd
-		print "lp", str(lp)
+		print ("oops infeasible lp")
+		print ("intervalVs", Vs, "intervalVg", Vg, "intervalVd", Vd)
+		print ("lp", str(lp))
 		return
+
+	print ("lp")
+	print (lp)
 
 	print ("minsol['status']", minsol["status"])
 	print ("maxsol['status']", maxsol["status"])
@@ -153,11 +156,24 @@ def testLpTransistorHelp(m1, Vs, Vg, Vd):
 	#print ("maxsol slack")
 	#print (lp.slack())
 
-	minIds = minsol['x'][3] - 1e-7
-	maxIds = maxsol['x'][3] + 1e-7
+	#minIds = minsol['x'][3] - 1e-6
+	#maxIds = maxsol['x'][3] + 1e-6
+
+	minIds = minsol['x'][3]
+	maxIds = maxsol['x'][3]
+
+	print ("lp: minIds", minIds, "maxIds", maxIds)
+	if m1.model.channelType == "nfet":
+		ids = m1.ids(np.array([Vs, Vg, Vd, 1.8]))
+	elif m1.model.channelType == "pfet":
+		ids = m1.ids(np.array([0.0, Vg, Vd, Vs]))
+
+	print ("val:", ids[0], ids[1])
 
 
-	sampleDelta = 0.0001
+
+
+	'''sampleDelta = 0.0001
 	vsSamples = np.linspace(Vs[0]+sampleDelta, Vs[1]-sampleDelta, 10)
 	vgSamples = np.linspace(Vg[0]+sampleDelta, Vg[1]-sampleDelta, 10)
 	vdSamples = np.linspace(Vd[0]+sampleDelta, Vd[1]-sampleDelta, 10)
@@ -181,16 +197,21 @@ def testLpTransistorHelp(m1, Vs, Vg, Vd):
 					print "minIds", minIds, "maxIds", maxIds
 					print "actualIds", ids
 					print "lp", str(lp)
-					return
+					return'''
 
 
 def testNfet():
+	'''filename = "precompConvexHull.pkl"
+	theFile = open(filename, "rb")
+	numDivisions, mainDict = pickle.load(theFile)
+	theFile.close()
+	print ("loaded")'''
 	nfet = MosfetModel(channelType = 'nfet', Vt =0.4, k = 270.0e-6)
 	m1 = Mosfet(0, 1, 2, nfet)
 
 	######### when src <= drain
 	# cutoff everywhere in the hyperrectangle
-	Vs = np.array([0.3,0.6])
+	'''Vs = np.array([0.3,0.6])
 	Vd = np.array([1.2,1.5])
 	Vg = np.array([0.4,0.7])
 	testLpTransistorHelp(m1, Vs, Vg, Vd)
@@ -205,10 +226,10 @@ def testNfet():
 	Vs = np.array([0.3,0.6])
 	Vd = np.array([0.7,0.8])
 	Vg = np.array([1.5,1.8])
-	testLpTransistorHelp(m1, Vs, Vg, Vd)
+	testLpTransistorHelp(m1, Vs, Vg, Vd)'''
 
 	# cutoff + saturation
-	Vs = np.array([0.3,0.4])
+	'''Vs = np.array([0.3,0.4])
 	Vd = np.array([0.9,1.1])
 	Vg = np.array([0.7,1.0])
 	testLpTransistorHelp(m1, Vs, Vg, Vd)
@@ -223,47 +244,52 @@ def testNfet():
 	Vs = np.array([0.3,0.4])
 	Vd = np.array([0.9,1.0])
 	Vg = np.array([0.7,1.5])
-	testLpTransistorHelp(m1, Vs, Vg, Vd)
+	testLpTransistorHelp(m1, Vs, Vg, Vd)'''
 
 	######### when src >= drain
 	# cutoff everywhere in the hyperrectangle
-	Vd = np.array([0.3,0.6])
+	'''Vd = np.array([0.3,0.6])
 	Vs = np.array([1.2,1.5])
 	Vg = np.array([0.4,0.7])
-	testLpTransistorHelp(m1, Vs, Vg, Vd)
+	testLpTransistorHelp(m1, Vs, Vg, Vd, numDivisions, mainDict)
 
 	# saturation everywhere in the hyperrectangle
 	Vd = np.array([0.3,0.6])
 	Vs = np.array([1.2,1.5])
 	Vg = np.array([1.0,1.3])
-	testLpTransistorHelp(m1, Vs, Vg, Vd)
+	testLpTransistorHelp(m1, Vs, Vg, Vd, numDivisions, mainDict)
 
 	# linear everywhere in the hyperrectangle
 	Vd = np.array([0.3,0.6])
 	Vs = np.array([0.7,0.8])
 	Vg = np.array([1.5,1.8])
-	testLpTransistorHelp(m1, Vs, Vg, Vd)
+	testLpTransistorHelp(m1, Vs, Vg, Vd, numDivisions, mainDict)
 
 	# cutoff + saturation
 	Vd = np.array([0.3,0.4])
 	Vs = np.array([0.9,1.1])
 	Vg = np.array([0.7,1.0])
-	testLpTransistorHelp(m1, Vs, Vg, Vd)
+	testLpTransistorHelp(m1, Vs, Vg, Vd, numDivisions, mainDict)
 
 	# linear + saturation
 	Vd = np.array([0.3,0.4])
 	Vs = np.array([0.6,1.0])
 	Vg = np.array([1.0,1.5])
-	testLpTransistorHelp(m1, Vs, Vg, Vd)
+	testLpTransistorHelp(m1, Vs, Vg, Vd, numDivisions, mainDict)
 
 	# cutoff + linear + saturation
 	Vd = np.array([0.3,0.4])
 	Vs = np.array([0.9,1.0])
 	Vg = np.array([0.7,1.5])
-	testLpTransistorHelp(m1, Vs, Vg, Vd)
+	testLpTransistorHelp(m1, Vs, Vg, Vd, numDivisions, mainDict)'''
 
 
 def testPfet():
+	filename = "precompConvexHull.pkl"
+	theFile = open(filename, "rb")
+	numDivisions, mainDict = pickle.load(theFile)
+	theFile.close()
+	print ("loaded")
 	pfet = MosfetModel(channelType = 'pfet', Vt = -0.4, k = -90.0e-6)
 	m1 = Mosfet(3, 1, 2, pfet)
 
@@ -272,74 +298,74 @@ def testPfet():
 	Vs = np.array([0.3,0.6])
 	Vd = np.array([1.2,1.5])
 	Vg = np.array([0.4,0.7])
-	testLpTransistorHelp(m1, Vs, Vg, Vd)
+	testLpTransistorHelp(m1, Vs, Vg, Vd, numDivisions, mainDict)
 
 	# cutoff + saturation
 	Vs = np.array([0.3,0.6])
 	Vd = np.array([1.2,1.5])
 	Vg = np.array([1.0,1.3])
-	testLpTransistorHelp(m1, Vs, Vg, Vd)
+	testLpTransistorHelp(m1, Vs, Vg, Vd, numDivisions, mainDict)
 
 	# cutoff
 	Vs = np.array([0.3,0.6])
 	Vd = np.array([0.7,0.8])
 	Vg = np.array([1.5,1.8])
-	testLpTransistorHelp(m1, Vs, Vg, Vd)
+	testLpTransistorHelp(m1, Vs, Vg, Vd, numDivisions, mainDict)
 
 	# cutoff + saturation
 	Vs = np.array([0.3,0.4])
 	Vd = np.array([0.9,1.1])
 	Vg = np.array([0.7,1.0])
-	testLpTransistorHelp(m1, Vs, Vg, Vd)
+	testLpTransistorHelp(m1, Vs, Vg, Vd, numDivisions, mainDict)
 
 	# linear + saturation
 	Vs = np.array([0.3,0.4])
 	Vd = np.array([0.6,1.0])
 	Vg = np.array([1.0,1.5])
-	testLpTransistorHelp(m1, Vs, Vg, Vd)
+	testLpTransistorHelp(m1, Vs, Vg, Vd, numDivisions, mainDict)
 
 	# cutoff
 	Vs = np.array([0.3,0.4])
 	Vd = np.array([0.9,1.0])
 	Vg = np.array([0.7,1.5])
-	testLpTransistorHelp(m1, Vs, Vg, Vd)
+	testLpTransistorHelp(m1, Vs, Vg, Vd, numDivisions, mainDict)
 
 	######### when src >= drain
 	# linear + saturation
 	Vd = np.array([0.3,0.6])
 	Vs = np.array([1.2,1.5])
 	Vg = np.array([0.4,0.7])
-	testLpTransistorHelp(m1, Vs, Vg, Vd)
+	testLpTransistorHelp(m1, Vs, Vg, Vd, numDivisions, mainDict)
 
 	# cutoff + saturation
 	Vd = np.array([0.3,0.6])
 	Vs = np.array([1.2,1.5])
 	Vg = np.array([1.0,1.3])
-	testLpTransistorHelp(m1, Vs, Vg, Vd)
+	testLpTransistorHelp(m1, Vs, Vg, Vd, numDivisions, mainDict)
 
 	# cutoff
 	Vd = np.array([0.3,0.6])
 	Vs = np.array([0.7,0.8])
 	Vg = np.array([1.5,1.8])
-	testLpTransistorHelp(m1, Vs, Vg, Vd)
+	testLpTransistorHelp(m1, Vs, Vg, Vd, numDivisions, mainDict)
 
 	# cutoff + saturation
 	Vd = np.array([0.3,0.4])
 	Vs = np.array([0.9,1.1])
 	Vg = np.array([0.7,1.0])
-	testLpTransistorHelp(m1, Vs, Vg, Vd)
+	testLpTransistorHelp(m1, Vs, Vg, Vd, numDivisions, mainDict)
 
 	# cutoff
 	Vd = np.array([0.3,0.4])
 	Vs = np.array([0.6,1.0])
 	Vg = np.array([1.0,1.5])
-	testLpTransistorHelp(m1, Vs, Vg, Vd)
+	testLpTransistorHelp(m1, Vs, Vg, Vd, numDivisions, mainDict)
 
 	# cutoff
 	Vd = np.array([0.3,0.4])
 	Vs = np.array([0.9,1.0])
 	Vg = np.array([0.7,1.5])
-	testLpTransistorHelp(m1, Vs, Vg, Vd)
+	testLpTransistorHelp(m1, Vs, Vg, Vd, numDivisions, mainDict)
 
 def testCircuit():
 	# set up a two stage oscillator and check if the lp constraints
@@ -374,7 +400,7 @@ def testCircuit():
 	cHyper = [x for x in origHyper] + [0.0, Vdd]
 	#print ("current in origHyper", c.f(cHyper))
 	newHyper = c.linearConstraints(cHyper, [4, 5])
-	print newHyper
+	print (newHyper)
 
 def testCircuitSchmitt():
 	Vtn, Vtp = 0.4, -0.4
@@ -418,7 +444,7 @@ def testCircuitSchmitt():
 
 if __name__ == "__main__":
 	testNfet()
-	testPfet()
+	#testPfet()
 	#testCircuit()
 	#testCircuitSchmitt()
 	#testLPUnionTanh(-1.0, 1.0)

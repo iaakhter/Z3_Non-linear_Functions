@@ -40,7 +40,10 @@ class LP:
 		return len(self.A) + len(self.Aeq)
 
 	def __str__(self):
-		return "ineqA\n" + str(np.array(self.A)) + "\n" + "ineqB\n" + str(np.array(self.b)) + "\n" + \
+		ineqAStr = ""
+		for ineq in self.A:
+			ineqAStr += str(np.array(ineq)) + "\n"
+		return "ineqA\n" + ineqAStr + "\n" + "ineqB\n" + str(np.array(self.b)) + "\n" + \
 				"eqA\n" + str(np.array(self.Aeq)) + "\n" + "eqB\n" + str(np.array(self.beq)) + "\n" + \
 				"cost\n" + str(np.array(self.c)) + "\n"
 
@@ -84,12 +87,14 @@ class LP:
 
 	
 	# Use inequality constraints of 
-	# one LP as costs (both min and max) of other LP
+	# one LP (self) as costs (both min and max) of other LP
 	# to construct constraints that satisfy both LP
-	# return a new LP from the new constraints
-	def constraint_as_cost(self, otherLp):
-		'''print ("start constraint_as_cost")
-		print ("selfLp")
+	# return a new LP from the new constraints.
+	# otherLpExcludingInds indicates the indices of the inequality
+	# constraints in self that are not considered as cost for consideration
+	def constraint_as_cost(self, otherLp, otherLpExcludingInds):
+		#print ("start constraint_as_cost")
+		'''print ("selfLp")
 		print (self)
 		print ("otherLp")
 		print (otherLp)'''
@@ -101,43 +106,44 @@ class LP:
 		# that satisfies both the LPs
 		validConstraints = []
 		for i in range(len(self.A)):
-			'''print ("constraint being considered")
-			print (self.A[i])
-			print (self.b[i])'''
-			minCost = [ val*1.0 for val in self.A[i]]
-			maxCost = [-val*1.0 for val in self.A[i]]
-			possibleValidConstraints = []
-			possibleBs = []
-			
-			# list containint [x, y] where x and y
-			# represent a constraint to be added to
-			# A and b respectively
-			possibleValidConstraints.append([[ val for val in self.A[i]], self.b[i]])
-			possibleBs.append(self.b[i])
-			
+			if otherLpExcludingInds is None or not(i>= otherLpExcludingInds[0] and i < otherLpExcludingInds[1]):
+				#print ("constraint being considered")
+				#print (self.A[i])
+				#print (self.b[i])
+				minCost = [ val*1.0 for val in self.A[i]]
+				maxCost = [-val*1.0 for val in self.A[i]]
+				possibleValidConstraints = []
+				possibleBs = []
+				
+				# list containint [x, y] where x and y
+				# represent a constraint to be added to
+				# A and b respectively
+				possibleValidConstraints.append([[ val for val in self.A[i]], self.b[i]])
+				possibleBs.append(self.b[i])
+				
 
-			# Maximize
-			otherLp.add_cost(maxCost)
-			maxSol = otherLp.solve()
-			if maxSol is not None and maxSol["status"] == "optimal":
-				#print ("maxSol['status']", maxSol["status"])
-				#print ("maxCost", maxCost)
-				#print ("maxSol['x']", np.array(maxSol['x']))
-				maxB = np.dot(np.array(maxCost), np.array(maxSol['x']))[0]
-				#print ("maxB", maxB)
-				possibleValidConstraints.append([minCost, -maxB])
-				possibleBs.append(-maxB)
-				#print ("constraint being added", possibleValidConstraints[-1])
+				# Maximize
+				otherLp.add_cost(maxCost)
+				maxSol = otherLp.solve()
+				if maxSol is not None and maxSol["status"] == "optimal":
+					#print ("maxSol['status']", maxSol["status"])
+					#print ("maxCost", maxCost)
+					#print ("maxSol['x']", np.array(maxSol['x']))
+					maxB = np.dot(np.array(maxCost), np.array(maxSol['x']))[0]
+					#print ("maxB", maxB)
+					possibleValidConstraints.append([minCost, -maxB])
+					possibleBs.append(-maxB)
+					#print ("constraint being added", possibleValidConstraints[-1])
 
 
 
-			# Add the constraint with the highest absolute constant to the newLp
-			maxB = max(possibleBs)
-			maxBindex = possibleBs.index(maxB)
-			if maxSol is not None and maxSol["status"] == "optimal":
-				#print ("possibleValidConstraints", possibleValidConstraints)
-				#print ("maxBindex", maxBindex)
-				newLp.ineq_constraint(possibleValidConstraints[maxBindex][0], possibleValidConstraints[maxBindex][1])
+				# Add the constraint with the highest constant to the newLp
+				maxB = max(possibleBs)
+				maxBindex = possibleBs.index(maxB)
+				if maxSol is not None and maxSol["status"] == "optimal":
+					#print ("possibleValidConstraints", possibleValidConstraints)
+					#print ("maxBindex", maxBindex)
+					newLp.ineq_constraint(possibleValidConstraints[maxBindex][0], possibleValidConstraints[maxBindex][1])
 
 		
 		#print ("newLp")
@@ -149,22 +155,23 @@ class LP:
 	# Create a union of self and another LP
 	# The union of LPs should satisfy both
 	# the LPs
-	def union(self, otherLp):
-		'''print ("selfLp before", self.num_constraints())
-		print (self)
-		print ("otherLp before", otherLp.num_constraints())
-		print (otherLp)'''
+	def union(self, otherLp, otherLpExcludingInds):
+		#print ("selfLp before", self.num_constraints())
+		#print (self)
+		#print ("otherLp before", otherLp.num_constraints())
+		#print (otherLp)
+		#print ("otherLpExcludingInds", otherLpExcludingInds)
 		newLp = LP()
 
 		# Use inequality constraints of self as 
 		# costs of otherLp to find new constraints
 		# that satisfy self and otherLP
-		newLp.concat(self.constraint_as_cost(otherLp))
+		newLp.concat(self.constraint_as_cost(otherLp, None))
 
 		# Use inequality constraints of otherLp as 
 		# costs of self to find new constraints
 		# that satisfy self and otherLP
-		newLp.concat(otherLp.constraint_as_cost(self))
+		newLp.concat(otherLp.constraint_as_cost(self, otherLpExcludingInds))
 
 		# add the equality constraints
 		for i in range(len(self.Aeq)):
@@ -232,6 +239,7 @@ class LP:
 		bMatrix = matrix(cocantenatedb)
 		cMatrix = matrix(self.c)
 		solvers.options["show_progress"] = False
+		#solvers.options['maxiters'] = 1000 
 
 		'''print ("self lp")
 		print (self)
@@ -242,6 +250,8 @@ class LP:
 		print (bMatrix)
 		print ("cMatrix")
 		print (cMatrix)'''
+		#sol = solvers.lp(cMatrix, AMatrix, bMatrix)
+		#return sol
 
 		try:
 			sol = solvers.lp(cMatrix, AMatrix, bMatrix)

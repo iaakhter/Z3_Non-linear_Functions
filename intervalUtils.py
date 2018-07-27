@@ -14,8 +14,6 @@ def multiplyRegularMatWithIntervalMat(regMat,intervalMat):
 			intervalVal = np.zeros(2)
 			for k in range(intervalMat.shape[1]):
 				intervalVal += interval_mult(regMat[i,k],intervalMat[k,j])
-				intervalVal[0] = np.nextafter(intervalVal[0], np.float("-inf"))
-				intervalVal[1] = np.nextafter(intervalVal[1], np.float("inf"))
 			result[i,j,:] = intervalVal
 
 	return result
@@ -38,8 +36,6 @@ def multiplyIntervalMatWithIntervalVec(mat,vec):
 		intervalVal = np.zeros(2)
 		for j in range(mat.shape[1]):
 			mult = interval_mult(mat[i,j],vec[j])
-			mult[0] = np.nextafter(mult[0], np.float("-inf"))
-			mult[1] = np.nextafter(mult[1], np.float("inf"))
 			intervalVal += mult
 		result[i,:] = intervalVal
 	return result
@@ -203,18 +199,14 @@ def krawczykHelp(startBounds, jacInterval, samplePoint, fSamplePoint, jacSampleP
 	
 	xi_minus_samplePoint = np.column_stack((startBounds[:,0] - samplePoint, startBounds[:,1] - samplePoint))
 	
-	for i in range(numV):
-		xi_minus_samplePoint[i,0] = np.nextafter(xi_minus_samplePoint[i,0], np.float("-inf"))
-		xi_minus_samplePoint[i,1] = np.nextafter(xi_minus_samplePoint[i,1], np.float("inf"))
+	xi_minus_samplePoint = np.array([interval_round(xi_minus_samplePoint[i]) for i in range(numV)])
 
 	lastTerm = multiplyIntervalMatWithIntervalVec(I_minus_C_jacInterval, xi_minus_samplePoint)
 	
 	kInterval = np.column_stack((samplePoint - C_fSamplePoint + lastTerm[:,0], samplePoint - C_fSamplePoint + lastTerm[:,1]))
 
-	for i in range(numV):
-		kInterval[i,0] = np.nextafter(kInterval[i,0], np.float("-inf"))
-		kInterval[i,1] = np.nextafter(kInterval[i,1], np.float("inf"))
-	
+	kInterval = np.array([interval_round(kInterval[i]) for i in range(numV)])
+
 	# if kInterval is in the interior of startBounds, found a unique solution
 	if(all([ (interval_lo(kInterval[i]) > interval_lo(startBounds[i])) and (interval_hi(kInterval[i]) < interval_hi(startBounds[i]))
 		 for i in range(numV) ])):
@@ -302,12 +294,10 @@ def checkExistenceOfSolution(model,hyperRectangle, alpha = 1.0):
 
 	if hasattr(model, 'f'):
 		funVal = model.f(startBounds)
-		if(any([funVal[i,0]*funVal[i,1] > 1e-12 for i in range(numV)])):
+		if(any([np.nextafter(funVal[i,0]*funVal[i,1], np.float("inf")) > np.nextafter(0.0, np.float("inf")) 
+				for i in range(numV)])):
 			return [False, None]
-	'''if hasattr(model, 'f'):
-		funVal = model.fInterval(startBounds)
-		if(all([not(mpi('0.0') in funVal[i]) for i in range(numV)])):
-			return [False, None]'''
+
 	constructBiggerHyper = False
 	iteration = 0
 	startBounds3d = np.copy(startBounds)

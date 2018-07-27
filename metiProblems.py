@@ -63,6 +63,7 @@ class Meti25:
 				#print ("xRoot", xRoot, "derXRoot", derXRoot)
 				jac[:,:,0] = min(jac[:,:,0], derXRoot)
 				jac[:,:,1] = max(jac[:,:,1], derXRoot)
+				jac[0,0,:] = interval_round(jac[0,0,:])
 			except ValueError:
 				pass
 			startBound = endBound
@@ -177,6 +178,7 @@ class Meti18:
 				#print ("xRoot", xRoot, "derXRoot", derXRoot)
 				jac[:,:,0] = min(jac[:,:,0], derXRoot)
 				jac[:,:,1] = max(jac[:,:,1], derXRoot)
+				jac[0,0,:] = interval_round(jac[0,0,:])
 			except ValueError:
 				pass
 			startBound = endBound

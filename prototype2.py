@@ -376,7 +376,7 @@ def ifFeasibleHyper(hyperRectangle, statVars, volRedThreshold, model, kAlpha = 1
 	lenV = hyperRectangle.shape[0]
 	iterNum = 0
 	while True:
-		logging.info(("hyperRectangle" + str(hyperRectangle)))
+		#logging.info(("hyperRectangle" + str(hyperRectangle)))
 
 		newHyperRectangle = np.copy(hyperRectangle)
 
@@ -394,9 +394,9 @@ def ifFeasibleHyper(hyperRectangle, statVars, volRedThreshold, model, kAlpha = 1
 			else:
 				vol = None
 			statVars['stringHyperList'].append(("l", vol))
-			logging.info("newHyperRectangle")
+			'''logging.info("newHyperRectangle")
 			for i in range(lenV):
-				logging.info(str(newHyperRectangle[i][0]) + str(newHyperRectangle[i][1]))
+				logging.info(str(newHyperRectangle[i][0]) + str(newHyperRectangle[i][1]))'''
 			if feasible == False:
 				return (False, None)
 
@@ -442,7 +442,8 @@ def ifFeasibleHyper(hyperRectangle, statVars, volRedThreshold, model, kAlpha = 1
 
 
 def addToSolutions(model, allHypers, solHyper):
-	#print ("solHyper[0]", solHyper[0][0])
+	#print ("allHypers")
+	#print (allHypers)
 	lenV = len(model.bounds)
 	allHypersCopy = [hyper for hyper in allHypers]
 	foundOverlap = False
@@ -455,14 +456,17 @@ def addToSolutions(model, allHypers, solHyper):
 			for ui in range(lenV):
 				unionHyper[ui,:] = interval_union(solHyper[0][ui], oldHyper[0][ui])
 
-			#print ("unionHyper", unionHyper)
 			feasibility = intervalUtils.checkExistenceOfSolution(model, unionHyper.transpose())
 			if feasibility[0]:
+				#print ("solHyper", solHyper)
+				#print ("oldHyper", oldHyper)
+				#print ("unionHyper", unionHyper)
 				foundOverlap = True
 				allHypers[hi][0] = unionHyper
 				break
 
 	if not(foundOverlap):
+		#print ("adding", solHyper)
 		allHypers.append(solHyper)
 
 def findAndIgnoreNewtonSoln(model, minVal, maxVal, numSolutions, numTrials = 10):
@@ -847,12 +851,12 @@ if __name__ == "__main__":
 	global runOptions
 	runOptions = []
 	statVars = {}
-	logging.basicConfig(level=logging.DEBUG)
+	#logging.basicConfig(level=logging.INFO)
 	start = time.time()
-	allHypers = rambusOscillator(modelType="tanh", numStages=2, g_cc=4.0, volRedThreshold=1.0, statVars=statVars, numSolutions="all" , useLp=True)
+	allHypers = rambusOscillator(modelType="mosfet", numStages=4, g_cc=4.0, volRedThreshold=1.0, statVars=statVars, numSolutions="all" , useLp=False)
 	#print ("allHypers", allHypers)
-	#schmittTrigger(inputVoltage = 1.0, volRedThreshold = 1.0, statVars = statVars, numSolutions = "all", useLp = True)
-	#singleVariableInequalities(problemType="flyspeck172", volRedThreshold=1.0, statVars=statVars, useLp=True)
+	#schmittTrigger(inputVoltage = 1.8, volRedThreshold = 1.0, statVars = statVars, numSolutions = "all", useLp = False)
+	#singleVariableInequalities(problemType="meti25", volRedThreshold=1.0, statVars=statVars, useLp=True)
 	#print(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss)
 	#print ("numSolutions", len(allHypers))
 	#separateHyperSpaceTest()

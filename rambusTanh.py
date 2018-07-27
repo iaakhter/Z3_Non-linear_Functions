@@ -3,6 +3,7 @@ import lpUtils
 from cvxopt import matrix,solvers
 import funCompUtils as fcUtils
 from intervalBasics import *
+import mpmath
 
 class RambusTanh:
 	def __init__(self, modelParam, g_cc, g_fwd, numStages):

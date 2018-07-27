@@ -14,12 +14,23 @@ def sinFun(x,const):
 		lowVal = math.floor(x[0]/(const*math.pi))
 		highVal = math.floor(x[1]/(const*math.pi))
 		if highVal - lowVal > 2.0:
-			return np.array([-1.0, 1.0])
+			val = np.array([-1.0, 1.0])
+			return val
 
 		if int(lowVal) %2 == 0:
-			return np.array([min(funVal[0], funVal[1]), 1.0])
+			val = np.array([min(funVal[0], funVal[1]), 1.0])
+			val[0] = np.nextafter(val[0], np.float("-inf"))
+			return val
 		else:
-			return np.array([-1.0, max(funVal[0], funVal[1])])
+			val = np.array([-1.0, max(funVal[0], funVal[1])])
+			val[1] = np.nextafter(val[1], np.float("inf"))
+			return val
+
+	if interval_p(x):
+		if not(funVal[0] == -1.0 or funVal[0] == 1.0):
+			funVal[0] = np.nextafter(funVal[0], np.float("-inf"))
+		if not(funVal[1] == -1.0 or funVal[1] == 1.0):
+			funVal[1] = np.nextafter(funVal[1], np.float("inf"))
 	return funVal
 	
 
@@ -37,12 +48,23 @@ def cosFun(x,const):
 		lowVal = math.floor(shiftedToSin[0]/(const*math.pi))
 		highVal = math.floor(shiftedToSin[1]/(const*math.pi))
 		if highVal - lowVal > 2.0:
-			return np.array([-1.0, 1.0])
+			val = np.array([-1.0, 1.0])
+			return val
 
 		if int(lowVal) %2 == 0:
-			return np.array([min(funVal[0], funVal[1]), 1.0])
+			val = np.array([min(funVal[0], funVal[1]), 1.0])
+			val[0] = np.nextafter(val[0], np.float("-inf"))
+			return val
 		else:
-			return np.array([-1.0, max(funVal[0], funVal[1])])
+			val = np.array([-1.0, max(funVal[0], funVal[1])])
+			val[1] = np.nextafter(val[1], np.float("inf"))
+			return val
+	
+	if interval_p(x):
+		if not(funVal[0] == -1.0 or funVal[0] == 1.0):
+			funVal[0] = np.nextafter(funVal[0], np.float("-inf"))
+		if not(funVal[1] == -1.0 or funVal[1] == 1.0):
+			funVal[1] = np.nextafter(funVal[1], np.float("inf"))
 	return funVal
 	
 
@@ -52,12 +74,10 @@ def cosFunder(x,const):
 
 def tanhFun(x, const):
 	tanhVal = np.tanh(const*x)
-	#tanhVal = (np.exp(const*x) - np.exp(-const*x))/(np.exp(const*x) + np.exp(-const*x))
 	if interval_p(x):
-		return np.array([min(tanhVal[0], tanhVal[1]), max(tanhVal[0], tanhVal[1])])
-	return tanhVal
-	#return (exp(a*val) - exp(-a*val))/(exp(a*val) + exp(-a*val))
-
+		val = np.array([min(tanhVal[0], tanhVal[1]), max(tanhVal[0], tanhVal[1])])
+		return interval_round(val)
+	return interval_round(tanhVal)
 
 def tanhFunder(x, const):
 	den = np.cosh(const*x)*np.cosh(const*x)
@@ -70,7 +90,7 @@ def tanhFunder(x, const):
 			grad0 = np.divide(const,den0)
 			grad = np.array([min(grad[0], grad[1], grad0), max(grad[0], grad[1], grad0)])
 
-	return grad
+	return interval_round(grad)
 
 #1/(const*x)
 def invFun(x, const):
@@ -79,10 +99,11 @@ def invFun(x, const):
 	funVal = np.divide(1, (const*x))
 	if interval_p(x):
 		if x[0]*x[1] > 0.0:
-			return np.array([min(funVal[0], funVal[1]), max(funVal[0], funVal[1])])
+			val = np.array([min(funVal[0], funVal[1]), max(funVal[0], funVal[1])])
+			return interval_round(val)
 		else:
 			return np.array([-float("inf"), float("inf")])
-	return funVal
+	return interval_round(funVal)
 	
 
 def invFunder(x,const):
@@ -91,10 +112,12 @@ def invFunder(x,const):
 	der = -np.divide(const,(const*const*x*x))
 	if interval_p(x):
 		if x[0]*x[1] > 0.0:
-			return np.array([min(der[0], der[1]), max(der[0], der[1])])
+			val = np.array([min(der[0], der[1]), max(der[0], der[1])])
+			return interval_round(val)
 		else:
-			return np.array([-float("inf"), max(der[0], der[1])])
-	return der
+			val = np.array([-float("inf"), max(der[0], der[1])])
+			return interval_round(val)
+	return interval_round(der)
 
 
 #arcsin(const*x)
@@ -103,8 +126,9 @@ def arcsinFun(x, const):
 		raise Exception('Invalid argument for arcsin ' + str(x))
 	fun = np.arcsin(const*x)
 	if interval_p(x):
-		return np.array([min(fun[0], fun[1]), max(fun[0], fun[1])])
-	return fun
+		val = np.array([min(fun[0], fun[1]), max(fun[0], fun[1])])
+		return interval_round(val)
+	return interval_round(fun)
 
 
 def arcsinFunder(x, const):
@@ -118,14 +142,8 @@ def arcsinFunder(x, const):
 			grad0 = np.divide(const,(1.0))
 			grad = np.array([min(grad[0], grad[1], grad0), max(grad[0], grad[1], grad0)])
 
-	return grad
+	return interval_round(grad)
 
-
-#arctan(const*x)
-def arctanFun(x, const):
-	Ifun = math.atan(const*x)
-	der = const/(1.0 + const*x*const*x)
-	return [Ifun, der]
 
 
 #linear constraints for sin(constant*x)

@@ -40,6 +40,7 @@ class Flyspeck172:
 			der2 = 2*math.asin(math.cos(0.797)*math.sin(math.pi/x[1])) - (2*math.cos(0.797)*math.pi*math.cos(math.pi/x[1]))/(x[1]*(- math.cos(0.797)*math.cos(0.797)*math.sin(math.pi/x[1])**2 + 1)**(1/2.0)) - 331/10000.0
 			jac[0,0,0] = min(der1, der2)
 			jac[0,0,1] = max(der1, der2)
+			jac[0,0,:] = interval_round(jac[0,0,:])
 		else:
 			jac = np.zeros((1,1))
 			jac[0,0] = 2*math.asin(math.cos(0.797)*math.sin(math.pi/x)) - (2*math.cos(0.797)*math.pi*math.cos(math.pi/x))/(x*(- math.cos(0.797)*math.cos(0.797)*math.sin(math.pi/x)**2 + 1)**(1/2.0)) - 331/10000.0
@@ -227,6 +228,7 @@ class Flyspeck172:
 		xBounds = hyperRectangle[0]
 		aBounds = fcUtils.invFun(xBounds, 1)
 		bBounds = fcUtils.sinFun(aBounds, math.pi)
+		#print ("bBounds", bBounds)
 		cBounds = fcUtils.arcsinFun(bBounds, math.cos(0.797))
 		
 

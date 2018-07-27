@@ -4,6 +4,7 @@ import random
 import math
 from intervalBasics import *
 import logging
+from mpmath import *
 
 
 def multiplyRegularMatWithIntervalMat(regMat,intervalMat):
@@ -13,6 +14,8 @@ def multiplyRegularMatWithIntervalMat(regMat,intervalMat):
 			intervalVal = np.zeros(2)
 			for k in range(intervalMat.shape[1]):
 				intervalVal += interval_mult(regMat[i,k],intervalMat[k,j])
+				intervalVal[0] = np.nextafter(intervalVal[0], np.float("-inf"))
+				intervalVal[1] = np.nextafter(intervalVal[1], np.float("inf"))
 			result[i,j,:] = intervalVal
 
 	return result
@@ -23,6 +26,10 @@ def subtractIntervalMatFromRegularMat(regMat,intervalMat):
 	result = np.zeros((regMat.shape[0],regMat.shape[1],2))
 	result[:,:,0] = np.minimum(mat1,mat2)
 	result[:,:,1] = np.maximum(mat1,mat2)
+	for i in range(result.shape[0]):
+		for j in range(result.shape[1]):
+			result[i,j,0] = np.nextafter(result[i,j,0], np.float("-inf"))
+			result[i,j,1] = np.nextafter(result[i,j,1], np.float("inf"))
 	return result
 
 def multiplyIntervalMatWithIntervalVec(mat,vec):
@@ -30,7 +37,10 @@ def multiplyIntervalMatWithIntervalVec(mat,vec):
 	for i in range(mat.shape[0]):
 		intervalVal = np.zeros(2)
 		for j in range(mat.shape[1]):
-			intervalVal += interval_mult(mat[i,j],vec[j])
+			mult = interval_mult(mat[i,j],vec[j])
+			mult[0] = np.nextafter(mult[0], np.float("-inf"))
+			mult[1] = np.nextafter(mult[1], np.float("inf"))
+			intervalVal += mult
 		result[i,:] = intervalVal
 	return result
 
@@ -193,10 +203,17 @@ def krawczykHelp(startBounds, jacInterval, samplePoint, fSamplePoint, jacSampleP
 	
 	xi_minus_samplePoint = np.column_stack((startBounds[:,0] - samplePoint, startBounds[:,1] - samplePoint))
 	
+	for i in range(numV):
+		xi_minus_samplePoint[i,0] = np.nextafter(xi_minus_samplePoint[i,0], np.float("-inf"))
+		xi_minus_samplePoint[i,1] = np.nextafter(xi_minus_samplePoint[i,1], np.float("inf"))
+
 	lastTerm = multiplyIntervalMatWithIntervalVec(I_minus_C_jacInterval, xi_minus_samplePoint)
 	
 	kInterval = np.column_stack((samplePoint - C_fSamplePoint + lastTerm[:,0], samplePoint - C_fSamplePoint + lastTerm[:,1]))
 
+	for i in range(numV):
+		kInterval[i,0] = np.nextafter(kInterval[i,0], np.float("-inf"))
+		kInterval[i,1] = np.nextafter(kInterval[i,1], np.float("inf"))
 	
 	# if kInterval is in the interior of startBounds, found a unique solution
 	if(all([ (interval_lo(kInterval[i]) > interval_lo(startBounds[i])) and (interval_hi(kInterval[i]) < interval_hi(startBounds[i]))
@@ -204,16 +221,11 @@ def krawczykHelp(startBounds, jacInterval, samplePoint, fSamplePoint, jacSampleP
 		return (True, kInterval)
 
 
-	epsilonBounds = 1e-8
 	intersect = np.zeros((numV,2))
 	for i in range(numV):
 		intersectVar = interval_intersect(kInterval[i], startBounds[i])
 		if intersectVar is not None:
 			intersect[i] = intersectVar
-		
-		elif np.less_equal(np.absolute(kInterval[i,:] - startBounds[i,:]),epsilonBounds*np.ones((2))).all():
-			# being careful about numerical issues here
-			intersect[i] = startBounds[i]
 		else:
 			# no solution
 			return (False, None)
@@ -290,11 +302,16 @@ def checkExistenceOfSolution(model,hyperRectangle, alpha = 1.0):
 
 	if hasattr(model, 'f'):
 		funVal = model.f(startBounds)
-		if(not all([funVal[i,0]*funVal[i,1] <= 1e-12 for i in range(numV)])):
+		if(any([funVal[i,0]*funVal[i,1] > 1e-12 for i in range(numV)])):
 			return [False, None]
+	'''if hasattr(model, 'f'):
+		funVal = model.fInterval(startBounds)
+		if(all([not(mpi('0.0') in funVal[i]) for i in range(numV)])):
+			return [False, None]'''
 	constructBiggerHyper = False
 	iteration = 0
 	startBounds3d = np.copy(startBounds)
+	prevIntersect = None
 	while True:
 		logging.debug("startBounds" + str(startBounds))
 		samplePoint = (startBounds[:,0] + startBounds[:,1])/2.0
@@ -366,26 +383,23 @@ def checkExistenceOfSolution(model,hyperRectangle, alpha = 1.0):
 		
 		intersect = kHelpResult[1]
 
-		epsilonBounds = 1e-8
+		epsilonBounds = 1e-12
 
 		logging.debug("intersect" + str(intersect))
 
 		oldVolume = volume(startBounds)
 		newVolume = volume(intersect)
 		volReduc = (oldVolume - newVolume)/(oldVolume*1.0)
-
-		tinyIntersect = np.less_equal(intersect[:,1] - intersect[:,0],epsilonBounds).all()
 		
 		if startBounds3d.shape[0] != intersect.shape[0]:
 			intersect = np.insert(intersect, [degenCol], startBounds3d[degenCol], axis = 0)
 		
-		if (tinyIntersect or math.isnan(volReduc) or 
-			(volReduc < alpha and degenRow is None) or volReduc == 0.0):
+		if (math.isnan(volReduc) or (volReduc < alpha and degenRow is None) or volReduc == 0.0):
 			# If intersect is tiny, use newton's method to find a solution
 			# in the intersect and construct a bigger hyper than intersect
 			# with the solution at the center. This is to take care of cases
 			# when the solution is at the boundary
-			if constructBiggerHyper == False and tinyIntersect:
+			if constructBiggerHyper == False:
 				constructBiggerHyper = True
 				exampleVolt = (intersect[:,0] + intersect[:,1])/2.0
 				soln = newton(model,exampleVolt)
@@ -393,6 +407,7 @@ def checkExistenceOfSolution(model,hyperRectangle, alpha = 1.0):
 				# the new hyper must contain the solution in the middle and enclose old hyper
 				# and then we check for uniqueness of solution in the newer bigger hyperrectangle
 				if soln[0]:
+					prevIntersect = np.copy(intersect)
 					for si in range(numV):
 						maxDiff = max(abs(intersect[si,1] - soln[1][si]), abs(soln[1][si] - intersect[si,0]))
 						if maxDiff < epsilonBounds:
@@ -402,9 +417,12 @@ def checkExistenceOfSolution(model,hyperRectangle, alpha = 1.0):
 
 					logging.debug("bigger hyper " +str(intersect))
 					startBounds = intersect
+				else:
+					return [False, intersect]
+
 			else:
-				intersect[:,0] = np.maximum(hyperRectangle[0,:], intersect[:,0])
-				intersect[:,1] = np.minimum(hyperRectangle[1,:], intersect[:,1])
+				intersect[:,0] = np.maximum(prevIntersect[:,0], intersect[:,0])
+				intersect[:,1] = np.minimum(prevIntersect[:,1], intersect[:,1])
 				if startBounds3d.shape[0] != intersect.shape[0]:
 					raise Exception('Krawczyk could not solve the reduced problem')
 				return [False,intersect]

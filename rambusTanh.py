@@ -76,13 +76,15 @@ class RambusTanh:
 		for i in range(lenV):
 			fwdInd = (i-1)%lenV
 			ccInd = (i+lenV//2)%lenV
-			#print "fwdInd ", fwdInd, " ccInd ", ccInd
+			#print ("fwdInd ", fwdInd, " ccInd ", ccInd)
 			#print "hyperRectangle[fwdInd][0]", hyperRectangle[fwdInd][0], "hyperRectangle[fwdInd][1]", hyperRectangle[fwdInd][1]
 			
 			triangleClaimFwd = fcUtils.tanhLinearConstraints(self.modelParam, self.xs[fwdInd], self.ys[i], hyperRectangle[fwdInd,0],hyperRectangle[fwdInd,1])
+			#print ("triangleClaimFwd", triangleClaimFwd)
 			allConstraints += triangleClaimFwd
 
 			triangleClaimCc = fcUtils.tanhLinearConstraints(self.modelParam, self.xs[ccInd], self.zs[i], hyperRectangle[ccInd,0],hyperRectangle[ccInd,1])
+			#print ("triangleClaimCc", triangleClaimCc)
 			allConstraints += triangleClaimCc
 				
 			allConstraints += str(self.g_fwd) + " " + self.ys[i] + " + " + str(-self.g_fwd-self.g_cc) + \

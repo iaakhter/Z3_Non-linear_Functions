@@ -14,7 +14,7 @@ def multiplyRegularMatWithIntervalMat(regMat,intervalMat):
 			intervalVal = np.zeros(2)
 			for k in range(intervalMat.shape[1]):
 				intervalVal += interval_mult(regMat[i,k],intervalMat[k,j])
-			result[i,j,:] = intervalVal
+			result[i,j,:] = interval_round(intervalVal)
 
 	return result
 
@@ -37,7 +37,7 @@ def multiplyIntervalMatWithIntervalVec(mat,vec):
 		for j in range(mat.shape[1]):
 			mult = interval_mult(mat[i,j],vec[j])
 			intervalVal += mult
-		result[i,:] = intervalVal
+		result[i,:] = interval_round(intervalVal)
 	return result
 
 
@@ -245,32 +245,49 @@ def krawczykHelp(startBounds, jacInterval, samplePoint, fSamplePoint, jacSampleP
 def determineDegeneracy(model, startBounds):
 	numV = startBounds.shape[0]
 	numIter = 0
-	zeroEpsilon = 1e-9
+	zeroEpsilon = 1e-12
 
 	jacInterval = model.jacobian(startBounds)
+	#print ("jacInterval")
+	#print (jacInterval)
 
 	degenRows, degenCols = [], []
 	for row in range(jacInterval.shape[0]):
-		if np.all(np.absolute(jacInterval[row,:,:]) < zeroEpsilon):
+		#if np.all(np.absolute(jacInterval[row,:,:]) < zeroEpsilon):
+		if np.all(np.absolute(jacInterval[row,:,:]) == 0.0):
 			degenRows.append(row)
 
 	for col in range(jacInterval.shape[1]):
-		if np.all(np.absolute(jacInterval[:, col, :]) < zeroEpsilon):
+		#if np.all(np.absolute(jacInterval[:, col, :]) < zeroEpsilon):
+		if np.all(np.absolute(jacInterval[:, col, :]) == 0.0):
 			degenCols.append(col)
 
-	#print ("degenRows", degenRows)
-	#print ("degenCols", degenCols)
-
-	if len(degenRows) != 1:
+	'''print ("startBounds")
+	for i in range(numV):
+		print (startBounds[i,0], startBounds[i,1])
+	print ("jacInterval")
+	print (jacInterval)
+	print ("degenRows", degenRows, "degenCols", degenCols)'''
+	
+	if len(degenRows) != len(degenCols):
 		#print ("len(degenRows)", len(degenRows))
-		raise Exception ('Number of degenrate rows (with all zeros) in jacobian interval ' + str(jacInterval)+ 
-			' for sample point ' +  str(samplePoint) + ' in startBounds ' + str(startBounds) + " is not 1 but " + str(len(degenRows)))
+		raise Exception ('Number of degenrate rows ' + str(len(degenRows)) +' in jacobian interval ' + str(jacInterval)+ 
+			' in startBounds ' + str(startBounds) + " does not equal number of degenerate columns " + str(len(degenCols)))
 
-	if len(degenCols) != 1:
+	if len(degenRows) == 0:
+		return None
+
+	if len(degenCols) > 1 :
 		#print ("len(degenCols)", len(degenCols))
 		raise Exception ('Number of degenerate cols (with all zeros) in jacobian interval ' + str(jacInterval)+ 
-			' for sample point ' +  str(samplePoint) + ' in startBounds ' + str(startBounds) + " is not 1 but " + str(len(degenCols)))
+			' in startBounds ' + str(startBounds) + " is greater than 1: " + str(len(degenCols)))
 
+	if len(degenRows) > 1 :
+		#print ("len(degenCols)", len(degenCols))
+		raise Exception ('Number of degenerate rows (with all zeros) in jacobian interval ' + str(jacInterval)+ 
+			' in startBounds ' + str(startBounds) + " is greater than 1: " + str(len(degenRows)))
+
+	
 	samplePoint = (startBounds[:,0] + startBounds[:,1])/2.0
 	#print ("samplePoint", samplePoint)
 	fSamplePoint = model.f(samplePoint)
@@ -303,6 +320,8 @@ def checkExistenceOfSolution(model,hyperRectangle, alpha = 1.0):
 	startBounds3d = np.copy(startBounds)
 	prevIntersect = None
 	while True:
+		#print ("startBounds")
+		#print (startBounds)
 		logging.debug("startBounds" + str(startBounds))
 		samplePoint = (startBounds[:,0] + startBounds[:,1])/2.0
 		fSamplePoint = np.array(model.f(samplePoint))
@@ -335,11 +354,12 @@ def checkExistenceOfSolution(model,hyperRectangle, alpha = 1.0):
 		
 		degenResult, degenRow, degenCol = None, None, None
 		
-		try:
-			degenResult = determineDegeneracy(model, startBounds)
-		except:
-			pass
+		#try:
+		degenResult = determineDegeneracy(model, startBounds)
+		#except:
+		#	pass
 
+		#print ("degenResult", degenResult)
 		if degenResult is not None:	
 			if degenResult[0] == False and degenResult[1] is None:
 				return [False, None]
@@ -360,6 +380,8 @@ def checkExistenceOfSolution(model,hyperRectangle, alpha = 1.0):
 		
 		kHelpResult = krawczykHelp(startBounds, jacInterval, samplePoint, fSamplePoint, jacSamplePoint)
 		
+		#print ("kHelpResult")
+		#print (kHelpResult)
 		# Deal with reduced dimension after getting the result if we arrive at that situation
 
 		if kHelpResult[0] or kHelpResult[1] is None:
@@ -384,11 +406,12 @@ def checkExistenceOfSolution(model,hyperRectangle, alpha = 1.0):
 		if startBounds3d.shape[0] != intersect.shape[0]:
 			intersect = np.insert(intersect, [degenCol], startBounds3d[degenCol], axis = 0)
 		
-		if (math.isnan(volReduc) or (volReduc < alpha and degenRow is None) or volReduc == 0.0):
+		if (math.isnan(volReduc) or volReduc < alpha):
 			# If intersect is tiny, use newton's method to find a solution
 			# in the intersect and construct a bigger hyper than intersect
 			# with the solution at the center. This is to take care of cases
 			# when the solution is at the boundary
+			#print ("Coming here?")
 			if constructBiggerHyper == False:
 				constructBiggerHyper = True
 				exampleVolt = (intersect[:,0] + intersect[:,1])/2.0

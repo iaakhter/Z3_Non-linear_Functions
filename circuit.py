@@ -164,6 +164,7 @@ class Mosfet:
 			#print ("dVal", dVal)
 			ds.append(dVal)
 		
+		lp2d = LP()
 		lp = LP()
 
 		# handle the case where A is neither 
@@ -224,6 +225,7 @@ class Mosfet:
 				# transform expression in terms of vgse and vds, to Vs, Vg and Vd
 				dConst =  -(valToCompare + cost[0]*Vt)
 
+				lp2d.ineq_constraint([-cost[0], -cost[1], -cost[2]], -valToCompare)
 				lp.ineq_constraint([cost[0] + cost[1], -cost[0], -cost[1], -cost[2]], dConst)
 			#print ("lp in reg")
 			#print(lp)
@@ -240,14 +242,18 @@ class Mosfet:
 				cost = costs[ci]
 				if len(cost) == 3:
 					gradgsdICons = [-cost[0] - cost[1], cost[0], cost[1], cost[2], ds[ci] + cost[0]*Vt]
+					gradgsdICons2d = [cost[0], cost[1], cost[2], ds[ci]]
 				elif len(cost) == 2:
 					gradgsdICons = [-cost[0], cost[0], 0.0, cost[1], ds[ci] + cost[0]*Vt]
+					gradgsdICons2d = [cost[0], 0.0, cost[1], ds[ci]]
 				#print ("gradgsdICons before", gradgsdICons)
 				if(cvx_flag):
 					gradgsdICons = [-grad for grad in gradgsdICons]
+					gradgsdICons2d = [-grad for grad in gradgsdICons2d]
 				
 				#print ("gradgsdICons", gradgsdICons)
 				lp.ineq_constraint(gradgsdICons[:-1], gradgsdICons[-1])
+				lp2d.ineq_constraint(gradgsdICons2d[:-1], gradgsdICons2d[-1])
 
 
 			# take average of cost this is needed for cap constraint
@@ -272,17 +278,40 @@ class Mosfet:
 
 			if len(cost) == 3:
 				gradgsdICons = [-avgCost[0] - avgCost[1], avgCost[0], avgCost[1], avgCost[2], d + avgCost[0]*Vt]
+				gradgsdICons2d = [avgCost[0], avgCost[1], avgCost[2], d]
 			elif len(cost) == 2:
 				gradgsdICons = [-avgCost[0], avgCost[0], 0.0, avgCost[1], d + avgCost[0]*Vt]
+				gradgsdICons2d = [avgCost[0], 0.0, avgCost[1], d]
 			#print ("gradgsdICons before", gradgsdICons)
 			if not(cvx_flag):
 				gradgsdICons = [-grad for grad in gradgsdICons]
+				gradgsdICons2d = [-grad for grad in gradgsdICons2d]
 
 			lp.ineq_constraint(gradgsdICons[:-1], gradgsdICons[-1])
+			lp2d.ineq_constraint(gradgsdICons2d[:-1], gradgsdICons2d[-1])
+
+
+		if self.model.gds != 0.0:
+			leakTermMat = np.array([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, -self.model.gds, 1.0]])
+			newAList = list(np.dot(np.array(lp2d.A), leakTermMat))
+			lp2d.A = newAList
+
+		lp3d = LP()
+		for i in range(len(lp2d.A)):
+			lp3d.ineq_constraint([-lp2d.A[i][0] - lp2d.A[i][1], lp2d.A[i][0], lp2d.A[i][1], lp2d.A[i][2]], 
+				lp2d.b[i] + lp2d.A[i][0]*Vt)
 			
+		'''print ("lp3d")
+		print (lp3d)
+
+		print ("lp")
+		print (lp)'''
+
+
 		#print ("lp in regConstraints")
 		#print (lp)
-		return lp
+		#return lp
+		return lp3d
 
 	# Construct linear constraints for the mosfet model
 	# depending on whatever region they belong to - cutoff,

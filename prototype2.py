@@ -16,6 +16,10 @@ import pickle
 import logging
 from solverAnalysis import *
 
+def printHyper(hyper):
+	for i in range(hyper.shape[0]):
+		print (hyper[i,0], hyper[i,1])
+
 
 def bisectFunOrdering(hyper):
 	orderingArray = options[0]
@@ -282,6 +286,8 @@ def solverLoop(uniqueHypers, model, statVars, volRedThreshold, bisectFun, numSol
 
 		#pop the hyperrectangle
 		hyperPopped = stackList.pop(-1)
+		print ("hyperPopped")
+		printHyper(hyperPopped)
 		logging.info("hyperPopped")
 		for i in range(lenV):
 			logging.info(str(hyperPopped[i][0]) + str(hyperPopped[i][1]))
@@ -300,6 +306,7 @@ def solverLoop(uniqueHypers, model, statVars, volRedThreshold, bisectFun, numSol
 		#Apply the Gauss-Seidel + Lp loop
 		feasibility = ifFeasibleHyper(hyperPopped, statVars, volRedThreshold, model, kAlpha, useLp)
 		
+		print ("feasibility", feasibility)
 		if feasibility[0]:
 			#If the Gauss_Seidel + Lp loop indicate uniqueness, then add the hyperrectangle
 			#to our list
@@ -314,6 +321,8 @@ def solverLoop(uniqueHypers, model, statVars, volRedThreshold, bisectFun, numSol
 			#the stackList to be processed again.
 			hypForBisection = feasibility[1]
 			while hypForBisection is not None:
+				print ("hypForBisection")
+				printHyper(hypForBisection)
 				logging.debug("hypForBisection" + str(hypForBisection))
 				lHyp, rHyp = bisectFun(hypForBisection)
 				statVars['numBisection'] += 1
@@ -335,6 +344,12 @@ def solverLoop(uniqueHypers, model, statVars, volRedThreshold, bisectFun, numSol
 				statVars['numGs'] += 1
 				statVars['stringHyperList'].append(("g", intervalUtils.volume(rFeas[1])))
 				logging.debug("rFeas" + str(rFeas))
+				print ("lHyp")
+				printHyper(lHyp)
+				print ("lFeas", lFeas)
+				print ("rHyp")
+				printHyper(rHyp)
+				print ("rFeas", rFeas)
 				if lFeas[0] or rFeas[0] or (lFeas[0] == False and lFeas[1] is None) or (rFeas[0] == False and rFeas[1] is None):
 					if lFeas[0] and rFeas[0]:
 						statVars['numDoubleKill'] += 1
@@ -397,6 +412,9 @@ def ifFeasibleHyper(hyperRectangle, statVars, volRedThreshold, model, kAlpha = 1
 			'''logging.info("newHyperRectangle")
 			for i in range(lenV):
 				logging.info(str(newHyperRectangle[i][0]) + str(newHyperRectangle[i][1]))'''
+			print ("newHyperRectangle", newHyperRectangle)
+			for i in range(lenV):
+				print (newHyperRectangle[i,0], newHyperRectangle[i,1])
 			if feasible == False:
 				return (False, None)
 
@@ -531,10 +549,6 @@ def schmittTrigger(inputVoltage, volRedThreshold, statVars, numSolutions = "all"
 	#model = schmittMosfet.SchmittMosfet(modelParam = modelParam, inputVoltage = inputVoltage)
 	model = schmittMosfet.SchmittMosfetMark(modelParam = modelParam, inputVoltage = inputVoltage)
 
-	# test val
-	fVal = model.f(np.array([0.0, 0.0, 0.2]))
-	print ("fVal", fVal[0], fVal[1], fVal[2])
-
 	startExp = time.time()
 	lenV = 3
 	
@@ -563,11 +577,11 @@ def schmittTrigger(inputVoltage, volRedThreshold, statVars, numSolutions = "all"
 	'''newtonSol = intervalUtils.newton(model,np.array([1.8, 1.4, 1.8]))
 	print ("newtonSol", newtonSol)'''
 
-	'''hyper = np.array([[ 1.575 - 1e-9 ,  1.8 + 1e-9],
-       [ 1.39999908 - 1e-9  ,  1.8 + 1e-9],
-       [ 1.61538929 - 1e-9 , 1.8 + 1e-9]])
+	'''hyper = np.array([[0.0, 0.19752105925203098],
+ 					[0.0, 0.1202708866316566],
+					[0.0, 0.225]])
 
-	feasibility = ifFeasibleHyper(hyper, lpThreshold,model,useLp=useLp)
+	feasibility = ifFeasibleHyper(hyper, statVars, volRedThreshold,model)
 	print ("feas", feasibility)'''
 
 	
@@ -604,6 +618,10 @@ def schmittTrigger(inputVoltage, volRedThreshold, statVars, numSolutions = "all"
 	if statVars['numGs'] != 0:
 		statVars['avgGSTime'] = (statVars['totalGSTime']*1.0)/statVars['numGs']
 
+	# test val
+	#fVal = model.f(np.array([[-1.07149845e-23,  1.07149845e-23], [-6.42907949e-24,  6.42907949e-24], [-0.1,  4.97086508e-01]]))
+	#print ("fVal", fVal)
+
 	return allHypers
 
 def rambusOscillator(modelType, numStages, g_cc, volRedThreshold, statVars, numSolutions="all" , useLp=True, kAlpha = 1.0):
@@ -626,12 +644,16 @@ def rambusOscillator(modelType, numStages, g_cc, volRedThreshold, statVars, numS
 	bounds = model.bounds
 	#print ("bounds ", bounds)
 	
-	'''hyper = np.array([[ 0.9,  1.8 ],
-       [ 0.0,  1.8],
-       [ 0.0,  1.8],
-       [ 0.0,  1.8]])
+	'''hyper = np.array([[-0.37800106, -0.02183056],
+					 [-0.78603865, -0.57121116],
+					 [ 0.99546833,  0.99977379],
+					 [ 0.07034466,  0.07034743],
+					 [ 0.02168568,  0.73358026],
+					 [ 0.39912437,  0.78861493],
+					 [-0.99977743, -0.99253623],
+					 [-0.07034689, -0.07034519]])
 
-	feas = ifFeasibleHyper(hyper, lpThreshold,model)
+	feas = ifFeasibleHyper(hyper, statVars, volRedThreshold,model)
 	print ("feas", feas)'''
 
 	'''sol = np.array([0.04369848, 0.56992351, 0.80192295, 0.83295818,
@@ -673,7 +695,7 @@ def rambusOscillator(modelType, numStages, g_cc, volRedThreshold, statVars, numS
 	print ("numSolutions", len(allHypers))
 	
 	# categorize solutions found
-	'''sampleSols, rotatedSols, stableSols, unstableSols = rUtils.categorizeSolutions(allHypers,model)
+	"""sampleSols, rotatedSols, stableSols, unstableSols = rUtils.categorizeSolutions(allHypers,model)
 
 	for hi in range(len(sampleSols)):
 		print ("equivalence class# ", hi)
@@ -682,7 +704,7 @@ def rambusOscillator(modelType, numStages, g_cc, volRedThreshold, statVars, numS
 		print ("other member rotationIndices: ")
 		for mi in range(len(rotatedSols[hi])):
 			print (rotatedSols[hi][mi])
-		print ("")'''
+		print ("")"""
 
 	'''for hi in range(len(sampleSols)):
 		if len(rotatedSols[hi]) > lenV - 1 or (len(rotatedSols[hi]) >= 1 and rotatedSols[hi][0] == 0):
@@ -851,11 +873,11 @@ if __name__ == "__main__":
 	global runOptions
 	runOptions = []
 	statVars = {}
-	#logging.basicConfig(level=logging.INFO)
+	#logging.basicConfig(level=logging.DEBUG)
 	start = time.time()
-	allHypers = rambusOscillator(modelType="mosfet", numStages=4, g_cc=4.0, volRedThreshold=1.0, statVars=statVars, numSolutions="all" , useLp=False)
+	#allHypers = rambusOscillator(modelType="tanh", numStages=6, g_cc=4.0, volRedThreshold=1.0, statVars=statVars, numSolutions="all" , useLp=True)
 	#print ("allHypers", allHypers)
-	#schmittTrigger(inputVoltage = 1.8, volRedThreshold = 1.0, statVars = statVars, numSolutions = "all", useLp = False)
+	schmittTrigger(inputVoltage = 1.8, volRedThreshold = 1.0, statVars = statVars, numSolutions = "all", useLp = True)
 	#singleVariableInequalities(problemType="meti25", volRedThreshold=1.0, statVars=statVars, useLp=True)
 	#print(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss)
 	#print ("numSolutions", len(allHypers))

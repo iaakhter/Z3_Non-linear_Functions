@@ -16,11 +16,11 @@ class SchmittMosfetMark:
 		#self.Sp = self.Sn*2.0
 		self.inputVoltage = inputVoltage
 
-		#nfet = circuit.MosfetModel('nfet', self.Vtn, self.Kn, "default")
-		#pfet = circuit.MosfetModel('pfet', self.Vtp, self.Kp, "default")
+		nfet = circuit.MosfetModel('nfet', self.Vtn, self.Kn, "default")
+		pfet = circuit.MosfetModel('pfet', self.Vtp, self.Kp, "default")
 
-		nfet = circuit.MosfetModel('nfet', self.Vtn, self.Kn)
-		pfet = circuit.MosfetModel('pfet', self.Vtp, self.Kp)
+		#nfet = circuit.MosfetModel('nfet', self.Vtn, self.Kn)
+		#pfet = circuit.MosfetModel('pfet', self.Vtp, self.Kp)
 
 		# with the voltage array containing [grnd, Vdd, input, X[0], X[1], X[2]]
 		# where X[0] is the output voltage and X[1] is the voltage at node with 

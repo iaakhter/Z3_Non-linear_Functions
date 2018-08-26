@@ -1,15 +1,17 @@
 #@author: Mark Greenstreet
-import pickle
+#import pickle
 import math
 import numpy as np
 from cvxopt import matrix,solvers
 from scipy.spatial import ConvexHull
 from intervalBasics import *
 from lpUtilsMark import *
+import stChannel_py
+
 
 
 class MosfetModel:
-	def __init__(self, channelType, Vt, k, gds=0.0):
+	def __init__(self, channelType, Vt = None, k = None, gds=0.0):
 		self.channelType = channelType   # 'pfet' or 'nfet'
 		self.Vt = Vt                     # threshold voltage
 		self.k = k                       # carrier mobility
@@ -19,6 +21,97 @@ class MosfetModel:
 
 	def __str__(self):
 		return "MosfetModel(" + str(self.channelType) + ", " + str(self.Vt) + ", " + str(self.k) + ", " + str(self.s) + ")"
+
+
+class StMosfet:
+	def __init__(self, s, g, d, model, shape):
+		self.s = s
+		self.g = g
+		self.d = d
+		self.shape = shape
+		self.model = model
+		self.stMosfet = stChannel_py.StMosfet()
+
+	def ids(self, V):
+		model = self.model
+		return(self.ids_help(V[self.s], V[self.g], V[self.d], model.channelType))
+
+	def ids_help(self, Vs, Vg, Vd, channelType):
+		VbC = stChannel_py.MyList();
+		if channelType == "nfet":
+			fetFunc = self.stMosfet.mvs_idn
+			VbC[:] = [0.0, 0.0]
+		else:
+			fetFunc = self.stMosfet.mvs_idp
+			VbC[:] = [1.8, 1.8]
+
+		VdC = stChannel_py.MyList()
+		VgC = stChannel_py.MyList()
+		VsC = stChannel_py.MyList()
+		if interval_p(Vd):
+			VdC[:] = [Vd[0], Vd[1]]
+		else:
+			VdC[:] = [Vd, Vd]
+
+		if interval_p(Vg):
+			VgC[:] = [Vg[0], Vg[1]]
+		else:
+			VgC[:] = [Vg, Vg]
+
+		if interval_p(Vs):
+			VsC[:] = [Vs[0], Vs[1]]
+		else:
+			VsC[:] = [Vs, Vs]
+
+		iVal = fetFunc(VdC, VgC, VsC, VbC)
+
+		if(interval_p(Vs) or interval_p(Vg) or interval_p(Vd)):
+			return self.shape*np.array([iVal[0], iVal[1]])
+		else:
+			return self.shape*iVal[0]
+
+
+	def grad_ids(self, V):
+		model = self.model
+		return(self.grad_ids_help(V[self.s], V[self.g], V[self.d], model.channelType))
+
+	def grad_ids_help(self, Vs, Vg, Vd, channelType):
+		VbC = stChannel_py.MyList();
+		if channelType == "nfet":
+			fetGrad = self.stMosfet.mvs_idnJac
+			VbC[:] = [0.0, 0.0]
+		else:
+			fetGrad = self.stMosfet.mvs_idpJac
+			VbC[:] = [1.8, 1.8]
+
+		VdC = stChannel_py.MyList()
+		VgC = stChannel_py.MyList()
+		VsC = stChannel_py.MyList()
+		if interval_p(Vd):
+			VdC[:] = [Vd[0], Vd[1]]
+		else:
+			VdC[:] = [Vd, Vd]
+
+		if interval_p(Vg):
+			VgC[:] = [Vg[0], Vg[1]]
+		else:
+			VgC[:] = [Vg, Vg]
+
+		if interval_p(Vs):
+			VsC[:] = [Vs[0], Vs[1]]
+		else:
+			VsC[:] = [Vs, Vs]
+
+		jac = fetGrad(VdC, VgC, VsC, VbC)
+
+		if(interval_p(Vs) or interval_p(Vg) or interval_p(Vd)):
+			return self.shape*np.array([np.array([jac[2][0], jac[2][1]]),
+							np.array([jac[1][0], jac[1][1]]),
+							np.array([jac[0][0], jac[0][1]])])
+		else:
+			return self.shape*np.array([jac[2][0],jac[1][0],jac[0][0]])
+
+
 
 class Mosfet:
 	def __init__(self, s, g, d, model, shape=3.0):
@@ -49,7 +142,7 @@ class Mosfet:
 			i0 = ks*(Vgse - Vds/2.0)*Vds
 		return(i0 + i_leak)
 
-	# Calculate ids given Vgse (Vg - Vs - Vt) and Vds (Vd - Vs)
+	'''# Calculate ids given Vgse (Vg - Vs - Vt) and Vds (Vd - Vs)
 	def ids_help_var2(self, Vgse, Vds, channelType, ks):
 		if(channelType == 'pfet'):
 			return -self.ids_help_var2(-Vgse, -Vds, 'nfet', -ks)
@@ -68,7 +161,7 @@ class Mosfet:
 	def ids_var2(self, Vgs, Vds):
 		model = self.model
 		Vgse = Vgs - model.Vt
-		return self.ids_help_var2(Vgse, Vds, model.channelType, model.k*self.shape )
+		return self.ids_help_var2(Vgse, Vds, model.channelType, model.k*self.shape )'''
 
 	
 	def ids(self, V):
@@ -420,7 +513,7 @@ class Mosfet:
 
 			return lp
 
-	def lp_grind_pre(self, Vgs, Vds, numDivisions, mainDict):
+	'''def lp_grind_pre(self, Vgs, Vds, numDivisions, mainDict):
 		minVal, maxVal = -1.8, 1.8
 		unitDiff = (maxVal - minVal)/numDivisions
 
@@ -436,9 +529,6 @@ class Mosfet:
 				dictVdsEntry[0] -= 1
 			elif dictVdsEntry[1] != numDivisions:
 				dictVdsEntry[1] += 1
-		'''print ("Vgs", Vgs, "Vds", Vds)
-		print ("dictVgsEntry", dictVgsEntry)
-		print ("dictVdsEntry", dictVdsEntry)'''
 		lp = mainDict[(int(dictVgsEntry[0]), int(dictVdsEntry[0]))][(int(dictVgsEntry[1]), int(dictVdsEntry[1]))]
 		newLp = LP()
 		for i in range(len(lp.A)):
@@ -512,7 +602,7 @@ class Mosfet:
 			else:
 				hyperLp.ineq_constraint([0.0, 0.0, 0.0, -1.0], -(Ids - 1e-5))
 				hyperLp.ineq_constraint([0.0, 0.0, 0.0, 1.0], (Ids + 1e-5))
-			return self.lp_grind_pre(Vgs, Vds, numDivisions, mainDict).concat(hyperLp)
+			return self.lp_grind_pre(Vgs, Vds, numDivisions, mainDict).concat(hyperLp)'''
 
 
 	def lp_ids_help(self, Vs, Vg, Vd, channelType, Vt, ks):

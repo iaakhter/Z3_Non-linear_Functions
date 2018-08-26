@@ -5,6 +5,7 @@ import intervalUtils
 from intervalBasics import *
 import rambusTanh
 import rambusMosfet
+import rambusStMosfet
 import flyspeckProblems
 import metiProblems
 import schmittMosfet
@@ -12,7 +13,6 @@ import rambusUtils as rUtils
 import random
 import math
 import circuit
-import pickle
 import logging
 from solverAnalysis import *
 
@@ -621,7 +621,11 @@ def schmittTrigger(inputVoltage, volRedThreshold, statVars, numSolutions = "all"
 	# test val
 	#fVal = model.f(np.array([[-1.07149845e-23,  1.07149845e-23], [-6.42907949e-24,  6.42907949e-24], [-0.1,  4.97086508e-01]]))
 	#print ("fVal", fVal)
-
+	print ("numBisection", statVars['numBisection'], "numLp", statVars['numLp'], "numGs", statVars['numGs'],
+		"numSingleKill", statVars['numSingleKill'], "numDoubleKill", statVars['numDoubleKill'])
+	print ("totalGSTime", statVars['totalGSTime'], "totalLPTime", statVars['totalLPTime'], "avgGSTime", 
+		statVars['avgGSTime'], "avgLPTime", statVars['avgLPTime'])
+	print ("numLpCalls", statVars['numLpCalls'], "numSuccessLpCalls", statVars['numSuccessLpCalls'], "numUnsuccessLpCalls", statVars['numUnsuccessLpCalls'])
 	return allHypers
 
 def rambusOscillator(modelType, numStages, g_cc, volRedThreshold, statVars, numSolutions="all" , useLp=True, kAlpha = 1.0):
@@ -639,6 +643,10 @@ def rambusOscillator(modelType, numStages, g_cc, volRedThreshold, statVars, numS
 		modelParam = [-0.4, 0.4, 1.8, 270*1e-6, -90*1e-6, 8/3.0]
 		model = rambusMosfet.RambusMosfetMark(modelParam = modelParam, g_cc = g_cc, g_fwd = 1.0, numStages = numStages)
 	
+	elif modelType == "stMosfet":
+		modelParam = [1.8] #Vdd
+		model = rambusStMosfet.RambusStMosfet(modelParam = modelParam, g_cc = g_cc, g_fwd = 1.0, numStages = numStages)
+
 	startExp = time.time()
 	lenV = numStages*2
 	bounds = model.bounds
@@ -695,7 +703,7 @@ def rambusOscillator(modelType, numStages, g_cc, volRedThreshold, statVars, numS
 	print ("numSolutions", len(allHypers))
 	
 	# categorize solutions found
-	"""sampleSols, rotatedSols, stableSols, unstableSols = rUtils.categorizeSolutions(allHypers,model)
+	sampleSols, rotatedSols, stableSols, unstableSols = rUtils.categorizeSolutions(allHypers,model)
 
 	for hi in range(len(sampleSols)):
 		print ("equivalence class# ", hi)
@@ -704,7 +712,7 @@ def rambusOscillator(modelType, numStages, g_cc, volRedThreshold, statVars, numS
 		print ("other member rotationIndices: ")
 		for mi in range(len(rotatedSols[hi])):
 			print (rotatedSols[hi][mi])
-		print ("")"""
+		print ("")
 
 	'''for hi in range(len(sampleSols)):
 		if len(rotatedSols[hi]) > lenV - 1 or (len(rotatedSols[hi]) >= 1 and rotatedSols[hi][0] == 0):
@@ -875,10 +883,10 @@ if __name__ == "__main__":
 	statVars = {}
 	#logging.basicConfig(level=logging.DEBUG)
 	start = time.time()
-	#allHypers = rambusOscillator(modelType="tanh", numStages=6, g_cc=4.0, volRedThreshold=1.0, statVars=statVars, numSolutions="all" , useLp=True)
+	allHypers = rambusOscillator(modelType="stMosfet", numStages=4, g_cc=4.0, volRedThreshold=1.0, statVars=statVars, numSolutions="all" , useLp=False)
 	#print ("allHypers", allHypers)
-	schmittTrigger(inputVoltage = 1.8, volRedThreshold = 1.0, statVars = statVars, numSolutions = "all", useLp = True)
-	#singleVariableInequalities(problemType="meti25", volRedThreshold=1.0, statVars=statVars, useLp=True)
+	#schmittTrigger(inputVoltage = 1.0, volRedThreshold = 1.0, statVars = statVars, numSolutions = "all", useLp = True)
+	#singleVariableInequalities(problemType="flyspeck172", volRedThreshold=1.0, statVars=statVars, useLp=True)
 	#print(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss)
 	#print ("numSolutions", len(allHypers))
 	#separateHyperSpaceTest()

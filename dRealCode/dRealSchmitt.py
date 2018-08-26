@@ -131,12 +131,12 @@ def schmittTrigger(inputVoltage, Vtp, Vtn, Vdd, Kn, Kp, Sn, numSolutions = "all"
 		for i in range(lenV):
 			allConstraints.append(vs[i] >= 0.0)
 			allConstraints.append(vs[i] <= 1.8)
-		allConstraints += nFet(Vtn, Vdd, Kn, Sn, 0.0, inputVoltage, vs[1], tIs[0])
-		allConstraints += nFet(Vtn, Vdd, Kn, Sn, vs[1], inputVoltage, vs[0], tIs[1])
-		allConstraints += nFet(Vtn, Vdd, Kn, Sn, vs[1], vs[0], Vdd, tIs[2])
-		allConstraints += pFet(Vtp, Vdd, Kp, Sp, Vdd, inputVoltage, vs[2], tIs[3])
-		allConstraints += pFet(Vtp, Vdd, Kp, Sp, vs[2], inputVoltage, vs[0], tIs[4])
-		allConstraints += pFet(Vtp, Vdd, Kp, Sp, vs[2], vs[0], 0.0, tIs[5])
+		allConstraints += nFetLeak(Vtn, Vdd, Kn, Sn, 0.0, inputVoltage, vs[1], tIs[0])
+		allConstraints += nFetLeak(Vtn, Vdd, Kn, Sn, vs[1], inputVoltage, vs[0], tIs[1])
+		allConstraints += nFetLeak(Vtn, Vdd, Kn, Sn, vs[1], vs[0], Vdd, tIs[2])
+		allConstraints += pFetLeak(Vtp, Vdd, Kp, Sp, Vdd, inputVoltage, vs[2], tIs[3])
+		allConstraints += pFetLeak(Vtp, Vdd, Kp, Sp, vs[2], inputVoltage, vs[0], tIs[4])
+		allConstraints += pFetLeak(Vtp, Vdd, Kp, Sp, vs[2], vs[0], 0.0, tIs[5])
 		allConstraints.append(nIs[0] == -tIs[4] - tIs[1])
 		allConstraints.append(nIs[1] == -tIs[0] + tIs[1] + tIs[2])
 		allConstraints.append(nIs[2] == -tIs[3] + tIs[5] + tIs[4])
@@ -167,7 +167,7 @@ def schmittTrigger(inputVoltage, Vtp, Vtn, Vdd, Kn, Kp, Sn, numSolutions = "all"
 			break
 		hyper = np.zeros((lenV,2))
 		for i in range(lenV):
-			hyper[i,:] = [result[vs[i]].lb() - 1e+13*epsilon, result[vs[i]].ub() + 1e+13*epsilon]
+			hyper[i,:] = [result[vs[i]].lb() - 1000*epsilon, result[vs[i]].ub() + 1000*epsilon]
 
 		print ("hyper", hyper)
 		allSolutions.append(hyper)
@@ -195,4 +195,4 @@ def schmittTrigger(inputVoltage, Vtp, Vtn, Vdd, Kn, Kp, Sn, numSolutions = "all"
 	return allSolutions
 
 if __name__ == "__main__":
-	schmittTrigger(inputVoltage = 1.8, Vtp = -0.4, Vtn = 0.4, Vdd = 1.8, Kn = 270*1e-6, Kp = -90*1e-6, Sn = 3.0, numSolutions = "all")
+	schmittTrigger(inputVoltage = 0.0, Vtp = -0.4, Vtn = 0.4, Vdd = 1.8, Kn = 270*1e-6, Kp = -90*1e-6, Sn = 3.0, numSolutions = "all")

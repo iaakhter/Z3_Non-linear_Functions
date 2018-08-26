@@ -2,12 +2,9 @@ import numpy as np
 import time
 import intervalUtils
 from intervalBasics import *
-import rambusTanh
-import rambusMosfet
-import rambusStMosfet
+from circuitModels import RambusTanh, RambusMosfetMark, RambusStMosfet, SchmittMosfetMark
 import flyspeckProblems
 import metiProblems
-import schmittMosfet
 import rambusUtils as rUtils
 import random
 import math
@@ -278,7 +275,7 @@ def schmittTrigger(inputVoltage, volRedThreshold, statVars, numSolutions = "all"
 	#load the schmitt trigger model
 	#modelParam = [Vtp, Vtn, Vdd, Kn, Kp, Sn]
 	modelParam = [-0.4, 0.4, 1.8, 270*1e-6, -90*1e-6, 8/3.0]
-	model = schmittMosfet.SchmittMosfetMark(modelParam = modelParam, inputVoltage = inputVoltage)
+	model = SchmittMosfetMark(modelParam = modelParam, inputVoltage = inputVoltage)
 
 	startExp = time.time()
 
@@ -354,16 +351,16 @@ def rambusOscillator(modelType, numStages, g_cc, volRedThreshold, statVars, numS
 	
 	if modelType == "tanh":
 		a = -5.0
-		model = rambusTanh.RambusTanh(modelParam = a, g_cc = g_cc, g_fwd = 1.0, numStages=numStages)
+		model = RambusTanh(modelParam = a, g_cc = g_cc, g_fwd = 1.0, numStages=numStages)
 	elif modelType == "mosfet":
 		#modelParam = [Vtp, Vtn, Vdd, Kn, Kp, Sn]
 		#modelParam = [-0.25, 0.25, 1.0, 1.0, -0.5, 1.0]
 		#modelParam = [-0.4, 0.4, 1.8, 1.5, -0.5, 8/3.0]
 		modelParam = [-0.4, 0.4, 1.8, 270*1e-6, -90*1e-6, 8/3.0]
-		model = rambusMosfet.RambusMosfetMark(modelParam = modelParam, g_cc = g_cc, g_fwd = 1.0, numStages = numStages)	
+		model = RambusMosfetMark(modelParam = modelParam, g_cc = g_cc, g_fwd = 1.0, numStages = numStages)	
 	elif modelType == "stMosfet":
 		modelParam = [1.8] #Vdd
-		model = rambusStMosfet.RambusStMosfet(modelParam = modelParam, g_cc = g_cc, g_fwd = 1.0, numStages = numStages)
+		model = RambusStMosfet(modelParam = modelParam, g_cc = g_cc, g_fwd = 1.0, numStages = numStages)
 
 	startExp = time.time()
 	
@@ -547,7 +544,7 @@ if __name__ == "__main__":
 	statVars = {}
 	#logging.basicConfig(level=logging.DEBUG)
 	start = time.time()
-	allHypers = rambusOscillator(modelType="mosfet", numStages=2, g_cc=4.0, volRedThreshold=1.0, statVars=statVars, numSolutions="all" , useLp=False)
+	allHypers = rambusOscillator(modelType="tanh", numStages=2, g_cc=4.0, volRedThreshold=1.0, statVars=statVars, numSolutions="all" , useLp=False)
 	#print ("allHypers", allHypers)
 	#schmittTrigger(inputVoltage = 1.0, volRedThreshold = 1.0, statVars = statVars, numSolutions = "all", useLp = True)
 	#singleVariableInequalities(problemType="flyspeck172", volRedThreshold=1.0, statVars=statVars, useLp=True)

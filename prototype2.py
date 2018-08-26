@@ -1,6 +1,5 @@
 import numpy as np
 import time
-import copy
 import intervalUtils
 from intervalBasics import *
 import rambusTanh
@@ -13,8 +12,6 @@ import rambusUtils as rUtils
 import random
 import math
 import circuit
-import logging
-from solverAnalysis import *
 
 def printHyper(hyper):
 	for i in range(hyper.shape[0]):
@@ -42,207 +39,6 @@ def bisectMax(hyper, options=None):
 	lHyper[bisectIndex][1] = midVal
 	rHyper[bisectIndex][0] = midVal
 	return [lHyper, rHyper]
-
-# Divide bigHyper into smaller spaces such that
-# smallHyper is one of the smaller spaces
-# Make sure that none of the smaller hypers overlap
-# one another
-def separateHyperSpace(bigHyper, smallHyper):
-	lenV = bigHyper.shape[0]
-	startHyper = np.copy(bigHyper)
-	smallerHyperList = [smallHyper]
-	for i in range(lenV):
-		indexOfSeparation = i
-		hyper1 = np.copy(startHyper)
-		hyper1[indexOfSeparation,1] = smallHyper[indexOfSeparation, 0]
-		hyper2 = np.copy(startHyper)
-		hyper2[indexOfSeparation,0] = smallHyper[indexOfSeparation, 1]
-		smallerHyperList.append(hyper1)
-		smallerHyperList.append(hyper2)
-		startHyper[indexOfSeparation,:] = smallHyper[indexOfSeparation,:]
-
-	return smallerHyperList
-
-# Try to find one solution in hyper using Newton's method
-def findNewtonSol(model, hyper, numTrials = 100):
-	lenV = len(model.bounds)
-	allHypers = []
-	solutionsFoundSoFar = []
-	hyperRange = hyper[:,1] - hyper[:,0]
-	
-	#print ("numTrials in newtons preprocessing", numTrials)
-	start = time.time()
-	numFailures = 0
-	for n in range(numTrials):
-		if len(allHypers) == 1:
-			break
-		numFailures += 1
-		trialSoln = np.multiply(np.random.rand((lenV)), hyperRange) + hyper[:,0]
-		finalSoln = intervalUtils.newton(model,trialSoln)
-		if finalSoln[0] and np.greater_equal(finalSoln[1], hyper[:,0]).all() and np.less_equal(finalSoln[1], hyper[:,1]).all():
-			alreadyFound = False
-			for exSol in solutionsFoundSoFar:
-				diff = np.absolute(finalSoln[1] - exSol)
-				if np.less_equal(diff, np.ones(diff.shape)*1e-14).all():
-					alreadyFound = True
-					break
-			if not(alreadyFound):
-				solutionsFoundSoFar.append(finalSoln[1])
-				hyperWithUniqueSoln = np.zeros((lenV,2))
-				diff = np.ones((lenV))*0.4
-				startingIndex = 0
-				while True:
-					#print ("diff", diff)
-					hyperWithUniqueSoln[:,0] = finalSoln[1] - diff
-					hyperWithUniqueSoln[:,1] = finalSoln[1] + diff
-					kResult = intervalUtils.checkExistenceOfSolution(model,hyperWithUniqueSoln.transpose())
-					if kResult[0] == False and kResult[1] is not None:
-						diff[startingIndex] = diff[startingIndex]/2.0
-						startingIndex = (startingIndex + 1)%lenV
-					else:
-						end = time.time()
-						#print ("Preprocess: found unique hyper ", hyperWithUniqueSoln, "in", end - start, "after", numFailures, "failures")
-						start = time.time()
-						numFailures = 0
-						allHypers.append(hyperWithUniqueSoln)
-						break
-	#print ("total num hypers found in ", numTrials, " trials is ", len(allHypers))
-	return (allHypers, solutionsFoundSoFar)
-
-
-# Try another algorithm for the solver where we use Newton's method
-def solverLoop2(uniqueHypers, model, volRedThreshold, bisectFun, numSolutions = "all", numTrials = 100, orderingArray=None, useLp = True):
-	global numBisection, numLp, numGs, numSingleKill, numDoubleKill
-	global stringHyperList
-	global totalLPTime, totalGSTime
-	lenV = len(model.bounds)
-	hyperRectangle = np.zeros((lenV,2))
-
-	for i in range(lenV):
-		hyperRectangle[i,0] = model.bounds[i][0]
-		hyperRectangle[i,1] = model.bounds[i][1]
-
-	stringHyperList.append(("i", intervalUtils.volume(hyperRectangle)))
-
-	start = time.time()
-	feas = intervalUtils.checkExistenceOfSolution(model,hyperRectangle.transpose())
-	end = time.time()
-	totalGSTime += end - start
-	numGs += 1
-	if feas[0] or feas[1] is None:
-		return uniqueHypers
-	stringHyperList.append(("g", intervalUtils.volume(feas[1])))
-
-	#stack containing hyperrectangles about which any decision
-	#has not been made - about whether they contain unique solution
-	#or no solution
-	stackList = []
-	stackList.append(feas[1])
-	numNewtonUsed = 0
-	while len(stackList) > 0:
-		#print ("len stack", len(stackList))
-
-		#pop the hyperrectangle
-		hyperPopped = stackList.pop(-1)
-		print ("hyperPopped", hyperPopped)
-
-		#Apply the Gauss-Seidel + Lp loop
-		feasibility = ifFeasibleHyper(hyperPopped, volRedThreshold, model, useLp)
-		#print ("feasibility", feasibility)
-		
-		if feasibility[0]:
-			#If the Gauss_Seidel + Lp loop indicate uniqueness, then add the hyperrectangle
-			#to our list
-			if numSolutions == "all" or len(uniqueHypers) < numSolutions:
-				addToSolutions(model, uniqueHypers, feasibility[1])
-			else:
-				return uniqueHypers
-
-		elif feasibility[0] == False and feasibility[1] is not None:
-			# For now let findNewtonSols return at max 1 solution
-			newtonHypers, newtonSols = findNewtonSol(model, feasibility[1], numTrials)
-			for hyper in newtonHypers:
-				if numSolutions == "all" or len(uniqueHypers) < numSolutions:
-					addToSolutions(model, uniqueHypers, hyper)
-				else:
-					return uniqueHypers
-
-				hypersToCheck = separateHyperSpace(feasibility[1], hyper)[1:]
-
-				stackList += hypersToCheck
-
-			if len(newtonHypers) > 0:
-				numNewtonUsed += 1
-
-			if len(newtonHypers) == 0:
-				#If the Gauss-Seidel + Lp loop cannot make a decision about
-				#the hyperrectangle, the do the bisect and kill loop - keep
-				#bisecting as long atleast one half either contains a unique
-				#solution or no solution. Otherwise, add the two halves to
-				#the stackList to be processed again.
-				hypForBisection = feasibility[1]
-				#print (hypForBisection[:,1] - hypForBisection[:,0])
-				orderIndex = 0
-				while hypForBisection is not None:
-					#print ("hypForBisection", hypForBisection)
-
-					lHyp, rHyp = bisectFun(hypForBisection, orderingArray, orderIndex)
-					numBisection += 1
-					stringHyperList.append(("b", [intervalUtils.volume(lHyp), intervalUtils.volume(rHyp)]))
-					#print ("lHyp", lHyp)
-					orderIndex = (orderIndex + 1)%lenV
-					start = time.time()
-					lFeas = intervalUtils.checkExistenceOfSolution(model,lHyp.transpose())
-					end = time.time()
-					totalGSTime += end - start
-					numGs += 1
-					stringHyperList.append(("g", intervalUtils.volume(lFeas[1])))
-					#print ("lFeas", lFeas)
-					#print ("rHyp", rHyp)
-					start = time.time()
-					rFeas = intervalUtils.checkExistenceOfSolution(model,rHyp.transpose())
-					end = time.time()
-					totalGSTime += end - start
-
-					numGs += 1
-					stringHyperList.append(("g", intervalUtils.volume(rFeas[1])))
-					#print ("rFeas", rFeas)
-					if lFeas[0] or rFeas[0] or (lFeas[0] == False and lFeas[1] is None) or (rFeas[0] == False and rFeas[1] is None):
-						if lFeas[0] and rFeas[0]:
-							numDoubleKill += 1
-						elif lFeas[0] == False and lFeas[1] is None and rFeas[0] == False and rFeas[1] is None:
-							numDoubleKill += 1
-						else:
-							numSingleKill += 1
-						
-						if lFeas[0]:
-							#print ("addedHyper", lHyp)
-							if numSolutions == "all" or len(uniqueHypers) < numSolutions:
-								addToSolutions(model, uniqueHypers, lFeas[1])
-							else:
-								return uniqueHypers
-						if rFeas[0]:
-							#print ("addedHyper", rHyp)
-							if numSolutions == "all" or len(uniqueHypers) < numSolutions:
-								addToSolutions(model, uniqueHypers, rFeas[1])
-							else:
-								return uniqueHypers
-
-						if lFeas[0] == False and lFeas[1] is not None:
-							hypForBisection = lFeas[1]
-						elif rFeas[0] == False and rFeas[1] is not None:
-							hypForBisection = rFeas[1]
-						else:
-							hypForBisection = None
-
-					else:
-						stackList.append(lFeas[1])
-						stackList.append(rFeas[1])
-						hypForBisection = None
-
-	print ("numNewtonUsed", numNewtonUsed)
-	return uniqueHypers
-
 
 
 #solver's main loop
@@ -282,15 +78,10 @@ def solverLoop(uniqueHypers, model, statVars, volRedThreshold, bisectFun, numSol
 	stackList = [feas[1]]
 
 	while len(stackList) > 0:
-		logging.info("len stack" + str(len(stackList)))
-
 		#pop the hyperrectangle
 		hyperPopped = stackList.pop(-1)
 		print ("hyperPopped")
 		printHyper(hyperPopped)
-		logging.info("hyperPopped")
-		for i in range(lenV):
-			logging.info(str(hyperPopped[i][0]) + str(hyperPopped[i][1]))
 		
 		#if the popped hyperrectangle is contained in a hyperrectangle
 		#that is already known to contain a unique solution, then do not
@@ -323,19 +114,15 @@ def solverLoop(uniqueHypers, model, statVars, volRedThreshold, bisectFun, numSol
 			while hypForBisection is not None:
 				print ("hypForBisection")
 				printHyper(hypForBisection)
-				logging.debug("hypForBisection" + str(hypForBisection))
 				lHyp, rHyp = bisectFun(hypForBisection)
 				statVars['numBisection'] += 1
 				statVars['stringHyperList'].append(("b", [intervalUtils.volume(lHyp), intervalUtils.volume(rHyp)]))
-				logging.debug("lHyp" + str(lHyp))
 				start = time.time()
 				lFeas = intervalUtils.checkExistenceOfSolution(model, lHyp.transpose(), kAlpha)
 				end = time.time()
 				statVars['totalGSTime'] += end - start
 				statVars['numGs'] += 1
 				statVars['stringHyperList'].append(("g", intervalUtils.volume(lFeas[1])))
-				logging.debug("lFeas" + str(lFeas))
-				logging.debug("rHyp" + str(rHyp))
 				start = time.time()
 				rFeas = intervalUtils.checkExistenceOfSolution(model, rHyp.transpose(), kAlpha)
 				end = time.time()
@@ -343,7 +130,6 @@ def solverLoop(uniqueHypers, model, statVars, volRedThreshold, bisectFun, numSol
 
 				statVars['numGs'] += 1
 				statVars['stringHyperList'].append(("g", intervalUtils.volume(rFeas[1])))
-				logging.debug("rFeas" + str(rFeas))
 				print ("lHyp")
 				printHyper(lHyp)
 				print ("lFeas", lFeas)
@@ -391,8 +177,6 @@ def ifFeasibleHyper(hyperRectangle, statVars, volRedThreshold, model, kAlpha = 1
 	lenV = hyperRectangle.shape[0]
 	iterNum = 0
 	while True:
-		#logging.info(("hyperRectangle" + str(hyperRectangle)))
-
 		newHyperRectangle = np.copy(hyperRectangle)
 
 		if useLp:
@@ -409,9 +193,6 @@ def ifFeasibleHyper(hyperRectangle, statVars, volRedThreshold, model, kAlpha = 1
 			else:
 				vol = None
 			statVars['stringHyperList'].append(("l", vol))
-			'''logging.info("newHyperRectangle")
-			for i in range(lenV):
-				logging.info(str(newHyperRectangle[i][0]) + str(newHyperRectangle[i][1]))'''
 			print ("newHyperRectangle", newHyperRectangle)
 			for i in range(lenV):
 				print (newHyperRectangle[i,0], newHyperRectangle[i,1])
@@ -487,57 +268,8 @@ def addToSolutions(model, allHypers, solHyper):
 		#print ("adding", solHyper)
 		allHypers.append(solHyper)
 
-def findAndIgnoreNewtonSoln(model, minVal, maxVal, numSolutions, numTrials = 10):
-	lenV = len(model.bounds)
-	allHypers = []
-	solutionsFoundSoFar = []
-	bounds = model.bounds
-	overallHyper = np.zeros((lenV,2))
-	for i in range(lenV):
-		overallHyper[i,0] = bounds[i][0]
-		overallHyper[i,1] = bounds[i][1]
-	#print ("numTrials in newtons preprocessing", numTrials)
-	start = time.time()
-	numFailures = 0
-	for n in range(numTrials):
-		numFailures += 1
-		if len(allHypers) == numSolutions:
-			break
-		trialSoln = np.random.uniform(minVal, maxVal, (lenV))
-		finalSoln = intervalUtils.newton(model,trialSoln)
-		if finalSoln[0] and np.greater_equal(finalSoln[1], overallHyper[:,0]).all() and np.less_equal(finalSoln[1], overallHyper[:,1]).all():
-			alreadyFound = False
-			for exSol in solutionsFoundSoFar:
-				diff = np.absolute(finalSoln[1] - exSol)
-				if np.less_equal(diff, np.ones(diff.shape)*1e-14).all():
-					alreadyFound = True
-					break
-			if not(alreadyFound):
-				solutionsFoundSoFar.append(finalSoln[1])
-				hyperWithUniqueSoln = np.zeros((lenV,2))
-				diff = np.ones((lenV))*0.4
-				startingIndex = 0
-				while True:
-					#print ("diff", diff)
-					hyperWithUniqueSoln[:,0] = finalSoln[1] - diff
-					hyperWithUniqueSoln[:,1] = finalSoln[1] + diff
-					kResult = intervalUtils.checkExistenceOfSolution(model,hyperWithUniqueSoln.transpose())
-					if kResult[0] == False and kResult[1] is not None:
-						diff[startingIndex] = diff[startingIndex]/2.0
-						startingIndex = (startingIndex + 1)%lenV
-					else:
-						end = time.time()
-						#print ("Preprocess: found unique hyper ", hyperWithUniqueSoln, "in", end - start, "after", numFailures, "failures")
-						start = time.time()
-						numFailures = 0
-						allHypers.append(hyperWithUniqueSoln)
-						break
-	#print ("total num hypers found in ", numTrials, " trials is ", len(allHypers))
-	return (allHypers, solutionsFoundSoFar)
-
 
 def schmittTrigger(inputVoltage, volRedThreshold, statVars, numSolutions = "all", useLp = True):
-	global runOptions
 	statVars.update({'numBisection':0, 'numLp':0, 'numGs':0, 'numSingleKill':0, 'numDoubleKill':0,
 					'totalGSTime':0, 'totalLPTime':0, 'avgGSTime':0, 'avgLPTime':0, 'stringHyperList':[],
 					'numLpCalls':0, 'numSuccessLpCalls':0, 'numUnsuccessLpCalls':0})
@@ -546,28 +278,14 @@ def schmittTrigger(inputVoltage, volRedThreshold, statVars, numSolutions = "all"
 	#load the schmitt trigger model
 	#modelParam = [Vtp, Vtn, Vdd, Kn, Kp, Sn]
 	modelParam = [-0.4, 0.4, 1.8, 270*1e-6, -90*1e-6, 8/3.0]
-	#model = schmittMosfet.SchmittMosfet(modelParam = modelParam, inputVoltage = inputVoltage)
 	model = schmittMosfet.SchmittMosfetMark(modelParam = modelParam, inputVoltage = inputVoltage)
 
 	startExp = time.time()
-	lenV = 3
-	
-	#in case the user wants to specify the ordering of bisection
-	#by default this is a useless variable
-	bounds = model.bounds
-	print ("bounds ", bounds)
 
-	numStages = 1
-
-	#Apply Newton's preprocessing step
 	allHypers = []
-	solutionsFoundSoFar = []
 
-	#the solver's main loop
-	if len(runOptions) == 0:
-		solverLoop(allHypers, model, statVars=statVars, volRedThreshold=volRedThreshold, bisectFun=bisectMax, numSolutions=numSolutions, useLp=useLp)
-	elif any(option == "trace" for option in runOptions):
-		solverLoopTrace(allHypers, model, statVars=statVars, volRedThreshold=volRedThreshold, bisectFun=bisectMax, numSolutions=numSolutions, useLp=useLp)
+	solverLoop(allHypers, model, statVars=statVars, volRedThreshold=volRedThreshold, bisectFun=bisectMax, numSolutions=numSolutions, useLp=useLp)
+	
 	print ("allHypers")
 	print (allHypers)
 	print ("numSolutions", len(allHypers))
@@ -633,24 +351,21 @@ def rambusOscillator(modelType, numStages, g_cc, volRedThreshold, statVars, numS
 	statVars.update({'numBisection':0, 'numLp':0, 'numGs':0, 'numSingleKill':0, 'numDoubleKill':0,
 					'totalGSTime':0, 'totalLPTime':0, 'avgGSTime':0, 'avgLPTime':0, 'stringHyperList':[],
 					'numLpCalls':0, 'numSuccessLpCalls':0, 'numUnsuccessLpCalls':0})
-	a = -5.0
-	model = rambusTanh.RambusTanh(modelParam = a, g_cc = g_cc, g_fwd = 1.0, numStages=numStages)
 	
-	if modelType == "mosfet":
+	if modelType == "tanh":
+		a = -5.0
+		model = rambusTanh.RambusTanh(modelParam = a, g_cc = g_cc, g_fwd = 1.0, numStages=numStages)
+	elif modelType == "mosfet":
 		#modelParam = [Vtp, Vtn, Vdd, Kn, Kp, Sn]
 		#modelParam = [-0.25, 0.25, 1.0, 1.0, -0.5, 1.0]
 		#modelParam = [-0.4, 0.4, 1.8, 1.5, -0.5, 8/3.0]
 		modelParam = [-0.4, 0.4, 1.8, 270*1e-6, -90*1e-6, 8/3.0]
-		model = rambusMosfet.RambusMosfetMark(modelParam = modelParam, g_cc = g_cc, g_fwd = 1.0, numStages = numStages)
-	
+		model = rambusMosfet.RambusMosfetMark(modelParam = modelParam, g_cc = g_cc, g_fwd = 1.0, numStages = numStages)	
 	elif modelType == "stMosfet":
 		modelParam = [1.8] #Vdd
 		model = rambusStMosfet.RambusStMosfet(modelParam = modelParam, g_cc = g_cc, g_fwd = 1.0, numStages = numStages)
 
 	startExp = time.time()
-	lenV = numStages*2
-	bounds = model.bounds
-	#print ("bounds ", bounds)
 	
 	'''hyper = np.array([[-0.37800106, -0.02183056],
 					 [-0.78603865, -0.57121116],
@@ -671,33 +386,9 @@ def rambusOscillator(modelType, numStages, g_cc, volRedThreshold, statVars, numS
 	print ("model.f", model.f(sol))'''
 	
 	allHypers = []
-	solutionsFoundSoFar = []
+
+	solverLoop(allHypers, model, statVars=statVars, volRedThreshold=volRedThreshold, bisectFun=bisectMax, numSolutions=numSolutions, useLp=useLp, kAlpha=kAlpha)
 	
-	if len(runOptions) == 0:
-		solverLoop(allHypers, model, statVars=statVars, volRedThreshold=volRedThreshold, bisectFun=bisectMax, numSolutions=numSolutions, useLp=useLp, kAlpha=kAlpha)
-	elif any(option == "trace" for option in runOptions):
-		hyperInfo = solverLoopTrace(allHypers, model, statVars=statVars, volRedThreshold=volRedThreshold, bisectFun=bisectMax, numSolutions=numSolutions, useLp=useLp, kAlpha=kAlpha)
-		#print ("hyperInfo")
-		#print (hyperInfo)
-		printHyperInfo(hyperInfo)
-		filename = "rambus_"+modelType + "_numStages_" + str(numStages) + "_gcc_" + str(g_cc) + "_useLp_" + str(useLp) + ".pkl"
-		theFile = open(filename, "wb")
-		pickle.dump(hyperInfo, theFile)
-		theFile.close()
-
-		'''rootPaths = []
-		costHyperInfo(root = hyperInfo, paths = rootPaths, pathIndex = 0)
-		shortestPath = None
-		pathLength = float("inf")
-		for path in rootPaths:
-			print ("path", path)
-			if len(path) < pathLength:
-				shortestPath = path
-				pathLength = len(path)
-		print ("shortestPath", shortestPath)'''
-		'''for i in range(len(hyperInfo.nextChild)):
-			print ("child #", i, hyperInfo.nextChild[i])'''
-
 	#print ("allHypers")
 	#print (allHypers)
 	print ("numSolutions", len(allHypers))
@@ -730,7 +421,7 @@ def rambusOscillator(modelType, numStages, g_cc, volRedThreshold, statVars, numS
 		print unstableSols[si]'''
 	endExp = time.time()
 	#print ("TOTAL TIME ", endExp - startExp)
-	#print(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss)
+
 	if statVars['numLp'] != 0:
 		statVars['avgLPTime'] = (statVars['totalLPTime']*1.0)/statVars['numLp']
 	if statVars['numGs'] != 0:
@@ -826,8 +517,6 @@ def singleVariableInequalities(problemType, volRedThreshold, statVars, useLp=Tru
 		model = metiProblems.Meti18(xBound[0], xBound[1], " > ")
 
 
-	lenV = 1
-
 	'''newtonSol = intervalUtils.newton(model,np.array([0.8]))
 	print ("newtonSol", newtonSol)
 	#[[ -5.31508875e-09   5.31508875e-09]]
@@ -836,12 +525,7 @@ def singleVariableInequalities(problemType, volRedThreshold, statVars, useLp=Tru
 	print ("feasibility", feasibility)'''
 
 	allHypers = []
-	solutionsFoundSoFar = []
-
-	if len(runOptions) == 0:
-		solverLoop(allHypers, model, statVars=statVars, volRedThreshold=volRedThreshold, bisectFun=bisectMax, numSolutions = "all", useLp=useLp, kAlpha=kAlpha)
-	elif any(option == "trace" for option in runOptions):
-		hyperInfo = solverLoopTrace(allHypers, model, statVars=statVars, volRedThreshold=volRedThreshold, bisectFun=bisectMax, numSolutions="all", useLp=useLp, kAlpha=kAlpha)
+	solverLoop(allHypers, model, statVars=statVars, volRedThreshold=volRedThreshold, bisectFun=bisectMax, numSolutions = "all", useLp=useLp, kAlpha=kAlpha)
 	print ("allHypers")
 	print (allHypers)
 	print ("numSolutions", len(allHypers))
@@ -857,33 +541,13 @@ def singleVariableInequalities(problemType, volRedThreshold, statVars, useLp=Tru
 		statVars['avgGSTime'] = (statVars['totalGSTime']*1.0)/statVars['numGs']
 	return validIntervals
 
-def separateHyperSpaceTest():
-	lenV = 3
-	biggerHyper = np.zeros((lenV,2))
-	smallerHyper = np.zeros((lenV,2))
-	for i in range(lenV):
-		biggerHyper[i,:] = [-1.0, 1.0]
-		smallerHyper[i,:] = [-0.25, 0.5]
-
-	smallerHyperList = separateHyperSpace(biggerHyper, smallerHyper)
-	print ("number of total smallHypers", len(smallerHyperList))
-	volSmallHypers = 0.0
-	for smallHyper in smallerHyperList:
-		volSmallHypers += intervalUtils.volume(smallHyper)
-		print ("smallHyper")
-		print (smallHyper) 
-
-	print ("volume of biggerHyper", intervalUtils.volume(biggerHyper))
-	print ("total volume of smallerHypers", volSmallHypers)
 
 
 if __name__ == "__main__":
-	global runOptions
-	runOptions = []
 	statVars = {}
 	#logging.basicConfig(level=logging.DEBUG)
 	start = time.time()
-	allHypers = rambusOscillator(modelType="stMosfet", numStages=4, g_cc=4.0, volRedThreshold=1.0, statVars=statVars, numSolutions="all" , useLp=False)
+	allHypers = rambusOscillator(modelType="mosfet", numStages=2, g_cc=4.0, volRedThreshold=1.0, statVars=statVars, numSolutions="all" , useLp=False)
 	#print ("allHypers", allHypers)
 	#schmittTrigger(inputVoltage = 1.0, volRedThreshold = 1.0, statVars = statVars, numSolutions = "all", useLp = True)
 	#singleVariableInequalities(problemType="flyspeck172", volRedThreshold=1.0, statVars=statVars, useLp=True)

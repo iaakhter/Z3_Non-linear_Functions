@@ -1,10 +1,7 @@
 import numpy as np
-import copy
 import random
 import math
 from intervalBasics import *
-import logging
-from mpmath import *
 
 
 def multiplyRegularMatWithIntervalMat(regMat,intervalMat):
@@ -225,6 +222,8 @@ def krawczykHelp(startBounds, jacInterval, samplePoint, fSamplePoint, jacSampleP
 	return (False, intersect)
 
 
+
+
 # Find a sample point in hyperRectangle that has non-singular
 # jacobian. If after a couple of tries, you are not successful,
 # Check if a row of the jacobian interval is zero 
@@ -322,7 +321,6 @@ def checkExistenceOfSolution(model,hyperRectangle, alpha = 1.0):
 	while True:
 		#print ("startBounds")
 		#print (startBounds)
-		logging.debug("startBounds" + str(startBounds))
 		samplePoint = (startBounds[:,0] + startBounds[:,1])/2.0
 		fSamplePoint = np.array(model.f(samplePoint))
 		jacSamplePoint = model.jacobian(samplePoint)
@@ -361,20 +359,10 @@ def checkExistenceOfSolution(model,hyperRectangle, alpha = 1.0):
 
 		#print ("degenResult", degenResult)
 		if degenResult is not None:	
-			if degenResult[0] == False and degenResult[1] is None:
-				return [False, None]
-			
-			if degenResult[0]:
-				degenRow, degenCol = degenResult[1]
-				degenRow, degenCol = degenRow[0], degenCol[0]
-				startBounds = np.delete(startBounds, degenRow, axis = 0)
-				jacInterval = np.delete(np.delete(jacInterval, degenRow, axis = 0), degenCol, axis = 1)
-				samplePoint = np.delete(samplePoint, degenCol, axis = 0)
-				fSamplePoint = np.delete(fSamplePoint, degenRow, axis = 0)
-				jacSamplePoint = np.delete(np.delete(jacSamplePoint, degenRow, axis = 0), degenCol, axis = 1)
+			#TODO: need to handle the case where jacSample point is singular
+			pass
+	
 
-
-		#print ("degenRow", degenRow, "degenCol", degenCol)
 		#print ("jacInterval")
 		#print (jacInterval)
 		
@@ -385,11 +373,7 @@ def checkExistenceOfSolution(model,hyperRectangle, alpha = 1.0):
 		# Deal with reduced dimension after getting the result if we arrive at that situation
 
 		if kHelpResult[0] or kHelpResult[1] is None:
-			if kHelpResult[0] and startBounds3d.shape[0] != kHelpResult[1].shape[0]:
-				intersect = kHelpResult[1]
-				intersect = np.insert(intersect, [degenCol], startBounds3d[degenCol], axis = 0)
-				return [True, intersect, "1dim"]
-			elif kHelpResult[0]:
+			if kHelpResult[0]:
 				return [True, kHelpResult[1], "0dim"]
 			return kHelpResult
 		
@@ -397,14 +381,10 @@ def checkExistenceOfSolution(model,hyperRectangle, alpha = 1.0):
 
 		epsilonBounds = 1e-12
 
-		logging.debug("intersect" + str(intersect))
 
 		oldVolume = volume(startBounds)
 		newVolume = volume(intersect)
 		volReduc = (oldVolume - newVolume)/(oldVolume*1.0)
-		
-		if startBounds3d.shape[0] != intersect.shape[0]:
-			intersect = np.insert(intersect, [degenCol], startBounds3d[degenCol], axis = 0)
 		
 		if (math.isnan(volReduc) or volReduc < alpha):
 			# If intersect is tiny, use newton's method to find a solution
@@ -428,7 +408,7 @@ def checkExistenceOfSolution(model,hyperRectangle, alpha = 1.0):
 						intersect[si,0] = soln[1][si] - maxDiff
 						intersect[si,1] = soln[1][si] + maxDiff
 
-					logging.debug("bigger hyper " +str(intersect))
+					print("bigger hyper " +str(intersect))
 					startBounds = intersect
 				else:
 					return [False, intersect]
@@ -436,8 +416,6 @@ def checkExistenceOfSolution(model,hyperRectangle, alpha = 1.0):
 			else:
 				intersect[:,0] = np.maximum(prevIntersect[:,0], intersect[:,0])
 				intersect[:,1] = np.minimum(prevIntersect[:,1], intersect[:,1])
-				if startBounds3d.shape[0] != intersect.shape[0]:
-					raise Exception('Krawczyk could not solve the reduced problem')
 				return [False,intersect]
 		else:
 			startBounds = intersect

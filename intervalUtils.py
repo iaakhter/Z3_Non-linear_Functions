@@ -180,6 +180,13 @@ def krawczykHelp(startBounds, jacInterval, samplePoint, fSamplePoint, jacSampleP
 	numV = startBounds.shape[0]
 	I = np.identity(numV)
 
+	#print ("startBounds")
+	#print (startBounds)
+	'''print ("jacSamplePoint")
+	print (jacSamplePoint)
+	print ("jacInterval")
+	print (jacInterval)'''
+
 	try:
 		C = np.linalg.inv(jacSamplePoint)
 	except:
@@ -204,6 +211,8 @@ def krawczykHelp(startBounds, jacInterval, samplePoint, fSamplePoint, jacSampleP
 
 	kInterval = np.array([interval_round(kInterval[i]) for i in range(numV)])
 
+	#print ("startBounds", startBounds)
+	#print ("kInterval", kInterval)
 	# if kInterval is in the interior of startBounds, found a unique solution
 	if(all([ (interval_lo(kInterval[i]) > interval_lo(startBounds[i])) and (interval_hi(kInterval[i]) < interval_hi(startBounds[i]))
 		 for i in range(numV) ])):
@@ -212,6 +221,9 @@ def krawczykHelp(startBounds, jacInterval, samplePoint, fSamplePoint, jacSampleP
 
 	intersect = np.zeros((numV,2))
 	for i in range(numV):
+		#print ("i", i)
+		#print ("startBounds", startBounds[i][0], startBounds[i][1])
+		#print ("kInterval", kInterval[i][0], kInterval[i][1])
 		intersectVar = interval_intersect(kInterval[i], startBounds[i])
 		if intersectVar is not None:
 			intersect[i] = intersectVar
@@ -302,6 +314,7 @@ Check existence of solution within a certain hyperRectangle
 using the Krawczyk operator
 '''
 def checkExistenceOfSolution(model,hyperRectangle, alpha = 1.0):
+	epsilonBounds = 1e-12
 	numV = len(hyperRectangle[0])
 
 	startBounds = np.zeros((numV,2))
@@ -310,7 +323,12 @@ def checkExistenceOfSolution(model,hyperRectangle, alpha = 1.0):
 
 	if hasattr(model, 'f'):
 		funVal = model.f(startBounds)
-		if(any([np.nextafter(funVal[i,0]*funVal[i,1], np.float("inf")) > np.nextafter(0.0, np.float("inf")) 
+		'''print ("funVal")
+		for i in range(numV):
+			print ("i", i, "funVal[i]", np.nextafter(funVal[i,0], np.float("-inf")), np.nextafter(funVal[i,1], np.float("inf")))
+			print (np.nextafter(np.nextafter(funVal[i,0], np.float("-inf"))*np.nextafter(funVal[i,1], np.float("inf")), np.float("-inf")))'''
+		#if(any([funVal[i,0]*funVal[i,1] > epsilonBounds for i in range(numV)])):
+		if(any([np.nextafter(funVal[i,0], np.float("-inf"))*np.nextafter(funVal[i,1], np.float("inf")) > np.nextafter(0.0, np.float("inf")) 
 				for i in range(numV)])):
 			return [False, None]
 
@@ -350,16 +368,20 @@ def checkExistenceOfSolution(model,hyperRectangle, alpha = 1.0):
 			raise Exception('tiny')'''
 
 		
+		
+		#TODO: Need to deal with the case where jacobians and jacobian intervals
+		#are badly conditioned
 		degenResult, degenRow, degenCol = None, None, None
 		
-		#try:
-		degenResult = determineDegeneracy(model, startBounds)
-		#except:
-		#	pass
+		# This function should also use Newton's method to check
+		# if a solution exists in the hyper
+		degenResult = None
 
 		#print ("degenResult", degenResult)
 		if degenResult is not None:	
 			#TODO: need to handle the case where jacSample point is singular
+			# Write a separate function that deals with decoupled system and return
+			# it
 			pass
 	
 
@@ -370,16 +392,14 @@ def checkExistenceOfSolution(model,hyperRectangle, alpha = 1.0):
 		
 		#print ("kHelpResult")
 		#print (kHelpResult)
-		# Deal with reduced dimension after getting the result if we arrive at that situation
 
 		if kHelpResult[0] or kHelpResult[1] is None:
 			if kHelpResult[0]:
-				return [True, kHelpResult[1], "0dim"]
+				return [True, startBounds3d, "0dim"]
 			return kHelpResult
 		
 		intersect = kHelpResult[1]
 
-		epsilonBounds = 1e-12
 
 
 		oldVolume = volume(startBounds)
@@ -399,7 +419,14 @@ def checkExistenceOfSolution(model,hyperRectangle, alpha = 1.0):
 				#print ("soln ", soln)
 				# the new hyper must contain the solution in the middle and enclose old hyper
 				# and then we check for uniqueness of solution in the newer bigger hyperrectangle
+				solnInIntersect = True
 				if soln[0]:
+					for sl in range(numV):
+						if (soln[1][sl] < intersect[sl][0] - epsilonBounds or
+							soln[1][sl] > intersect[sl][1] + epsilonBounds):
+							solnInIntersect = False
+							break
+				if soln[0] and solnInIntersect:
 					prevIntersect = np.copy(intersect)
 					for si in range(numV):
 						maxDiff = max(abs(intersect[si,1] - soln[1][si]), abs(soln[1][si] - intersect[si,0]))
@@ -408,7 +435,7 @@ def checkExistenceOfSolution(model,hyperRectangle, alpha = 1.0):
 						intersect[si,0] = soln[1][si] - maxDiff
 						intersect[si,1] = soln[1][si] + maxDiff
 
-					print("bigger hyper " +str(intersect))
+					#print("bigger hyper " +str(intersect))
 					startBounds = intersect
 				else:
 					return [False, intersect]

@@ -10,7 +10,8 @@ def multiplyRegularMatWithIntervalMat(regMat,intervalMat):
 		for j in range(intervalMat.shape[1]):
 			intervalVal = np.zeros(2)
 			for k in range(intervalMat.shape[1]):
-				intervalVal += interval_mult(regMat[i,k],intervalMat[k,j])
+				intervalVal += interval_round(interval_mult(regMat[i,k],intervalMat[k,j]))
+				intervalVal = interval_round(intervalVal)
 			result[i,j,:] = interval_round(intervalVal)
 
 	return result
@@ -27,15 +28,31 @@ def subtractIntervalMatFromRegularMat(regMat,intervalMat):
 			result[i,j,1] = np.nextafter(result[i,j,1], np.float("inf"))
 	return result
 
-def multiplyIntervalMatWithIntervalVec(mat,vec):
-	result = np.zeros((mat.shape[0],vec.shape[1]))
+def multiplyMatWithVec(mat,vec):
+	isInterval = interval_p(mat[0,0]) or interval_p(vec[0])
+
+	if isInterval:
+		result = np.zeros((mat.shape[0],2))
+	else:
+		result = np.zeros((mat.shape[0],1))
 	for i in range(mat.shape[0]):
-		intervalVal = np.zeros(2)
+		if isInterval:
+			intervalVal = np.zeros((2))
+		else:
+			intervalVal = np.zeros((1))
 		for j in range(mat.shape[1]):
 			mult = interval_mult(mat[i,j],vec[j])
-			intervalVal += mult
-		result[i,:] = interval_round(intervalVal)
+			if isInterval:
+				intervalVal += interval_round(mult)
+				intervalVal = interval_round(intervalVal)
+			else:
+				intervalVal += mult
+		if isInterval:
+			result[i,:] = interval_round(intervalVal)
+		else:
+			result[i,:] = intervalVal
 	return result
+
 
 
 def volume(hyperRectangle):
@@ -179,15 +196,18 @@ def checkExistenceOfSolutionGS(model,hyperRectangle):
 def krawczykHelp(startBounds, jacInterval, samplePoint, fSamplePoint, jacSamplePoint):
 	numV = startBounds.shape[0]
 	I = np.identity(numV)
+	epsilonBounds = 1e-12
 
-	#print ("startBounds")
-	#print (startBounds)
-	'''print ("jacSamplePoint")
-	print (jacSamplePoint)
-	print ("jacInterval")
-	print (jacInterval)'''
+	'''print ("startBounds")
+	printHyper(startBounds)
+	print ("samplePoint", samplePoint)
+	print ("fSamplePoint", fSamplePoint)
+	print ("jacInterval", jacInterval)
+	print ("jacSamplePoint", jacSamplePoint)'''
+
 
 	try:
+		#print ("calculating inverse")
 		C = np.linalg.inv(jacSamplePoint)
 	except:
 		# If this has happened then the jacInterval is seriously
@@ -195,21 +215,33 @@ def krawczykHelp(startBounds, jacInterval, samplePoint, fSamplePoint, jacSampleP
 		# or a column
 		C = np.linalg.pinv(jacSamplePoint)
 
-	C_fSamplePoint = np.dot(C,fSamplePoint)
+	#print ("C", C)
+	if interval_p(fSamplePoint[0]):
+		C_fSamplePoint = multiplyMatWithVec(C, fSamplePoint)
+	else:
+		C_fSamplePoint = np.dot(C,fSamplePoint)
+	#print ("C_fSamplePoint", C_fSamplePoint)
 
 	C_jacInterval = multiplyRegularMatWithIntervalMat(C,jacInterval)
 
+	#print ("C_jacInterval", C_jacInterval)
+
 	I_minus_C_jacInterval = subtractIntervalMatFromRegularMat(I,C_jacInterval)
+
+	#print ("I_minus_C_jacInterval", I_minus_C_jacInterval)
 	
 	xi_minus_samplePoint = np.column_stack((startBounds[:,0] - samplePoint, startBounds[:,1] - samplePoint))
 	
 	xi_minus_samplePoint = np.array([interval_round(xi_minus_samplePoint[i]) for i in range(numV)])
 
-	lastTerm = multiplyIntervalMatWithIntervalVec(I_minus_C_jacInterval, xi_minus_samplePoint)
-	
-	kInterval = np.column_stack((samplePoint - C_fSamplePoint + lastTerm[:,0], samplePoint - C_fSamplePoint + lastTerm[:,1]))
+	#print ("xi_minus_samplePoint", xi_minus_samplePoint)
+	lastTerm = multiplyMatWithVec(I_minus_C_jacInterval, xi_minus_samplePoint)
 
-	kInterval = np.array([interval_round(kInterval[i]) for i in range(numV)])
+	#print ("lastTerm", lastTerm)
+	
+	kInterval = np.zeros((numV,2))
+	for i in range(numV):
+		kInterval[i,:] = interval_round(interval_add(interval_round(interval_sub(samplePoint[i], C_fSamplePoint[i])), lastTerm[i]))
 
 	#print ("startBounds", startBounds)
 	#print ("kInterval", kInterval)
@@ -218,7 +250,7 @@ def krawczykHelp(startBounds, jacInterval, samplePoint, fSamplePoint, jacSampleP
 		 for i in range(numV) ])):
 		return (True, kInterval)
 
-
+	
 	intersect = np.zeros((numV,2))
 	for i in range(numV):
 		#print ("i", i)
@@ -227,6 +259,10 @@ def krawczykHelp(startBounds, jacInterval, samplePoint, fSamplePoint, jacSampleP
 		intersectVar = interval_intersect(kInterval[i], startBounds[i])
 		if intersectVar is not None:
 			intersect[i] = intersectVar
+
+			'''elif np.less_equal(np.absolute(kInterval[i,:] - startBounds[i,:]),epsilonBounds*np.ones((2))).all():
+				# being careful about numerical issues here
+				intersect[i] = startBounds[i]'''
 		else:
 			# no solution
 			return (False, None)
@@ -236,78 +272,120 @@ def krawczykHelp(startBounds, jacInterval, samplePoint, fSamplePoint, jacSampleP
 
 
 
-# Find a sample point in hyperRectangle that has non-singular
-# jacobian. If after a couple of tries, you are not successful,
-# Check if a row of the jacobian interval is zero 
-# (meaning that no matter however each voltage changes, the current
-# represented by that row is always the same in the hyper). In this case, 
-# if the current at a sample point is non-zero, then we are done and
-# hyperrectangle does not contain a solution. 
-# Since now we are dealing with a non-square matrix, let's also
-# find the degenerate column (that can be expressed in terms of the
-# other columns). Right now, let's just pick the column with all zeros
-# (this means that that specific voltage does not have any effect on
-# any of the currents). Either return (True, sample point). 
-# Or (False, None) (if the current at sample point is non-zero)
-# return (True, (degenRows, degenCols)) -> reduced problem. 
-# IF we reduce the problem, solve Krawczyk with the reduced problem.
-# In this case, the solution is not a point but a line or surface
-# depending on the number of dimensions
-def determineDegeneracy(model, startBounds):
+def determineDegeneracy(model, startBounds, epsilonBounds):
 	numV = startBounds.shape[0]
-	numIter = 0
-	zeroEpsilon = 1e-12
-
-	jacInterval = model.jacobian(startBounds)
-	#print ("jacInterval")
-	#print (jacInterval)
-
-	degenRows, degenCols = [], []
-	for row in range(jacInterval.shape[0]):
-		#if np.all(np.absolute(jacInterval[row,:,:]) < zeroEpsilon):
-		if np.all(np.absolute(jacInterval[row,:,:]) == 0.0):
-			degenRows.append(row)
-
-	for col in range(jacInterval.shape[1]):
-		#if np.all(np.absolute(jacInterval[:, col, :]) < zeroEpsilon):
-		if np.all(np.absolute(jacInterval[:, col, :]) == 0.0):
-			degenCols.append(col)
-
-	'''print ("startBounds")
-	for i in range(numV):
-		print (startBounds[i,0], startBounds[i,1])
-	print ("jacInterval")
-	print (jacInterval)
-	print ("degenRows", degenRows, "degenCols", degenCols)'''
-	
-	if len(degenRows) != len(degenCols):
-		#print ("len(degenRows)", len(degenRows))
-		raise Exception ('Number of degenrate rows ' + str(len(degenRows)) +' in jacobian interval ' + str(jacInterval)+ 
-			' in startBounds ' + str(startBounds) + " does not equal number of degenerate columns " + str(len(degenCols)))
-
-	if len(degenRows) == 0:
-		return None
-
-	if len(degenCols) > 1 :
-		#print ("len(degenCols)", len(degenCols))
-		raise Exception ('Number of degenerate cols (with all zeros) in jacobian interval ' + str(jacInterval)+ 
-			' in startBounds ' + str(startBounds) + " is greater than 1: " + str(len(degenCols)))
-
-	if len(degenRows) > 1 :
-		#print ("len(degenCols)", len(degenCols))
-		raise Exception ('Number of degenerate rows (with all zeros) in jacobian interval ' + str(jacInterval)+ 
-			' in startBounds ' + str(startBounds) + " is greater than 1: " + str(len(degenRows)))
-
-	
 	samplePoint = (startBounds[:,0] + startBounds[:,1])/2.0
-	#print ("samplePoint", samplePoint)
-	fSamplePoint = model.f(samplePoint)
-	#print ("fSamplePoint", fSamplePoint)
-	if abs(fSamplePoint[degenRows[0]]) >= zeroEpsilon:
-		return (False, None)
+	fSamplePoint = np.array(model.f(samplePoint))
+	jacSamplePoint = model.jacobian(samplePoint)
+	jacInterval = model.jacobian(startBounds)
 
-	return (True, (degenRows, degenCols))
+	degenRow, degenCol = None, None
 
+	condJac = np.linalg.cond(jacSamplePoint)
+	print ("condJac", condJac)
+
+	if condJac > 1e+6:
+		prevIntersect, intersect = newtonInflation(model, startBounds, epsilonBounds)
+		if prevIntersect is not None:	
+			# Find the degen row - row with the minimum sum across columns
+			colSum = np.sum(np.absolute(jacSamplePoint), axis = 1)
+			degenRow = np.argmin(colSum)
+
+			# Find the degen column - column with the minimum sum across rows
+			rowSum = np.sum(np.absolute(jacSamplePoint), axis = 0)
+			degenCol = np.argmin(rowSum)
+		
+	return degenRow, degenCol
+
+
+# Assume that startBounds is very tiny and contains a solution (confirmed by Newton's method)
+def krawczykDecoupled(model, startBounds, degenRow, degenCol, epsilonBounds, alpha = 1.0):
+	# while loop to deal with system not including degenRow and degenCol
+	constructBiggerHyper = False
+	iteration = 0
+	startBounds3d = np.copy(startBounds)
+	prevIntersect = None
+
+	samplePoint = (startBounds[:,0] + startBounds[:,1])/2.0
+	rad = (startBounds[:,1] - startBounds[:,0])/2.0
+	fSamplePoint = np.array(model.f(samplePoint))
+	jacSamplePoint = model.jacobian(samplePoint)
+	jacInterval = model.jacobian(startBounds)
+
+
+	jacIntWeak = np.delete(jacInterval[:,degenCol], degenRow, axis = 0)
+	contribFromWeak = np.zeros((len(jacIntWeak), 2))
+	for cI in range(len(jacIntWeak)):
+		contribFromWeak[cI,:] = interval_mult(jacIntWeak[cI], rad[degenCol])
+	
+	fSamplePoint = np.delete(fSamplePoint, degenRow, axis = 0)
+	fSamplePointWithContrib = np.zeros((len(fSamplePoint), 2))
+	#print ("fSamplePoint before", fSamplePoint.shape)
+	#print (fSamplePoint)
+	for fi in range(len(fSamplePoint)):
+		fSamplePointWithContrib[fi,:] = interval_add(fSamplePoint[fi], contribFromWeak[fi,:])
+	#print ("fSamplePointWithContrib", fSamplePointWithContrib.shape)
+	#print (fSamplePointWithContrib)
+	
+	kHelpResult = krawczykHelp(np.delete(startBounds, degenCol, axis = 0), 
+								np.delete(np.delete(jacInterval, degenRow, axis = 0), degenCol, axis = 1),
+								np.delete(samplePoint, degenCol, axis = 0), fSamplePointWithContrib, 
+								np.delete(np.delete(jacSamplePoint, degenRow, axis = 0), degenCol, axis = 1))
+	
+	#print ("kHelpResult")
+	#print (kHelpResult)
+
+	if kHelpResult[0] or kHelpResult[1] is None:
+		if kHelpResult[0]:
+			intersect = kHelpResult[1]
+			intersect = np.insert(intersect, [degenCol], startBounds3d[degenCol], axis = 0)
+			startBounds = intersect
+			#print ("found converging stuff")
+		else:
+			raise Exception("Error: krawczykDecoupled::strongly coupled system should have contained a solution as confirmed by Newton's method")
+	
+	else:
+		return [False, startBounds3d]
+
+	# Deal with system with just degenRow and degenCol
+	samplePoint = (startBounds[:,0] + startBounds[:,1])/2.0
+	rad = (startBounds[:,1] - startBounds[:,0])/2.0
+	fSamplePoint = np.array(model.f(samplePoint))
+	jacSamplePoint = model.jacobian(samplePoint)
+	jacInterval = model.jacobian(startBounds)
+	
+	jacIntStrong = np.delete(jacInterval[degenRow, :], degenCol, axis = 0)
+	radStrong = np.delete(rad, degenCol, axis = 0)
+	contribFromStrong = multiplyMatWithVec(np.expand_dims(jacIntStrong, axis = 0), radStrong)
+	#print ("contribFromStrong", contribFromStrong)
+
+	fSamplePointWithContrib = interval_add(fSamplePoint[degenRow], contribFromStrong)
+	#print ("fSamplePointWithContrib", fSamplePointWithContrib)
+	
+	kHelpResult = krawczykHelp(np.expand_dims(startBounds[degenCol, :], axis = 0), 
+								np.expand_dims(np.expand_dims(jacInterval[degenRow, degenCol, :], axis = 0), axis = 1), 
+								np.array([samplePoint[degenCol]]), fSamplePointWithContrib, 
+								np.expand_dims(np.expand_dims(jacSamplePoint[degenRow, degenCol], axis = 0), axis = 1))
+	
+	#print ("kHelpResult")
+	#print (kHelpResult)
+
+	if kHelpResult[0] or kHelpResult[1] is None:
+		if kHelpResult[0]:
+			intersect = np.copy(startBounds3d)
+			intersect[degenCol, :] = kHelpResult[1]
+			return [True, intersect, '0dim']
+		else:
+			raise Exception("Error: krawczykDecoupled::weakly coupled system should have contained a solution as confirmed by Newton's method")
+	
+	return [False, startBounds3d]
+	
+
+
+# Print hyperrectangle
+def printHyper(hyper):
+	for i in range(hyper.shape[0]):
+		print (hyper[i,0], hyper[i,1])
 
 '''
 Check existence of solution within a certain hyperRectangle
@@ -323,90 +401,50 @@ def checkExistenceOfSolution(model,hyperRectangle, alpha = 1.0):
 
 	if hasattr(model, 'f'):
 		funVal = model.f(startBounds)
-		'''print ("funVal")
-		for i in range(numV):
-			print ("i", i, "funVal[i]", np.nextafter(funVal[i,0], np.float("-inf")), np.nextafter(funVal[i,1], np.float("inf")))
-			print (np.nextafter(np.nextafter(funVal[i,0], np.float("-inf"))*np.nextafter(funVal[i,1], np.float("inf")), np.float("-inf")))'''
-		#if(any([funVal[i,0]*funVal[i,1] > epsilonBounds for i in range(numV)])):
+		'''if(any([np.nextafter(funVal[i,0], np.float("-inf"))*np.nextafter(funVal[i,1], np.float("inf")) > epsilonBounds 
+				for i in range(numV)])):
+			return [False, None]'''
 		if(any([np.nextafter(funVal[i,0], np.float("-inf"))*np.nextafter(funVal[i,1], np.float("inf")) > np.nextafter(0.0, np.float("inf")) 
 				for i in range(numV)])):
 			return [False, None]
 
 	constructBiggerHyper = False
 	iteration = 0
-	startBounds3d = np.copy(startBounds)
 	prevIntersect = None
 	while True:
-		#print ("startBounds")
-		#print (startBounds)
 		samplePoint = (startBounds[:,0] + startBounds[:,1])/2.0
 		fSamplePoint = np.array(model.f(samplePoint))
 		jacSamplePoint = model.jacobian(samplePoint)
 		jacInterval = model.jacobian(startBounds)
-
-		#print ("jacInterval")
-		#print (jacInterval)
-
-		'''if(all([interval_r(startBounds[i]) < 1e-10 for i in range(startBounds.shape[0])])):
-			print ("startBounds = " + str(startBounds))
-			print ("jacInterval = " + str(jacInterval))
-			print ("samplePoint = " + str(samplePoint))
-			print ("fSamplePoint = " + str(fSamplePoint))
-			print ("jacSamplePoint = " + str(jacSamplePoint))
-			print ("")
-			u, s, v = np.linalg.svd(jacSamplePoint, full_matrices=True)
-			print ("svd of jacSamplePoint")
-			print ("singular values = " + str(s))
-			print ("u = " + str(u))
-			print ("v = " + str(v))
-			maxSingularValue = np.amax(s)
-			print ("very low singular values/vectors (< 1e-8 * maxSingularValue)")
-			for si in range(len(s)):
-				if s[si] < 1e-8*maxSingularValue:
-					print ("singular value " + str(s[si]))
-					print ("singular left vector " + str(u[:,si]))	
-			raise Exception('tiny')'''
-
-		
-		
-		#TODO: Need to deal with the case where jacobians and jacobian intervals
-		#are badly conditioned
-		degenResult, degenRow, degenCol = None, None, None
-		
-		# This function should also use Newton's method to check
-		# if a solution exists in the hyper
-		degenResult = None
-
-		#print ("degenResult", degenResult)
-		if degenResult is not None:	
-			#TODO: need to handle the case where jacSample point is singular
-			# Write a separate function that deals with decoupled system and return
-			# it
-			pass
-	
-
-		#print ("jacInterval")
-		#print (jacInterval)
-		
 		kHelpResult = krawczykHelp(startBounds, jacInterval, samplePoint, fSamplePoint, jacSamplePoint)
+		#print ("startBounds")
+		#printHyper(startBounds)
+		#print (startBounds)
+		#print ("jacInterval")
+		#print (jacInterval)
+		
 		
 		#print ("kHelpResult")
 		#print (kHelpResult)
 
 		if kHelpResult[0] or kHelpResult[1] is None:
 			if kHelpResult[0]:
-				return [True, startBounds3d, "0dim"]
+				return [True, kHelpResult[1], "0dim"]
 			return kHelpResult
 		
 		intersect = kHelpResult[1]
 
 
-
 		oldVolume = volume(startBounds)
 		newVolume = volume(intersect)
 		volReduc = (oldVolume - newVolume)/(oldVolume*1.0)
+
+		'''print ("oldVolume", oldVolume)
+		print ("newVolume", newVolume)
+		print ("volReduc", volReduc)
+		print ("alpha", alpha)'''
 		
-		if (math.isnan(volReduc) or volReduc < alpha):
+		if (math.isnan(volReduc) or volReduc <= alpha):
 			# If intersect is tiny, use newton's method to find a solution
 			# in the intersect and construct a bigger hyper than intersect
 			# with the solution at the center. This is to take care of cases
@@ -414,31 +452,11 @@ def checkExistenceOfSolution(model,hyperRectangle, alpha = 1.0):
 			#print ("Coming here?")
 			if constructBiggerHyper == False:
 				constructBiggerHyper = True
-				exampleVolt = (intersect[:,0] + intersect[:,1])/2.0
-				soln = newton(model,exampleVolt)
-				#print ("soln ", soln)
-				# the new hyper must contain the solution in the middle and enclose old hyper
-				# and then we check for uniqueness of solution in the newer bigger hyperrectangle
-				solnInIntersect = True
-				if soln[0]:
-					for sl in range(numV):
-						if (soln[1][sl] < intersect[sl][0] - epsilonBounds or
-							soln[1][sl] > intersect[sl][1] + epsilonBounds):
-							solnInIntersect = False
-							break
-				if soln[0] and solnInIntersect:
-					prevIntersect = np.copy(intersect)
-					for si in range(numV):
-						maxDiff = max(abs(intersect[si,1] - soln[1][si]), abs(soln[1][si] - intersect[si,0]))
-						if maxDiff < epsilonBounds:
-							maxDiff = epsilonBounds
-						intersect[si,0] = soln[1][si] - maxDiff
-						intersect[si,1] = soln[1][si] + maxDiff
-
-					#print("bigger hyper " +str(intersect))
-					startBounds = intersect
-				else:
+				prevIntersect, intersect = newtonInflation(model, intersect, epsilonBounds)
+				if prevIntersect is None:
 					return [False, intersect]
+				else:
+					startBounds = intersect
 
 			else:
 				intersect[:,0] = np.maximum(prevIntersect[:,0], intersect[:,0])
@@ -448,4 +466,32 @@ def checkExistenceOfSolution(model,hyperRectangle, alpha = 1.0):
 			startBounds = intersect
 
 		iteration += 1
+
+def newtonInflation(model, intersect, epsilonBounds):
+	numV = intersect.shape[0]
+	exampleVolt = (intersect[:,0] + intersect[:,1])/2.0
+	soln = newton(model,exampleVolt)
+	# the new hyper must contain the solution in the middle and enclose old hyper
+	# and then we check for uniqueness of solution in the newer bigger hyperrectangle
+	prevIntersect = None
+	solnInIntersect = True
+	if soln[0]:
+		#print ("soln ", soln[1][0], soln[1][1], soln[1][2])
+		for sl in range(numV):
+			if (soln[1][sl] < intersect[sl][0] - epsilonBounds or
+				soln[1][sl] > intersect[sl][1] + epsilonBounds):
+				solnInIntersect = False
+				break
+	if soln[0] and solnInIntersect:
+		prevIntersect = np.copy(intersect)
+		for si in range(numV):
+			maxDiff = max(abs(intersect[si,1] - soln[1][si]), abs(soln[1][si] - intersect[si,0]))
+			#print ("si", si, "maxDiff", maxDiff)
+			if maxDiff < epsilonBounds:
+				maxDiff = epsilonBounds
+			intersect[si,0] = soln[1][si] - maxDiff
+			intersect[si,1] = soln[1][si] + maxDiff
+
+	return (prevIntersect, intersect)
+
 

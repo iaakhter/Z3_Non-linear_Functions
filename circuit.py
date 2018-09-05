@@ -115,10 +115,10 @@ class StMosfet:
 	def grad_ids_help(self, Vs, Vg, Vd, channelType):
 		VbC = stChannel_py.MyList();
 		if channelType == "nfet":
-			fetGrad = self.stMosfet.mvs_idnJac
+			fetGrad = self.stMosfet.mvs_idnGrad
 			VbC[:] = [0.0, 0.0]
 		else:
-			fetGrad = self.stMosfet.mvs_idpJac
+			fetGrad = self.stMosfet.mvs_idpGrad
 			VbC[:] = [1.8, 1.8]
 
 		VdC = stChannel_py.MyList()

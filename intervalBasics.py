@@ -1,4 +1,5 @@
 # @author Mark Greenstreet
+# Basic interval operations
 
 import numpy as np
 import functools
@@ -97,7 +98,7 @@ def interval_mult(x, y):
 		p = [xx*yy for xx in x for yy in y]
 		return np.array([min(p), max(p)])
 	elif(interval_p(x)):
-		if(y >= 0): 
+		if(y >= 0):
 			return np.array([y*x[0], y*x[1]])
 		else:
 			return np.array([y*x[1], y*x[0]])

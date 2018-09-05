@@ -1,3 +1,5 @@
+# @author Itrat Ahmed Akhter
+# Functions to analyze dc equlibrium points
 import numpy as np
 import intervalUtils
 
@@ -17,6 +19,14 @@ def determineStability(equilibrium,model):
 
 '''
 Divide solutions according to equivalence classes.
+Each equivalence class consists of a set of solution 
+that are array rotations of each other.
+Equivalence classes are represented by a sample solution
+and a list of rotation indices. The list of rotation indices
+hold the indices over which the sample solution must be rotated
+to get the rest of the solutions in the equivalence class.
+This equivalence class is more to help debug the rambus oscillator
+problem.
 Categorize solutions as stable or unstable
 '''
 def categorizeSolutions(allHypers,model):
@@ -25,8 +35,7 @@ def categorizeSolutions(allHypers,model):
 	stableSols = []
 	unstableSols = []
 	allSols = []
-	for hyperDim in allHypers:
-		hyper = hyperDim[0]
+	for hyper in allHypers:
 		exampleSoln = (hyper[:,0] + hyper[:,1])/2.0
 		lenV = len(exampleSoln)
 		finalSoln = intervalUtils.newton(model,exampleSoln)

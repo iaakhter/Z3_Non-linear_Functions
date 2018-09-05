@@ -115,7 +115,7 @@ class LP:
 				possibleValidConstraints = []
 				possibleBs = []
 				
-				# list containint [x, y] where x and y
+				# list containing [x, y] where x and y
 				# represent a constraint to be added to
 				# A and b respectively
 				possibleValidConstraints.append([[ val for val in self.A[i]], self.b[i]])
@@ -179,37 +179,6 @@ class LP:
 		for i in range(len(otherLp.Aeq)):
 			newLp.eq_constraint([x for x in otherLp.Aeq[i]], otherLp.beq[i])
 
-		'''lpCheck1 = LP()
-		lpCheck1 = lpCheck1.concat(self)
-		lpCheck1 = lpCheck1.concat(newLp)
-		lpCheck1.add_cost([1.0,0.0,0.0, 0.0])
-		lpSol1 = lpCheck1.solve()
-		if lpSol1["status"] == "primal infeasible":
-			print "oops selfLp and unionLp together are infeasible"
-			print "selfLp"
-			print self
-			print "otherLp"
-			print otherLp
-			print "newLp"
-			print newLp
-			return
-
-		# check if highLp and unionLp are feasible
-		lpCheck2 = LP()
-		lpCheck2 = lpCheck2.concat(otherLp)
-		lpCheck2 = lpCheck2.concat(newLp)
-		lpCheck2.add_cost([1.0,0.0,0.0, 0.0])
-		lpSol2 = lpCheck2.solve()
-		if lpSol2["status"] == "primal infeasible":
-			print "oops Lp and unionLp together are infeasible"
-			print "selfLp"
-			print self
-			print "otherLp"
-			print otherLp
-			print "newLp"
-			print newLp
-			return'''
-
 		
 		#print ("newLp")
 		#print (newLp)
@@ -239,7 +208,6 @@ class LP:
 		bMatrix = matrix(cocantenatedb)
 		cMatrix = matrix(self.c)
 		solvers.options["show_progress"] = False
-		#solvers.options['maxiters'] = 1000 
 
 		'''print ("self lp")
 		print (self)
@@ -250,8 +218,6 @@ class LP:
 		print (bMatrix)
 		print ("cMatrix")
 		print (cMatrix)'''
-		#sol = solvers.lp(cMatrix, AMatrix, bMatrix)
-		#return sol
 
 		try:
 			sol = solvers.lp(cMatrix, AMatrix, bMatrix)
@@ -273,6 +239,10 @@ class LP:
 		return slack
 
 
+	# Map thre current LP to a new LP where
+	# the new Lp has nvar number of variables
+	# vmap indicates to which index in the new LP
+	# the variables of the current LP will correspond to
 	def varmap(self, nvar, vmap):
 		n_ineq = len(self.A)
 		A = []

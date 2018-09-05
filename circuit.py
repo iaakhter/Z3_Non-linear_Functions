@@ -1,11 +1,17 @@
-#@author: Mark Greenstreet
-#import pickle
+# @author: Mark Greenstreet and Itrat Akhter
+# # Implementation of long channel and short channel mosfet models
+# Short channel model calls on a shared library built by C++ boost
+# version which actually implements the model. 
+# Short channel model is from https://nanohub.org/publications/15/4
+# # Implementation of a circuit class that can combine the short
+# channel and long channel transistors.
 import math
 import numpy as np
 from cvxopt import matrix,solvers
 from scipy.spatial import ConvexHull
 from intervalBasics import *
 from lpUtilsMark import *
+# boost built shared library from C++
 import stChannel_py
 
 
@@ -23,58 +29,89 @@ class MosfetModel:
 		return "MosfetModel(" + str(self.channelType) + ", " + str(self.Vt) + ", " + str(self.k) + ", " + str(self.s) + ")"
 
 
+# Short channel model
 class StMosfet:
+	# s, g, d: Indices indicating source, gate and drain
+	# model: MosfetModel
+	# shape: shape
 	def __init__(self, s, g, d, model, shape):
 		self.s = s
 		self.g = g
 		self.d = d
 		self.shape = shape
 		self.model = model
+		self.gradDict = {} # stores computations of gradients for specific Vs, Vg, Vd and channelType
+		self.funDict = {} # stores computations of functions for specific Vs, Vg, Vd and channelType
 		self.stMosfet = stChannel_py.StMosfet()
 
+	# calculate ids from the given V
 	def ids(self, V):
 		model = self.model
 		return(self.ids_help(V[self.s], V[self.g], V[self.d], model.channelType))
 
+	# ids helper function. 
+	# Vs, Vg, Vd can be interval or point values
 	def ids_help(self, Vs, Vg, Vd, channelType):
 		VbC = stChannel_py.MyList();
 		if channelType == "nfet":
-			fetFunc = self.stMosfet.mvs_idn
+			fetFunc = self.stMosfet.mvs_idnMon
 			VbC[:] = [0.0, 0.0]
 		else:
-			fetFunc = self.stMosfet.mvs_idp
+			fetFunc = self.stMosfet.mvs_idpMon
 			VbC[:] = [1.8, 1.8]
 
 		VdC = stChannel_py.MyList()
 		VgC = stChannel_py.MyList()
 		VsC = stChannel_py.MyList()
+		VsDict, VgDict, VdDict = None, None, None
 		if interval_p(Vd):
 			VdC[:] = [Vd[0], Vd[1]]
+			VdDict = tuple(list(Vd))
 		else:
 			VdC[:] = [Vd, Vd]
+			VdDict = Vd
 
 		if interval_p(Vg):
 			VgC[:] = [Vg[0], Vg[1]]
+			VgDict = tuple(list(Vg))
 		else:
 			VgC[:] = [Vg, Vg]
+			VgDict = Vg
 
 		if interval_p(Vs):
 			VsC[:] = [Vs[0], Vs[1]]
+			VsDict = tuple(list(Vs))
 		else:
 			VsC[:] = [Vs, Vs]
+			VsDict = Vs
+
+		if (VsDict, VgDict, VdDict, channelType) in self.funDict:
+			return self.funDict[(VsDict, VgDict, VdDict, channelType)]
 
 		iVal = fetFunc(VdC, VgC, VsC, VbC)
 
 		if(interval_p(Vs) or interval_p(Vg) or interval_p(Vd)):
-			return self.shape*np.array([iVal[0], iVal[1]])
+			funVal =  self.shape*np.array([iVal[0], iVal[1]])
 		else:
-			return self.shape*iVal[0]
+			funVal = self.shape*iVal[0]
+
+		self.funDict[(VsDict, VgDict, VdDict, channelType)] = funVal
+		
+		# Clean up funDict
+		if len(self.funDict) >= 10000:
+			self.funDict = {}
+
+		return funVal
 
 
+	# calculate gradient of ids with respect to Vs, Vg and Vd
+	# from the given V
 	def grad_ids(self, V):
 		model = self.model
 		return(self.grad_ids_help(V[self.s], V[self.g], V[self.d], model.channelType))
 
+	# gradient helper function. 
+	# Vs, Vg, Vd can be interval or point values
 	def grad_ids_help(self, Vs, Vg, Vd, channelType):
 		VbC = stChannel_py.MyList();
 		if channelType == "nfet":
@@ -87,32 +124,92 @@ class StMosfet:
 		VdC = stChannel_py.MyList()
 		VgC = stChannel_py.MyList()
 		VsC = stChannel_py.MyList()
+		VsDict, VgDict, VdDict = None, None, None
 		if interval_p(Vd):
 			VdC[:] = [Vd[0], Vd[1]]
+			VdDict = tuple(list(Vd))
 		else:
 			VdC[:] = [Vd, Vd]
+			VdDict = Vd
 
 		if interval_p(Vg):
 			VgC[:] = [Vg[0], Vg[1]]
+			VgDict = tuple(list(Vg))
 		else:
 			VgC[:] = [Vg, Vg]
+			VgDict = Vg
 
 		if interval_p(Vs):
 			VsC[:] = [Vs[0], Vs[1]]
+			VsDict = tuple(list(Vs))
 		else:
 			VsC[:] = [Vs, Vs]
+			VsDict = Vs
+
+		if (VsDict, VgDict, VdDict, channelType) in self.gradDict:
+			return self.gradDict[(VsDict, VgDict, VdDict, channelType)]
 
 		jac = fetGrad(VdC, VgC, VsC, VbC)
 
 		if(interval_p(Vs) or interval_p(Vg) or interval_p(Vd)):
-			return self.shape*np.array([np.array([jac[2][0], jac[2][1]]),
+			grad = self.shape*np.array([np.array([jac[2][0], jac[2][1]]),
 							np.array([jac[1][0], jac[1][1]]),
 							np.array([jac[0][0], jac[0][1]])])
 		else:
-			return self.shape*np.array([jac[2][0],jac[1][0],jac[0][0]])
+			grad = self.shape*np.array([jac[2][0],jac[1][0],jac[0][0]])
+
+		# Clean up gradDict
+		self.gradDict[(VsDict, VgDict, VdDict, channelType)] = grad
+		if len(self.gradDict) >= 10000:
+			self.gradDict = {}
+		return grad
+
+	
+	# Construct and return lp for short channel mosfet model
+	# for interval Vs, Vg and Vd
+	# In this case, this is just the hyperrectangle bounds.
+	# TODO: Figure out the inflection points and construct tighter
+	# linear bounds around short channel ids
+	def lp_ids_help(self, Vs, Vg, Vd, channelType):
+		
+		Ids = self.ids_help(Vs, Vg, Vd, channelType)
+		hyperLp = LP()
+		if interval_p(Vs):
+			hyperLp.ineq_constraint([-1.0, 0.0, 0.0, 0.0], -Vs[0])
+			hyperLp.ineq_constraint([1.0, 0.0, 0.0, 0.0], Vs[1])
+		else:
+			hyperLp.ineq_constraint([-1.0, 0.0, 0.0, 0.0], -(Vs))
+			hyperLp.ineq_constraint([1.0, 0.0, 0.0, 0.0], Vs)
+		if interval_p(Vg):
+			hyperLp.ineq_constraint([0.0, -1.0, 0.0, 0.0], -Vg[0])
+			hyperLp.ineq_constraint([0.0, 1.0, 0.0, 0.0], Vg[1])
+		else:
+			hyperLp.ineq_constraint([0.0, -1.0, 0.0, 0.0], -(Vg))
+			hyperLp.ineq_constraint([0.0, 1.0, 0.0, 0.0], Vg)
+		if interval_p(Vd):
+			hyperLp.ineq_constraint([0.0, 0.0, -1.0, 0.0], -Vd[0])
+			hyperLp.ineq_constraint([0.0, 0.0, 1.0, 0.0], Vd[1])
+		else:
+			hyperLp.ineq_constraint([0.0, 0.0, -1.0, 0.0], -(Vd))
+			hyperLp.ineq_constraint([0.0, 0.0, 1.0, 0.0], Vd)
+		if interval_p(Ids):
+			hyperLp.ineq_constraint([0.0, 0.0, 0.0, -1.0], -(Ids[0]))
+			hyperLp.ineq_constraint([0.0, 0.0, 0.0, 1.0], (Ids[1]))
+		else:
+			hyperLp.ineq_constraint([0.0, 0.0, 0.0, -1.0], -(Ids))
+			hyperLp.ineq_constraint([0.0, 0.0, 0.0, 1.0], (Ids))
+		return hyperLp;
+
+	# Return lp defining linear constraints containing ids function
+	def lp_ids(self, V):
+		model = self.model.channelType	
+		return(self.lp_ids_help(V[self.s], V[self.g], V[self.d], model))
 
 
-
+# Long channel mosfet model
+# s, g, d: Indices indicating source, gate and drain
+# model: MosfetModel
+# shape: shape
 class Mosfet:
 	def __init__(self, s, g, d, model, shape=3.0):
 		self.s = s
@@ -121,6 +218,8 @@ class Mosfet:
 		self.shape = shape
 		self.model = model
 
+	# ids helper function. 
+	# Vs, Vg, Vd can be interval or point values
 	def ids_help(self, Vs, Vg, Vd, channelType, Vt, ks):
 		if(interval_p(Vs) or interval_p(Vg) or interval_p(Vd)):
 			# at least one of Vs, Vg, or Vd is an interval, we should return an interval
@@ -141,29 +240,8 @@ class Mosfet:
 		else: # linear
 			i0 = ks*(Vgse - Vds/2.0)*Vds
 		return(i0 + i_leak)
-
-	'''# Calculate ids given Vgse (Vg - Vs - Vt) and Vds (Vd - Vs)
-	def ids_help_var2(self, Vgse, Vds, channelType, ks):
-		if(channelType == 'pfet'):
-			return -self.ids_help_var2(-Vgse, -Vds, 'nfet', -ks)
-		elif(Vds < 0.0):
-			return -self.ids_help_var2(Vgse - Vds, -Vds, channelType, ks)
-		i_leak = Vds*self.model.gds
-		if(Vgse < 0):  # cut-off
-			i0 = 0
-		elif(Vgse < Vds): # saturation
-			i0 = (ks/2.0)*Vgse*Vgse
-		else: # linear
-			i0 = ks*(Vgse - Vds/2.0)*Vds
-		return(i0 + i_leak)
-
-	#TODO: Need a better way to frame this - more like ids
-	def ids_var2(self, Vgs, Vds):
-		model = self.model
-		Vgse = Vgs - model.Vt
-		return self.ids_help_var2(Vgse, Vds, model.channelType, model.k*self.shape )'''
-
 	
+	# calculate ids from the given V
 	def ids(self, V):
 		model = self.model
 		return(self.ids_help(V[self.s], V[self.g], V[self.d], model.channelType, model.Vt, model.k*self.shape))
@@ -236,7 +314,8 @@ class Mosfet:
 	# the function is with respect to 2 variables and for saturation
 	# or cutoff it is with respect to 1 variable.
 	# For the mosfet case, if it is linear region, the variables
-	# are Vg - Vs - Vt and Vd - Vs. For saturation or cutoff, 
+	# are Vg - Vs - Vt and Vd - Vs. For saturation, 
+	# the variables are Vd - Vs
 	def quad_lin_constraints(self, Amatrix, vertList, Vt):
 		#print ("ks", ks)
 		if Amatrix.shape[0] > 2:
@@ -265,8 +344,6 @@ class Mosfet:
 		if Amatrix.shape[0] > 1 and np.linalg.det(Amatrix) < 0:
 			# We need to sandwitch the model by the tangents
 			# on both sides so add negation of existing costs
-			# to existing costs
-			#costs = [[0,0,1]]
 			allCosts = [[grad for grad in cost] for cost in costs]
 			#allCosts = []
 			for cost in costs:
@@ -276,6 +353,7 @@ class Mosfet:
 				#print ("cost", cost)
 				# Multiply A with coefficient for Ids from cost
 				# In all cases, the cost for Ids is 
+				#costs = [[0,0,1]]
 				cA = cost[-1]*Amatrix
 
 				eigVals, eigVectors = np.linalg.eig(cA)
@@ -300,7 +378,7 @@ class Mosfet:
 				intersectionPoints = self.intersection([v0[0], v0[1], 0.0], vertList)
 
 				# Now test all the corners and all the intersection points to
-				# check which one is the minimum
+				# check which one is the minimum. That is the constant for our cost
 				pointsToTest = [point for point in vertList]
 				pointsToTest += intersectionPoints
 
@@ -384,6 +462,7 @@ class Mosfet:
 			lp2d.ineq_constraint(gradgsdICons2d[:-1], gradgsdICons2d[-1])
 
 
+		# deal with leakage term
 		if self.model.gds != 0.0:
 			leakTermMat = np.array([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, -self.model.gds, 1.0]])
 			newAList = list(np.dot(np.array(lp2d.A), leakTermMat))
@@ -410,8 +489,10 @@ class Mosfet:
 	# depending on whatever region they belong to - cutoff,
 	# saturation or linear - Assume nfet at the point when
 	# function is called
+	# Vgse = Vg - Vs - Vt
+	# Vds = Vd - Vs
+	# hyperLp = hyperrectangle bounds
 	def lp_grind(self, Vgse, Vds, Vt, ks, hyperLp):
-		#TODO: Need to incorporate the leakage term in A here somehow
 		#print ("lp_grind: Vgse", Vgse, "Vds", Vds)
 		#print ("lp_grind: hyperLp")
 		#print (hyperLp)
@@ -422,20 +503,15 @@ class Mosfet:
 		linA = (ks/2.0)*np.array([[0.0, 1.0], [1.0, -1.0]])
 
 		if interval_hi(Vgse) <= 0.0: # cutoff everywhere in the hyperrectangle
-			#print ("lp_grind: if1")
 			lp = LP()
-			#lp.ineq_constraint([0.0, 0.0, 0.0, -1.0], 0.0)
-			#lp.ineq_constraint([0.0, 0.0, 0.0, 1.0], 0.0)
 			return lp.concat(hyperLp)
 
 		elif(interval_lo(Vgse) >= 0 and interval_lo(Vds) >= interval_hi(Vgse)):  # saturation everywhere in the hyperrectangle
-			#print ("lp_grind: if2")
 			vertList = [np.array([Vgse[0]]), \
 					np.array([Vgse[1]])]
 			return self.quad_lin_constraints(satA, vertList, Vt).concat(hyperLp)
 
 		elif(interval_lo(Vgse) >= 0 and interval_hi(Vds) <= interval_lo(Vgse)):  # linear everywhere in the hyperrectangle
-			#print ("lp_grind: if3")
 			vertList = [np.array([Vgse[0], Vds[0]]), \
 						np.array([Vgse[1], Vds[0]]), \
 						np.array([Vgse[1], Vds[1]]), \
@@ -444,7 +520,6 @@ class Mosfet:
 
 		else:
 			return hyperLp
-			#print ("lp_grind: if4: hyperLp")
 			#print (hyperLp)
 			# take the union of the separate region constraints
 			# When taking the union, it is important to bound each variable
@@ -453,6 +528,9 @@ class Mosfet:
 			lp = LP()
 			lp.concat(hyperLp)
 			newVgse, newVds = Vgse, Vds
+			
+			# Check if there is a cutoff region. If there is add 
+			# linear constraints for cutoff
 			if Vgse[0] < 0.0 and Vgse[1] > 0.0:
 				newVgse = np.array([Vgse[0], 0.0])
 				regionLp = self.lp_grind(newVgse, newVds, Vt, ks, hyperLp)
@@ -464,6 +542,8 @@ class Mosfet:
 				newVgse = np.array([0.0, Vgse[1]])
 
 			# Find intersection between Vgse = Vds line and hyperrectangle
+			# To check if there is overlap between the saturation and linear
+			# region
 			vertList = [np.array([newVgse[0], newVds[0]]), \
 						np.array([newVgse[1], newVds[0]]), \
 						np.array([newVgse[1], newVds[1]]), \
@@ -472,6 +552,7 @@ class Mosfet:
 			#print ("intersectionPoints")
 			#print (intersectionPoints)
 			if len(intersectionPoints) == 0:
+				# Deal with just saturation
 				regionLp = self.lp_grind(newVgse, newVds, Vt, ks, hyperLp)
 				#print ("regionLp")
 				#print (regionLp)
@@ -479,7 +560,7 @@ class Mosfet:
 				#print ("lp after regionLp")
 				#print (lp)
 			else:
-				#print ("saturation + linear")
+				# deal with  ("saturation + linear")
 				# find the two polygons caused by the line Vgse = Vds line
 				# intersecting newVgse
 				vertList1, vertList2 = [], []
@@ -513,98 +594,8 @@ class Mosfet:
 
 			return lp
 
-	'''def lp_grind_pre(self, Vgs, Vds, numDivisions, mainDict):
-		minVal, maxVal = -1.8, 1.8
-		unitDiff = (maxVal - minVal)/numDivisions
-
-		dictVgsEntry = np.array([math.floor((Vgs[0] - minVal)/unitDiff), math.ceil((Vgs[1] - minVal)/unitDiff)])
-		dictVdsEntry = np.array([math.floor((Vds[0] - minVal)/unitDiff), math.ceil((Vds[1] - minVal)/unitDiff)])
-		if dictVgsEntry[0] == dictVgsEntry[1]:
-			if dictVgsEntry[0] != 0:
-				dictVgsEntry[0] -= 1
-			elif dictVgsEntry[1] != numDivisions:
-				dictVgsEntry[1] += 1
-		if dictVdsEntry[0] == dictVdsEntry[1]:
-			if dictVdsEntry[0] != 0:
-				dictVdsEntry[0] -= 1
-			elif dictVdsEntry[1] != numDivisions:
-				dictVdsEntry[1] += 1
-		lp = mainDict[(int(dictVgsEntry[0]), int(dictVdsEntry[0]))][(int(dictVgsEntry[1]), int(dictVdsEntry[1]))]
-		newLp = LP()
-		for i in range(len(lp.A)):
-			newLp.ineq_constraint([-lp.A[i][0]-lp.A[i][1], lp.A[i][0], lp.A[i][1], lp.A[i][2]], lp.b[i])
-		return newLp
-
-
-	
-	def lp_ids_help_pre(self, Vs, Vg, Vd, channelType, Vt, ks, numDivisions, mainDict):
-		Vgs = interval_sub(Vg, Vs)
-		Vgse = Vgs - Vt
-		Vds = interval_sub(Vd, Vs)
-		#print ("Vgse", Vgse, "Vds", Vds)
-		if(not(interval_p(Vs) or interval_p(Vg) or interval_p(Vd))):
-			#print ("if1")
-			# Vs, Vg, and Vd are non-intervals -- they define a point
-			# Add an inequality that our Ids is the value for this point
-			return(LP(None, None, None, [[0,0,0,1.0]], self.ids_help(Vs, Vg, Vd, channelType, Vt, ks)))
-		elif(channelType == 'pfet'):
-			#print ("if2")
-			LPnfet = self.lp_ids_help_pre(interval_neg(Vs), interval_neg(Vg), interval_neg(Vd), 'nfet', -Vt, -ks, numDivisions, mainDict)
-			return LPnfet.neg_A()
-		elif((interval_lo(Vs) <= interval_hi(Vd)) and (interval_hi(Vs) >= interval_lo(Vd))):
-			#print ("if3")
-			# If the Vs interval overlaps the Vd interval, then Vds can change sign.
-			# That means we've got a saddle.  We won't try to generated LP constraints
-			# for the saddle.  So, we just return an empty LP.
-			return(LP())
-		elif(interval_lo(Vs) > interval_hi(Vd)):
-			#print ("if4")
-			LPswap = self.lp_ids_help_pre(Vd, Vg, Vs, channelType, Vt, ks, numDivisions, mainDict)
-			A = []
-			for i in range(len(LPswap.A)):
-				row = LPswap.A[i]
-				A.append([row[2], row[1], row[0], -row[3]])
-			Aeq = []
-			for i in range(len(LPswap.Aeq)):
-				row = LPswap.Aeq[i]
-				Aeq.append([row[2], row[1], row[0], -row[3]])
-			return LP(LPswap.c, A, LPswap.b, Aeq, LPswap.beq)
-
-		else:
-			#print ("if5")
-			#return LP()
-			Ids = self.ids_help(Vs, Vg, Vd, channelType, Vt, ks)
-			# form the LP where the constraints for the Vgse and Vds
-			# bounds are added. This is important to make sure we don't get
-			# unboundedness from our linear program
-			hyperLp = LP()
-			if interval_p(Vs):
-				hyperLp.ineq_constraint([-1.0, 0.0, 0.0, 0.0], -Vs[0])
-				hyperLp.ineq_constraint([1.0, 0.0, 0.0, 0.0], Vs[1])
-			else:
-				hyperLp.ineq_constraint([-1.0, 0.0, 0.0, 0.0], -(Vs - 1e-5))
-				hyperLp.ineq_constraint([1.0, 0.0, 0.0, 0.0], Vs + 1e-5)
-			if interval_p(Vg):
-				hyperLp.ineq_constraint([0.0, -1.0, 0.0, 0.0], -Vg[0])
-				hyperLp.ineq_constraint([0.0, 1.0, 0.0, 0.0], Vg[1])
-			else:
-				hyperLp.ineq_constraint([0.0, -1.0, 0.0, 0.0], -(Vg - 1e-5))
-				hyperLp.ineq_constraint([0.0, 1.0, 0.0, 0.0], Vg + 1e-5)
-			if interval_p(Vd):
-				hyperLp.ineq_constraint([0.0, 0.0, -1.0, 0.0], -Vd[0])
-				hyperLp.ineq_constraint([0.0, 0.0, 1.0, 0.0], Vd[1])
-			else:
-				hyperLp.ineq_constraint([0.0, 0.0, -1.0, 0.0], -(Vd - 1e-5))
-				hyperLp.ineq_constraint([0.0, 0.0, 1.0, 0.0], Vd + 1e-5)
-			if interval_p(Ids):
-				hyperLp.ineq_constraint([0.0, 0.0, 0.0, -1.0], -(Ids[0] - 1e-5))
-				hyperLp.ineq_constraint([0.0, 0.0, 0.0, 1.0], (Ids[1] + 1e-5))
-			else:
-				hyperLp.ineq_constraint([0.0, 0.0, 0.0, -1.0], -(Ids - 1e-5))
-				hyperLp.ineq_constraint([0.0, 0.0, 0.0, 1.0], (Ids + 1e-5))
-			return self.lp_grind_pre(Vgs, Vds, numDivisions, mainDict).concat(hyperLp)'''
-
-
+	# Return an lp formed around ids for intervals given by
+	# Vs, Vg and Vd
 	def lp_ids_help(self, Vs, Vg, Vd, channelType, Vt, ks):
 		#print ("Vs", Vs, "Vg", Vg, "Vd", Vd, "channelType", channelType)
 		#print ("interval_r(Vs)", interval_r(Vs), "interval_r(Vd)", interval_r(Vd))
@@ -613,7 +604,7 @@ class Mosfet:
 		Vds = interval_sub(Vd, Vs)
 
 		Ids = self.ids_help(Vs, Vg, Vd, channelType, Vt, ks)
-		# form the LP where the constraints for the Vgse and Vds
+		# form the LP where the constraints for the Vg and Vd and Vs
 		# bounds are added. This is important to make sure we don't get
 		# unboundedness from our linear program
 		hyperLp = LP()
@@ -642,24 +633,24 @@ class Mosfet:
 			hyperLp.ineq_constraint([0.0, 0.0, 0.0, -1.0], -(Ids))
 			hyperLp.ineq_constraint([0.0, 0.0, 0.0, 1.0], (Ids))
 
+		# If hyperrectangles are tiny do not try to construct 
+		# linear convex regions and just return the lp representing
+		# the bounds
 		if interval_r(Vs) < 1e-14 and interval_r(Vd) < 1e-14:
 			return hyperLp
 		
 		#print ("Vgse", Vgse, "Vds", Vds)
 		if(not(interval_p(Vs) or interval_p(Vg) or interval_p(Vd))):
-			#print ("if1")
 			# Vs, Vg, and Vd are non-intervals -- they define a point
 			# Add an inequality that our Ids is the value for this point
 			return(LP(None, None, None, [[0,0,0,1.0]], self.ids_help(Vs, Vg, Vd, channelType, Vt, ks)))
 		elif(channelType == 'pfet'):
-			#print ("if2")
 			LPnfet = self.lp_ids_help(interval_neg(Vs), interval_neg(Vg), interval_neg(Vd), 'nfet', -Vt, -ks)
 			return LPnfet.neg_A()
 		elif((interval_lo(Vs) < interval_hi(Vd)) and (interval_hi(Vs) > interval_lo(Vd))):
-			#print ("if3")
 			# If the Vs interval overlaps the Vd interval, then Vds can change sign.
 			# That means we've got a saddle.  We won't try to generated LP constraints
-			# for the saddle.  So, we just return an empty LP.
+			# for the saddle.  So, we just return a hyperLp.
 			#return hyperLp
 			#print ("Vs", Vs, "Vd", Vd)
 			'''intersect = interval_intersect(Vs, Vd)
@@ -674,7 +665,6 @@ class Mosfet:
 
 			return hyperLp
 		elif(interval_lo(Vs) >= interval_hi(Vd)):
-			#print ("if4")
 			LPswap = self.lp_ids_help(Vd, Vg, Vs, channelType, Vt, ks)
 			A = []
 			for i in range(len(LPswap.A)):
@@ -687,7 +677,6 @@ class Mosfet:
 			return LP(LPswap.c, A, LPswap.b, Aeq, LPswap.beq)
 
 		else:
-			#print ("if5")
 			return self.lp_grind(Vgse, Vds, Vt, ks, hyperLp)
 
 	# Find the intersection points between the line
@@ -717,25 +706,22 @@ class Mosfet:
 
 		return intersectionPoints
 
+	# Return an lp
 	def lp_ids(self, V, numDivisions = None, mainDict = None):
 		model = self.model
 		idsLp = self.lp_ids_help(V[self.s], V[self.g], V[self.d], model.channelType, model.Vt, model.k*self.shape)
-		#idsLp = self.lp_ids_help_pre(V[self.s], V[self.g], V[self.d], model.channelType, model.Vt, model.k*self.shape, numDivisions, mainDict)
 	
 		#print ("idsLp")
 		#print (idsLp)
 		return idsLp
 
 
+# Circuit combining different transistor models
 class Circuit:
 	def __init__(self, tr):
-		self.tr = tr
-		'''filename = "precompConvexHull18.pkl"
-		theFile = open(filename, "rb")
-		self.numDivisions, self.mainDict = pickle.load(theFile)
-		theFile.close()
-		#print ("loaded")'''
+		self.tr = tr # list of transistor objects (long channel - Mosfet or short channel - StMosfet)
 
+	# Return node currents given the voltages at nodes
 	def f(self, V):
 		intervalVal = any([interval_p(x) for x in V])
 		if intervalVal:
@@ -750,9 +736,11 @@ class Circuit:
 			I_node[tr.d] = interval_sub(I_node[tr.d], Ids)
 		return I_node
 
+	# Return jacobian of node currents with respect to node voltages
 	def jacobian(self, V):
-		intervalVal = any([interval_p(x) for x in V])
-		
+		#print ("Calculating jacobian for V")
+		#print (V)
+		intervalVal = any([interval_p(x) for x in V])	
 		
 		if intervalVal:
 			J = np.zeros([len(V), len(V), 2])
@@ -761,7 +749,7 @@ class Circuit:
 		for i in range(len(self.tr)):
 			tr = self.tr[i]
 			g = tr.grad_ids(V)
-			# print 'i = ' + str(i) + ', tr.s = ' + str(tr.s) + ', tr.g = ' + str(tr.g) + ', tr.d = ' + str(tr.d) + ', g = ' + str(g)
+			#print 'i = ' + str(i) + ', tr.s = ' + str(tr.s) + ', tr.g = ' + str(tr.g) + ', tr.d = ' + str(tr.d) + ', g = ' + str(g)
 			sgd = [tr.s, tr.g, tr.d]
 			for i in range(len(sgd)):
 				J[tr.s, sgd[i]] = interval_add(J[tr.s, sgd[i]], g[i])
@@ -775,6 +763,8 @@ class Circuit:
 	# For 0 <= j < #transistors, variable[#nodes+j] is Ids for transistor j
 	# This function collects all the linear constraints related to the 
 	# transistors and set the node currents to 0
+	# grndPower Index is the list of indices indicating
+	# ground and power in V. We need this when we are setting sum of node currents to 0
 	def lp(self, V, grndPowerIndex):
 		lp = LP()
 		n_nodes = len(V)
@@ -793,12 +783,16 @@ class Circuit:
 		for i in range(n_tr):
 			#print ("transistor number", i)
 			tr = self.tr[i]
-			#lptr = tr.lp_ids(V, self.numDivisions, self.mainDict)
 			lptr = tr.lp_ids(V)
 
-			# remove the hyper constraints that we might have added 
-			# (hyper constraints might have been added in order to make the
-			# union code work)
+			# remove the hyper constraints that we have added 
+			# (hyper constraints have been repeated as these are
+			# the hyper constraints from each transistor. We had needed
+			# to add these if we created unions of two lps and avoid unboundedness).
+			# We need
+			# to avoid duplicate constraints so that we do not slow down
+			# the linear program solver. We will add the hyper constraints
+			# for each variable exactly once in a bit. 
 			modLptr = LP()
 			for ai in range(6,len(lptr.A)):
 				modLptr.ineq_constraint(lptr.A[ai], lptr.b[ai])
@@ -810,7 +804,8 @@ class Circuit:
 			lp.concat(modLptr.varmap(nvars, [tr.s, tr.g, tr.d, n_nodes+i]))
 			
 			# Add the hyper constraints for tr.s,tr.g and tr.d if they have not been
-			# added yet
+			# added yet. This makes sure that we have added hyper constraints for 
+			# each variable exactly once
 			for ind in [tr.s, tr.g, tr.d]:
 				if not(hyperAdded[ind]):
 					#print ("ind", ind)
@@ -833,14 +828,11 @@ class Circuit:
 		#print ("eqCoeffs")
 		#print (eqCoeffs)
 
-
 		# need to add equality constraints that the sum of the currents into each node is zero
 		for i in range(n_nodes):
 			if all([i != gpi for gpi in grndPowerIndex]):
-				#if i < 2:
 				lp.ineq_constraint(list(-eqCoeffs[i]), 0.0)
 				lp.ineq_constraint(list(eqCoeffs[i]), 0.0)
-				#lp.eq_constraint(list(eqCoeffs[i]), 0.0)
 
 		return lp
 
@@ -848,6 +840,8 @@ class Circuit:
 
 	# This function solves the linear program 
 	# returns a tighter hyperrectangle if feasible
+	# grndPower Index is the list of indices indicating
+	# ground and power in V
 	def linearConstraints(self, V, grndPowerIndex):
 		lp = self.lp(V, grndPowerIndex)
 		n_nodes = len(V)
@@ -877,11 +871,11 @@ class Circuit:
 				maxSol = lp.solve()
 
 				if minSol is None or maxSol is None:
-					print ("nvars", nvars)
-					print ("numConstraints", lp.num_constraints())
-					print ("hyperrectangle", V)
-					print ("minSol is None?", minSol, "maxSol is None?", maxSol)
-					print (lp)
+					#print ("nvars", nvars)
+					#print ("numConstraints", lp.num_constraints())
+					#print ("hyperrectangle", V)
+					#print ("minSol is None?", minSol, "maxSol is None?", maxSol)
+					#print (lp)
 					numUnsuccessLp += 2
 					continue
 
@@ -912,95 +906,4 @@ class Circuit:
 
 		#print ("numTotalLp", numTotalLp, "numSuccessLp", numSuccessLp, "numUnsuccessLp", numUnsuccessLp)
 		return [feasible, tighterHyper, numTotalLp, numSuccessLp, numUnsuccessLp]
-
-
-class TransistorCircuit(Circuit):
-	def __init__(self, tr):
-		Circuit.__init__(self, tr)
-		filename = "precompConvexHullInv9_20.pkl"
-		theFile = open(filename, "rb")
-		self.numDivisions, self.mainDict = pickle.load(theFile)
-		theFile.close()
-		#print ("loaded")
-
-	def lp(self, V, grndPowerIndex):
-
-
-		lp = LP()
-		n_nodes = len(V)
-		n_tr = len(self.tr)
-		nvars = len(V) + n_tr
-
-		#print ("nvars", nvars)
-		#print ("n_tr", n_tr)
-
-		eqCoeffs = np.zeros((n_nodes, nvars))
-		for i in range(n_tr):
-			#print ("transistor number", i)
-			tr = self.tr[i]
-			#print ("tr.s", tr.s, "V[tr.s]", V[tr.s])
-			VinInterval = V[tr.g]
-			VoutInterval = V[tr.d]
-
-			minVal, maxVal = 0.0, 1.8
-			unitDiff = (maxVal - minVal)/self.numDivisions
-
-			dictVinEntry = np.array([math.floor((VinInterval[0] - minVal)/unitDiff), math.ceil((VinInterval[1] - minVal)/unitDiff)])
-			dictVoutEntry = np.array([math.floor((VoutInterval[0] - minVal)/unitDiff), math.ceil((VoutInterval[1] - minVal)/unitDiff)])
-			if dictVinEntry[0] == dictVinEntry[1]:
-				if dictVinEntry[0] != 0:
-					dictVinEntry[0] -= 1
-				elif dictVinEntry[1] != self.numDivisions:
-					dictVinEntry[1] += 1
-			if dictVoutEntry[0] == dictVoutEntry[1]:
-				if dictVoutEntry[0] != 0:
-					dictVoutEntry[0] -= 1
-				elif dictVoutEntry[1] != numDivisions:
-					dictVoutEntry[1] += 1
-			'''print ("VinInterval", VinInterval, "VoutInterval", VoutInterval)
-			print ("dictVinEntry", dictVinEntry)
-			print ("dictVoutEntry", dictVoutEntry)'''
-			#localLp = self.mainDict[(int(dictVinEntry[0]), int(dictVoutEntry[0]))][(int(dictVinEntry[1]), int(dictVoutEntry[1]))]
-			localLp = LP()
-			localLp.ineq_constraint([-1.0, 0.0, 0.0], -VinInterval[0])
-			localLp.ineq_constraint([1.0, 0.0, 0.0], VinInterval[1])
-			localLp.ineq_constraint([0.0, -1.0, 0.0], -VoutInterval[0])
-			localLp.ineq_constraint([0.0, 1.0, 0.0], VoutInterval[1])
-			localLp.ineq_constraint([0.0, 0.0, -1.0], 100.0)
-			localLp.ineq_constraint([0.0, 0.0, 1.0], 100.0)
-			#print ("localLp")
-			#print (localLp)
-			lp.concat(localLp.varmap(nvars, [tr.g, tr.d, n_nodes+i]))
-			newIneqConstrant1 = np.zeros((nvars))
-			newIneqConstrant1[tr.s] = -1.0
-			newIneqConstrant2 = np.zeros((nvars))
-			newIneqConstrant2[tr.s] = 1.0
-			if interval_p(V[tr.s]):
-				lp.ineq_constraint(list(newIneqConstrant1), -V[tr.s][0])
-				lp.ineq_constraint(list(newIneqConstrant2), V[tr.s][1])
-			else:
-				lp.ineq_constraint(list(newIneqConstrant1), -(V[tr.s] - 1e-3))
-				lp.ineq_constraint(list(newIneqConstrant2), (V[tr.s] + 1e-3))
-			eqCoeffs[tr.s, n_nodes + i] += 1.0
-			eqCoeffs[tr.d, n_nodes + i] += -1.0
-
-		#print ("eqCoeffs")
-		#print (eqCoeffs)
-
-		#print ("lp")
-		#print (lp)
-
-
-		# need to add equality constraints that the sum of the currents into each node is zero
-		for i in range(n_nodes):
-			if all([i != gpi for gpi in grndPowerIndex]):
-				#if i < 2:
-				lp.ineq_constraint(list(-eqCoeffs[i]), 1e-3)
-				lp.ineq_constraint(list(eqCoeffs[i]), 1e-3)
-				#lp.eq_constraint(list(eqCoeffs[i]), 0.0)
-
-		return lp
-
-
-
 

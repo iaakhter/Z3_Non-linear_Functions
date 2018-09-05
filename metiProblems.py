@@ -1,3 +1,6 @@
+#@author: Itrat Ahmed Akhter
+# Metitarski examples
+
 import numpy as np
 import lpUtils
 from cvxopt import matrix,solvers
@@ -235,38 +238,4 @@ class Meti18:
 
 		return [feasible, newHyperRectangle, numTotalLp, numSuccessLp, numUnsuccessLp]
 
-
-
-if __name__ == "__main__":
-	model = Meti25(0.0, 100.0, ">")
-	#print (example1.oscNum(20))
-	#print (example1.jacobian(20))
-	x = np.linspace(0.0, 100.0, 1000)
-	for i in range(len(x)-1):
-		xBound = np.array([x[i], x[i+1]])
-		fVal = model.f(xBound)
-
-		sampleDelta = 0.0001
-		xSamples = np.linspace(xBound[0] + sampleDelta, xBound[1] - sampleDelta, 100)
-		for xs in xSamples:
-			f = model.oscNum(xs)[2]
-			if f < fVal[0] or f > fVal[1]:
-				print ("oops x ", xs, "for interval", xBound)
-				print ("actual f", f, "should be in", fVal)
-
-	model = Meti18(0.0, 100.0, ">")
-	#print (example1.oscNum(20))
-	#print (example1.jacobian(20))
-	x = np.linspace(0.0, 100.0, 1000)
-	for i in range(len(x)-1):
-		xBound = np.array([x[i], x[i+1]])
-		fVal = model.f(xBound)
-
-		sampleDelta = 0.0001
-		xSamples = np.linspace(xBound[0] + sampleDelta, xBound[1] - sampleDelta, 100)
-		for xs in xSamples:
-			f = model.oscNum(xs)[2]
-			if f < fVal[0] or f > fVal[1]:
-				print ("oops x ", xs, "for interval", xBound)
-				print ("actual f", f, "should be in", fVal)
 

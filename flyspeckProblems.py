@@ -1,3 +1,6 @@
+#@author: Itrat Akhter
+#@author: Flyspeck example
+
 import numpy as np
 import lpUtils
 from cvxopt import matrix,solvers
@@ -243,14 +246,6 @@ class Flyspeck172:
 		patch[2,:] = [xBounds[1], cBounds[1]]
 		patch[3,:] = [xBounds[0], cBounds[1]]
 		allConstraints += self.dLinearConstraints(self.d, self.x, self.c, patch)
-		#allConstraints += "1 " + self.x + " >= -3.60\n"
-		#allConstraints += "1 " + self.x + " <= -3.58\n"
-		#allConstraints += "1 " + self.a + " >= -0.278\n"
-		#allConstraints += "1 " + self.a + " <= -0.276\n"
-		#allConstraints += "1 " + self.b + " >= -0.767\n"
-		#allConstraints += "1 " + self.b + " <= -0.765\n"
-		#allConstraints += "1 " + self.c + " >= -0.566\n"
-		#allConstraints += "1 " + self.c + " <= -0.564\n"
 		#print ("xLowBound", xLowBound, "xUpperBound", xUpperBound)
 		#print ("aLowBound", aLowBound, "aUpperBound", aUpperBound)
 		#print ("cLowBound", cLowBound, "cUpperBound", cUpperBound)
@@ -261,12 +256,6 @@ class Flyspeck172:
 		#print ("allConstraints")
 		#print (allConstraints)
 
-		'''allConstraintList = allConstraints.splitlines()
-		allConstraints = ""
-		for i in range(len(allConstraintList)):
-			if (i >= 2 and i <= 3) or (i == 9) or (i == 17) or (i >= 21 and i <= 23):
-				allConstraints += allConstraintList[i] + "\n"
-		print ("numConstraints ", len(allConstraintList))'''
 
 		variableDict, A, B = lpUtils.constructCoeffMatrices(allConstraints)
 		newHyperRectangle = np.copy(hyperRectangle)
@@ -296,22 +285,4 @@ class Flyspeck172:
 
 		return [feasible, newHyperRectangle, numTotalLp, numSuccessLp, numUnsuccessLp]
 
-
-
-if __name__ == "__main__":
-	example1 = Flyspeck172(3, 64, ">")
-	#print (example1.oscNum(20))
-	#print (example1.jacobian(20))
-	x = np.linspace(1.0, 80, 1000)
-	for i in range(len(x)-1):
-		xBound = np.array([x[i], x[i+1]])
-		fVal = example1.f(xBound)
-
-		sampleDelta = 0.0001
-		xSamples = np.linspace(xBound[0] + sampleDelta, xBound[1] - sampleDelta, 100)
-		for xs in xSamples:
-			f = example1.f(xs)
-			if f < fVal[0] or f > fVal[1]:
-				print ("oops x ", xs, "for interval", xBound)
-				print ("actual f", f, "should be in", fVal)
 

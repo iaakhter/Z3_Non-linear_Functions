@@ -1,6 +1,14 @@
+# @author Itrat Ahmed Akhter
+# Util functions that take in a string of constraints representing an LP
+# and convert it into matrices acceptable by cvxopt.
+# TODO: Use lpUtilsMark.py in the rest of the code and get rid of this code
 import numpy as np
 from cvxopt import matrix,solvers
 
+# Construct the matrix representing the objective of the LP from objString
+# and return it. 
+# variableDict represents which string variable in objString corresponds to
+# which index for the LP in the objective matrix
 def constructObjMatrix(objString, variableDict):
 	objStringList = objString.split(" ")
 	objFun = objStringList[0]
@@ -18,8 +26,10 @@ def constructObjMatrix(objString, variableDict):
 	#print "xoptCMat"
 	#print xoptCMat
 	return xoptCMat
-	#return cMat
 
+# Construct the coefficient matrices for cvxopt from constraint string
+# Also return variableDict which represents which string variable in 
+# objString corresponds to which index for the LP in the objective matrix
 def constructCoeffMatrices(constraintString):
 	constraintList = constraintString.split("\n")
 	constraintList = constraintList[:len(constraintList)-1]
@@ -67,4 +77,3 @@ def constructCoeffMatrices(constraintString):
 	#print "xoptAMat"
 	#print xoptAMat
 	return [variableDict,xoptAMat, xoptBMat]
-	#return [variableDict, AMat, bMat]

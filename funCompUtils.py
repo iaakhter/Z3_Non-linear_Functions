@@ -1,12 +1,17 @@
+# @author Itrat Ahmed Akhter
+# Implementation of functions and gradients needed by our examples. 
+# They can return either interval or point evaluations depending on 
+# whether the arguments are points or intervals
+# This file also contains functions that returns linear constraints
+# bounding the function given an interval bound. 
 import math
 import numpy as np
 from scipy.spatial import ConvexHull
 from intervalBasics import *
 
-# assume that const > 0 in all cases
-
 
 #sin(const*x)
+# assume that const > 0
 def sinFun(x,const):
 	funVal = np.sin(const*x)
 
@@ -31,6 +36,7 @@ def sinFunder(x,const):
 
 
 #cos(const*x)
+# assume that const > 0
 def cosFun(x,const):
 	funVal = np.cos(const*x)
 
@@ -53,6 +59,7 @@ def cosFunder(x,const):
 	return interval_mult(const,interval_neg(sinFun(x,const)))
 
 
+#tanh(const*x)
 def tanhFun(x, const):
 	tanhVal = np.tanh(const*x)
 	if interval_p(x):
@@ -74,6 +81,7 @@ def tanhFunder(x, const):
 	return grad
 
 #1/(const*x)
+# assume that const > 0
 def invFun(x, const):
 	if any([xVal == 0 for xVal in x]):
 		raise Exception('Invalid argument for invFun ' + str(x))
@@ -100,6 +108,7 @@ def invFunder(x,const):
 
 
 #arcsin(const*x)
+# assume that const > 0
 def arcsinFun(x, const):
 	if any([xVal < -1 or xVal > 1 for xVal in x]):
 		raise Exception('Invalid argument for arcsin ' + str(x))
@@ -124,7 +133,7 @@ def arcsinFunder(x, const):
 
 
 
-#linear constraints for sin(constant*x)
+#linear constraints in the form of string for sin(constant*x)
 def sinLinearConstraints(constant, inputVar, outputVar, inputLow, inputHigh):
 	#print ("inputLow", inputLow, "inputHigh", inputHigh)
 	inputLowPi = math.ceil(inputLow/(math.pi/constant))
@@ -133,7 +142,6 @@ def sinLinearConstraints(constant, inputVar, outputVar, inputLow, inputHigh):
 
 	if inputLowPi == inputHighPi:
 		if inputLowPi%2 == 0:
-			#print ("coming here?")
 			return triangleBounds(sinFun, sinFunder, constant, inputVar, outputVar, inputLow, inputHigh, "pos")
 		else:
 			return triangleBounds(sinFun, sinFunder, constant, inputVar, outputVar, inputLow, inputHigh, "neg")
@@ -162,7 +170,7 @@ def sinLinearConstraints(constant, inputVar, outputVar, inputLow, inputHigh):
 	
 	return overallConstraint
 
-#linear constraints for sin(constant*x)
+#linear constraints in the form of a string for cos(constant*x)
 def cosLinearConstraints(constant, inputVar, outputVar, inputLow, inputHigh):
 	#print ("inputLow", inputLow, "inputHigh", inputHigh)
 	inputLowPi = math.ceil((inputLow - math.pi/2.0)/(math.pi/constant))
@@ -202,7 +210,7 @@ def cosLinearConstraints(constant, inputVar, outputVar, inputLow, inputHigh):
 
 
 
-#linear constraints for 1/(constant*x)
+#linear constraints for in the form of a string for 1/(constant*x)
 def inverseLinearConstraints(constant, inputVar, outputVar, inputLow, inputHigh):
 	if inputLow == 0.0 or inputHigh == 0.0:
 		raise  Exception("invalid lowBound or highBound for exponential" + str(inputLow) + " " + str(inputHigh))
@@ -213,7 +221,7 @@ def inverseLinearConstraints(constant, inputVar, outputVar, inputLow, inputHigh)
 	elif inputLow < 0.0 and inputHigh > 0.0:
 		return triangleBounds(invFun, invFunder, constant, inputVar, outputVar, inputLow, inputHigh, None)
 
-#linear constraints for arcsin(constant*x)
+#linear constraints in the form of a string for arcsin(constant*x)
 def arcsinLinearConstraints(constant, inputVar, outputVar, inputLow, inputHigh):
 	if inputLow < -1.0 or inputLow > 1.0 or inputHigh < -1.0 or inputHigh > 1.0:
 		raise Exception("invalid lowBound or highBound for arcsin" + str(inputLow) + " " + str(inputHigh))
@@ -236,7 +244,7 @@ def arcsinLinearConstraints(constant, inputVar, outputVar, inputLow, inputHigh):
 	#print (allTrianglePoints)
 	return overallConstraint + convexHullConstraints2D(allTrianglePoints, inputVar, outputVar)
 
-#linear constraints for tanh
+#linear constraints in the form of a string for tanh
 def tanhLinearConstraints(constant, inputVar, outputVar, inputLow, inputHigh):
 	if constant < 0:
 		if inputLow <= 0.0 and inputHigh <= 0.0:
@@ -265,7 +273,10 @@ def tanhLinearConstraints(constant, inputVar, outputVar, inputLow, inputHigh):
 	return overallConstraint
 
 
-#points of triangle formed by trianglebounds for a function
+# This function calculates tangents at inputLow and inputHigh and
+# and finds the intersection between the tangents. 
+# It returns the three points of a triangle:
+# (inputLow, function(inputLow)), (inputHigh, function(inputHigh)), (intersectionX, function(intersectionX))
 def trianglePoints(function, functionDer, inputLow, inputHigh, constant):
 	if inputLow > inputHigh:
 		return []
@@ -296,6 +307,11 @@ def trianglePoints(function, functionDer, inputLow, inputHigh, constant):
 	return tPts
 
 
+# This function constructs linear constraints from the given interval bounds
+# If there are no inflection points of the function in the interval bounds
+# then it returns triangle constraints formed from the tangents at the interval bounds
+# and a secant line between the interval bounds depending on the convexity of the
+# function. Otherwise it just returns constraints indicating the interval bounds
 def triangleBounds(function, functionDer, constant, inputVar, outputVar, inputLow, inputHigh, secDer):
 	funLow = function(np.array([inputLow]), constant)[0]
 	dLow = functionDer(np.array([inputLow]), constant)[0]
@@ -328,6 +344,9 @@ def triangleBounds(function, functionDer, constant, inputVar, outputVar, inputLo
 				"1 "+outputVar + " + " +str(-dLow) + " " + inputVar + " <= "+str(cLow)+"\n" +\
 				"1 "+outputVar + " + " +str(-dHigh) + " " + inputVar + " <= "+str(cHigh) + "\n"
 
+
+# This function finds the convex hull of a list of 2d points and creates
+# constraints around the convex hull and returns it in the form of strings
 def convexHullConstraints2D(points, inputVar, outputVar):
 	#print ("points")
 	#print (points)

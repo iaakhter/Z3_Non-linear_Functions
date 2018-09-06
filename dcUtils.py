@@ -3,6 +3,35 @@
 import numpy as np
 import intervalUtils
 
+def printSol(allHypers, model):
+	# categorize solutions found
+	sampleSols, rotatedSols, stableSols, unstableSols = categorizeSolutions(allHypers,model)
+
+	for hi in range(len(sampleSols)):
+		print ("equivalence class# ", hi)
+		print ("main member ", sampleSols[hi])
+		print ("check current ", model.f(sampleSols[hi]))
+		print ("number of other members ", len(rotatedSols[hi]))
+		print ("other member rotationIndices: ")
+		for mi in range(len(rotatedSols[hi])):
+			print (rotatedSols[hi][mi])
+		print ("")
+
+	'''for hi in range(len(sampleSols)):
+		if len(rotatedSols[hi]) > lenV - 1 or (len(rotatedSols[hi]) >= 1 and rotatedSols[hi][0] == 0):
+			print ("problem equivalence class# ", hi)
+			print ("main member ", sampleSols[hi])
+			print ("num other Solutions ", len(rotatedSols[hi]))
+
+	print ("")
+	print ("numSolutions, ", len(allHypers))
+	print ("num stable solutions ", len(stableSols))'''
+	'''for si in range(len(stableSols)):
+		print stableSols[si]'''
+	#print "num unstable solutions ", len(unstableSols)
+	'''for si in range(len(unstableSols)):
+		print unstableSols[si]'''
+
 '''
 Return true if stable and false otherwise
 '''

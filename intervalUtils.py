@@ -163,10 +163,7 @@ def krawczykHelp(startBounds, jacInterval, samplePoint, fSamplePoint, jacSampleP
 		C = np.linalg.pinv(jacSamplePoint)
 
 	#print ("C", C)
-	if interval_p(fSamplePoint[0]):
-		C_fSamplePoint = multiplyMatWithVec(C, fSamplePoint)
-	else:
-		C_fSamplePoint = np.dot(C,fSamplePoint)
+	C_fSamplePoint = np.dot(C,fSamplePoint)
 	#print ("C_fSamplePoint", C_fSamplePoint)
 
 	C_jacInterval = multiplyRegularMatWithIntervalMat(C,jacInterval)
@@ -187,8 +184,10 @@ def krawczykHelp(startBounds, jacInterval, samplePoint, fSamplePoint, jacSampleP
 	#print ("lastTerm", lastTerm)
 	
 	kInterval = np.zeros((numV,2))
+	kInterval[:,0] = samplePoint - C_fSamplePoint + lastTerm[:,0]
+	kInterval[:,1] = samplePoint - C_fSamplePoint + lastTerm[:,1]
 	for i in range(numV):
-		kInterval[i,:] = interval_round(interval_add(interval_round(interval_sub(samplePoint[i], C_fSamplePoint[i])), lastTerm[i]))
+		kInterval[i,:] = interval_round(kInterval[i,:])
 
 	#print ("startBounds", startBounds)
 	#print ("kInterval", kInterval)

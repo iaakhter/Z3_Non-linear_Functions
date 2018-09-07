@@ -1,3 +1,7 @@
+# @author Itrat Ahmed Akhter
+# Find dc equilibrium points for circuits involving long channel Mosfet models
+# using dReal
+
 from dreal.symbolic import Variable, logical_and, logical_or, tanh
 from dreal.symbolic import logical_not
 from dreal.symbolic import forall
@@ -6,6 +10,7 @@ import time
 import numpy as np
 
 
+# Constraints for nfet with leakage current
 def nFetLeak(Vtn, Vdd, Kn, Sn, src, gate, drain, tI):
 	constraints = []
 	gds = 1e-8
@@ -31,6 +36,7 @@ def nFetLeak(Vtn, Vdd, Kn, Sn, src, gate, drain, tI):
 	
 	return constraints
 
+# Constraints for nfet without leakage current
 def nFet(Vtn, Vdd, Kn, Sn, src, gate, drain, tI):
 	constraints = []
 	if type(src) == Variable or type(gate) == Variable:
@@ -55,6 +61,7 @@ def nFet(Vtn, Vdd, Kn, Sn, src, gate, drain, tI):
 	
 	return constraints
 
+# Constraints for pfet with leakage current
 def pFetLeak(Vtp, Vdd, Kp, Sp, src, gate, drain, tI):
 	constraints = []
 	gds = 1e-8
@@ -80,6 +87,7 @@ def pFetLeak(Vtp, Vdd, Kp, Sp, src, gate, drain, tI):
 	
 	return constraints
 
+# Constraints for pfet without leakage current
 def pFet(Vtp, Vdd, Kp, Sp, src, gate, drain, tI):
 	constraints = []
 	if type(src) == Variable or type(gate) == Variable:
@@ -104,7 +112,91 @@ def pFet(Vtp, Vdd, Kp, Sp, src, gate, drain, tI):
 	
 	return constraints
 
-def schmittTrigger(inputVoltage, Vtp, Vtn, Vdd, Kn, Kp, Sn, numSolutions = "all"):
+# Try and find dc equilibrium points for rambus oscillator with long channel mosfet model
+# numStages indicates the number of stages in the rambus oscillator
+# numSolutions indicates the number of solutions we want dReal to find
+# g_cc is the strength of the cross coupled inverter as compared to that of forward (g_fwd = 1.0)
+# Vtp, Vtn, Vdd, Kn, Kp, Sn are parameters for the long channel model
+def rambusOscillatorLcMosfet(numStages, numSolutions = "all", g_cc = 0.5, Vtp = -0.4, Vtn = 0.4, Vdd = 1.8, Kn = 270*1e-6, Kp = -90*1e-6, Sn = 3.0):
+	epsilon = 1e-14
+	start = time.time()
+	#print ("Vtp", Vtp, "Vtn", Vtn, "Vdd", Vdd, "Kn", Kn, "Kp", Kp, "Sn", Sn)
+	g_fwd = 1.0
+	lenV = numStages*2
+	Sp = 2*Sn
+
+	vs = []
+	ifwdNs = []
+	ifwdPs = []
+	iccNs = []
+	iccPs = []
+	for i in range(lenV):
+		vs.append(Variable("v" + str(i)))
+		ifwdNs.append(Variable("ifwdN" + str(i)))
+		ifwdPs.append(Variable("ifwdP" + str(i)))
+		iccNs.append(Variable("iccN" + str(i)))
+		iccPs.append(Variable("iccP" + str(i)))
+
+	allSolutions = []
+	while True:
+		if numSolutions != "all" and len(allSolutions) == numSolutions:
+			break
+		allConstraints = []	
+		for i in range(lenV):
+			allConstraints.append(vs[i] >= 0.0)
+			allConstraints.append(vs[i] <= Vdd)
+			allConstraints.append(g_fwd*(-ifwdNs[i]-ifwdPs[i]) + g_cc*(-iccNs[i]-iccPs[i]) == 0)
+			fwdInd = (i-1)%lenV
+			ccInd = (i+lenV//2)%lenV
+			fwdConstraints = nFet(Vtn, Vdd, Kn, Sn, 0.0, vs[fwdInd], vs[i], ifwdNs[i])
+			fwdConstraints += pFet(Vtp, Vdd, Kp, Sp, Vdd, vs[fwdInd], vs[i], ifwdPs[i])
+			ccConstraints = nFet(Vtn, Vdd, Kn, Sn, 0.0, vs[ccInd], vs[i], iccNs[i])
+			ccConstraints += pFet(Vtp, Vdd, Kp, Sp, Vdd, vs[ccInd], vs[i], iccPs[i])
+			allConstraints += fwdConstraints + ccConstraints
+		
+		# Store constraints pruning search space so that
+		# old hyperrectangles are not considered
+		excludingConstraints = []
+		for solution in allSolutions:
+			singleExcludingConstraints = []
+			for i in range(lenV):
+				singleExcludingConstraints.append(vs[i] <= solution[i][0])
+				singleExcludingConstraints.append(vs[i] >= solution[i][1])
+			excludingConstraints.append(singleExcludingConstraints)
+		
+		#print ("allConstraints")
+		#print (allConstraints)
+		f_sat = logical_and(*allConstraints)
+		if len(excludingConstraints) > 0:
+			for constraints in excludingConstraints:
+				f_sat = logical_and(f_sat, logical_or(*constraints))
+		
+		#print ("f_sat")
+		#print (f_sat)
+		result = CheckSatisfiability(f_sat, epsilon)
+		print (result)
+		if result is None:
+			break
+		hyper = np.zeros((lenV,2))
+		for i in range(lenV):
+			hyper[i,:] = [result[vs[i]].lb() - 1000*epsilon, result[vs[i]].ub() + 1000*epsilon]
+
+		print ("hyper", hyper)
+		allSolutions.append(hyper)
+
+		print ("num solutions found", len(allSolutions))
+
+
+	end = time.time()
+	print ("time taken", end - start)
+	return allSolutions
+
+
+# Try and find dc equilibrium points for schmitt trigger with long channel mosfet model
+# for a specific input voltage
+# Vtp, Vtn, Vdd, Kn, Kp, Sn are parameters for the long channel model
+# numSolutions indicates the number of solutions we want dReal to find
+def schmittTriggerLcMosfet(inputVoltage, Vtp = -0.4, Vtn = 0.4, Vdd = 1.8, Kn = 270*1e-6, Kp = -90*1e-6, Sn = 3.0, numSolutions = "all"):
 	epsilon = 1e-14
 	start = time.time()
 	print ("Vtp", Vtp, "Vtn", Vtn, "Vdd", Vdd, "Kn", Kn, "Kp", Kp, "Sn", Sn)
@@ -143,6 +235,8 @@ def schmittTrigger(inputVoltage, Vtp, Vtn, Vdd, Kn, Kp, Sn, numSolutions = "all"
 		for i in range(lenV):
 			allConstraints.append(nIs[i] == 0.0)
 		
+		# Store constraints pruning search space so that
+		# old hyperrectangles are not considered
 		excludingConstraints = []
 		for solution in allSolutions:
 			singleExcludingConstraints = []
@@ -154,6 +248,7 @@ def schmittTrigger(inputVoltage, Vtp, Vtn, Vdd, Kn, Kp, Sn, numSolutions = "all"
 		#print ("allConstraints")
 		#print (allConstraints)
 		#print ("numConstraints", len(allConstraints))
+
 		f_sat = logical_and(*allConstraints)
 		if len(excludingConstraints) > 0:
 			for constraints in excludingConstraints:
@@ -167,32 +262,76 @@ def schmittTrigger(inputVoltage, Vtp, Vtn, Vdd, Kn, Kp, Sn, numSolutions = "all"
 			break
 		hyper = np.zeros((lenV,2))
 		for i in range(lenV):
-			hyper[i,:] = [result[vs[i]].lb() - 1000*epsilon, result[vs[i]].ub() + 1000*epsilon]
+			hyper[i,:] = [result[vs[i]].lb() - 100*epsilon, result[vs[i]].ub() + 100*epsilon]
 
 		print ("hyper", hyper)
 		allSolutions.append(hyper)
 
 		print ("num solutions found", len(allSolutions))
-		'''if len(allSolutions) == 1:
-			break'''
 
-	# categorize solutions found
-	'''sampleSols, rotatedSols, stableSols, unstableSols = rUtils.categorizeSolutions(allSolutions,model)
-	
-	for solution in allSolutions:
-		print (solution)
 
-	for hi in range(len(sampleSols)):
-		print ("equivalence class# ", hi)
-		print ("main member ", sampleSols[hi])
-		print ("number of other members ", len(rotatedSols[hi]))
-		print ("other member rotationIndices: ")
-		for mi in range(len(rotatedSols[hi])):
-			print (rotatedSols[hi][mi])
-		print ("")'''
 	end = time.time()
 	print ("time taken", end - start)
 	return allSolutions
 
-if __name__ == "__main__":
-	schmittTrigger(inputVoltage = 0.0, Vtp = -0.4, Vtn = 0.4, Vdd = 1.8, Kn = 270*1e-6, Kp = -90*1e-6, Sn = 3.0, numSolutions = "all")
+
+# Try and find dc equilibrium points for inverter with long channel mosfet model
+# for a specific input voltage
+# Vtp, Vtn, Vdd, Kn, Kp, Sn are parameters for the long channel model
+# numSolutions indicates the number of solutions we want dReal to find
+def inverterLcMosfet(inputVoltage, Vtp = -0.4, Vtn = 0.4, Vdd = 1.8, Kn = 270*1e-6, Kp = -90*1e-6, Sn = 3.0, numSolutions = "all"):
+	epsilon = 1e-14
+	start = time.time()
+	Sp = Sn*3.0
+
+	outputVolt = Variable("outputVolt")
+	iP = Variable("iP")
+	iN = Variable("iN")
+	
+
+	allSolutions = []
+	while True:
+		if numSolutions != "all" and len(allSolutions) == numSolutions:
+			break
+		allConstraints = []	
+		allConstraints.append(outputVolt >= 0.0)
+		allConstraints.append(outputVolt <= Vdd)
+		allConstraints.append(-iP-iN == 0)
+		allConstraints += nFet(Vtn, Vdd, Kn, Sn, 0.0, inputVoltage, outputVolt, iN)
+		allConstraints += pFet(Vtp, Vdd, Kp, Sp, Vdd, inputVoltage, outputVolt, iP)
+		
+		# Store constraints pruning search space so that
+		# old hyperrectangles are not considered
+		excludingConstraints = []
+		for solution in allSolutions:
+			singleExcludingConstraints = []
+			singleExcludingConstraints.append(outputVolt <= solution[0][0])
+			singleExcludingConstraints.append(outputVolt >= solution[0][1])
+			excludingConstraints.append(singleExcludingConstraints)
+		
+		#print ("allConstraints")
+		#print (allConstraints)
+		f_sat = logical_and(*allConstraints)
+		if len(excludingConstraints) > 0:
+			for constraints in excludingConstraints:
+				f_sat = logical_and(f_sat, logical_or(*constraints))
+		
+		#print ("f_sat")
+		#print (f_sat)
+		result = CheckSatisfiability(f_sat, epsilon)
+		#print (result)
+		if result is None:
+			break
+		hyper = np.zeros((1,2))
+		hyper[0,:] = [result[outputVolt].lb() - 2*epsilon, result[outputVolt].ub() + 2*epsilon]
+
+		print ("hyper", hyper)
+		allSolutions.append(hyper)
+
+		print ("num solutions found", len(allSolutions))
+
+	
+	end = time.time()
+	print ("time taken", end - start)
+	return allSolutions
+

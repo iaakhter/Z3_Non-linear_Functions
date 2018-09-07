@@ -610,6 +610,14 @@ log
 }
 
 inline Interval
+log1p
+( const Interval &I )
+{
+  if ( I.l() <= -1.0 ) throw Interval::Exceptions( Interval::Exceptions::LOG );
+  return Interval( std::log1p(I.l()), std::log1p(I.u()) );
+}
+
+inline Interval
 xlog
 ( const Interval&I )
 {

@@ -29,11 +29,11 @@ def testFetCurrent(fetType):
 	vss = list(np.linspace(0.0, 1.5, 10));
 	Vb = stChannel_py.MyList();
 	if fetType == "n":
-		fetFunc = stMosfet.mvs_idn
+		fetFunc = stMosfet.mvs_idnMon
 		Vb.append(0.0);
 		Vb.append(0.0);
 	else:
-		fetFunc = stMosfet.mvs_idp
+		fetFunc = stMosfet.mvs_idpMon
 		Vb.append(1.8);
 		Vb.append(1.8);
 	for vd in vds:
@@ -48,6 +48,11 @@ def testFetCurrent(fetType):
 				Vg.append(vg + 0.3)
 				Vs.append(vs)
 				Vs.append(vs + 0.3)
+
+				'''print ("CALCULATING INTERVAL FOR ")
+				print ("Vd", Vd[0], Vd[1])
+				print ("Vg", Vg[0], Vg[1])
+				print ("Vs", Vs[0], Vs[1])'''
 
 				idn = fetFunc(Vd, Vg, Vs, Vb)
 				
@@ -85,12 +90,12 @@ def testFetJac(fetType):
 	Vb = stChannel_py.MyList();
 	if fetType == "n":
 		fetFun = stMosfet.mvs_idn
-		fetJac = stMosfet.mvs_idnJac
+		fetJac = stMosfet.mvs_idnGrad
 		Vb.append(0.0);
 		Vb.append(0.0);
 	else:
 		fetFun = stMosfet.mvs_idp
-		fetJac = stMosfet.mvs_idpJac
+		fetJac = stMosfet.mvs_idpGrad
 		Vb.append(1.8);
 		Vb.append(1.8);
 
@@ -151,12 +156,12 @@ def testFetJacInterval(fetType):
 	Vb = stChannel_py.MyList();
 	if fetType == "n":
 		fetFun = stMosfet.mvs_idn
-		fetJac = stMosfet.mvs_idnJac
+		fetJac = stMosfet.mvs_idnGrad
 		Vb.append(0.0);
 		Vb.append(0.0);
 	else:
 		fetFun = stMosfet.mvs_idp
-		fetJac = stMosfet.mvs_idpJac
+		fetJac = stMosfet.mvs_idpGrad
 		Vb.append(1.8);
 		Vb.append(1.8);
 	
@@ -212,40 +217,41 @@ def testFetJacInterval(fetType):
 
 #ids = StMosfet.mvs_idn([0.7, 0.7], [0.6, 0.6], [0.9, 0.9], [0.0, 0.0])
 stMosfet = stChannel_py.StMosfet()
-'''Vd = stChannel_py.MyList()
+Vd = stChannel_py.MyList()
 Vg = stChannel_py.MyList()
 Vs = stChannel_py.MyList()
 Vb = stChannel_py.MyList()
-Vd[:] = [0.7, 0.7]
-Vg.append(0.6)
-Vg.append(0.6)
-Vs.append(0.9)
-Vs.append(0.9)
-Vb.append(0.0)
-Vb.append(0.0)
-idn = stMosfet.mvs_idn(Vd, Vg, Vs, Vb)
-idnJac = stMosfet.mvs_idnJac(Vd, Vg, Vs, Vb)
+Vd[:] = [0.94, 0.94]
+Vg[:] = [0.04, 0.04]
+Vs[:] = [0.86, 0.86]
+Vb[:] = [0.0, 0.0]
+idn = stMosfet.mvs_idnMon(Vd, Vg, Vs, Vb)
+print ("idn", idn[0], idn[1])
+'''idnJac = stMosfet.mvs_idnJac(Vd, Vg, Vs, Vb)
 print ("idn", idn[0], idn[1])
 print ("jac der0", idnJac[0][0], idnJac[0][1],
 	"der1", idnJac[1][0], idnJac[1][1],
 	"der2", idnJac[2][0], idnJac[2][1],
 	"der3", idnJac[3][0], idnJac[3][1])
 
+Vd[:] = [1.799993521250602, 1.799993521250602]
+Vg[:] = [0.0, 0.0]
+Vs[:] = [1.8, 1.8] 
 Vbp = stChannel_py.MyList()
 Vbp.append(1.8)
 Vbp.append(1.8)
-idp = stMosfet.mvs_idp(Vd, Vg, Vs, Vbp)
-idpJac = stMosfet.mvs_idpJac(Vd, Vg, Vs, Vbp)
+idp = stMosfet.mvs_idp(Vd, Vg, Vs, Vbp, 0.0)
+idpJac = stMosfet.mvs_idpJac(Vd, Vg, Vs, Vbp, 0.0)
 print ("idp", idp[0], idp[1])
 print ("jac der0", idpJac[0][0], idpJac[0][1],
 	"der1", idpJac[1][0], idpJac[1][1],
 	"der2", idpJac[2][0], idpJac[2][1],
 	"der3", idpJac[3][0], idpJac[3][1])'''
 
-print ("testing nfet")
-testFetCurrent('n')
-print ("testing pfet")
-testFetCurrent('p')
+#print ("testing nfet")
+#testFetCurrent('n')
+#print ("testing pfet")
+#testFetCurrent('p')
 print ("testing nfetJac")
 testFetJac('n')
 print ("testing pfetJac")

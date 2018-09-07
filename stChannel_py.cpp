@@ -216,7 +216,7 @@ F<I> mvs_id(const std::map<std::string, double>& params,
     F<I> eta0 = ( Vgsi - ( Vt0bs0 - Vdsi * delta - FF * aphit ))/ ( nphit );  // Compute eta0 factor from uncorrected intrinsic Vgs and internal Vds.
                                                                          // Using FF instead of FF0 in eta0 gives smoother capacitances.
     //Charge at VS in saturation (Qinv)
-    F<I> Qinv_corr = Qref*log(1.0 + exp(eta));
+    F<I> Qinv_corr = Qref*log1p(exp(eta));
  
     //Transport equations
     double vx0 = vxo;

@@ -571,6 +571,16 @@ INLINE2 FTypeName<T> fabs (const FTypeName<T>& a)
 	return c;
 }
 
+template <class T>
+INLINE2 FTypeName<T> log1p (const FTypeName<T>& a)
+{
+	FTypeName<T> c(log1p(a.v));
+	T tmp(1.0/(a.v + 1.0));
+	c.touchg(a.gsize);
+	for (int i=0;i<a.gsize;i++) c.g[i]=a.g[i]*tmp;
+	return c;
+}
+
 /* --------------------------------------------------------------------- */
 /*                                                                       */
 /*                    COMPOUND ASSIGNMENT OPERATORS                      */

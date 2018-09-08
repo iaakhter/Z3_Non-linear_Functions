@@ -262,7 +262,7 @@ def schmittTriggerLcMosfet(inputVoltage, Vtp = -0.4, Vtn = 0.4, Vdd = 1.8, Kn = 
 			break
 		hyper = np.zeros((lenV,2))
 		for i in range(lenV):
-			hyper[i,:] = [result[vs[i]].lb() - 100*epsilon, result[vs[i]].ub() + 100*epsilon]
+			hyper[i,:] = [result[vs[i]].lb() - 1000*epsilon, result[vs[i]].ub() + 1000*epsilon]
 
 		print ("hyper", hyper)
 		allSolutions.append(hyper)

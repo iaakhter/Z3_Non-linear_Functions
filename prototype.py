@@ -11,7 +11,6 @@ import dcUtils
 import random
 import math
 import circuit
-import itertools
 
 
 # A mechanism to bisect a hyperrectangle
@@ -632,10 +631,11 @@ def singleVariableInequalities(problemType, statVars, useLp=False):
 if __name__ == "__main__":
 	statVars = {}
 	start = time.time()
-	#allHypers = schmittTrigger(modelType="lcMosfet", inputVoltage = 0.5, statVars=statVars, numSolutions = "all", useLp = False)
-	#allHypers = inverter(modelType="lcMosfet", inputVoltage=0.1, statVars=statVars, numSolutions="all" , useLp=False)
-	allHypers = rambusOscillator(modelType="tanh", numStages=2, g_cc=0.5, statVars=statVars, numSolutions="all", useLp=False)
-	#allHypers = singleVariableInequalities(problemType="flyspeck172", statVars=statVars, useLp=False)
-	print ("numSolutions", len(allHypers))
+	#allHypers = schmittTrigger(modelType="lcMosfet", inputVoltage = 0.5, statVars=statVars, numSolutions = "all")
+	#allHypers = inverter(modelType="lcMosfet", inputVoltage=1.8, statVars=statVars, numSolutions="all")
+	#allHypers = rambusOscillator(modelType="tanh", numStages=2, g_cc=0.5, statVars=statVars, numSolutions="all")
+	#allHypers = singleVariableInequalities(problemType="flyspeck172", statVars=statVars)
 	end = time.time()
+	print ("allHypers", allHypers)
+	print ("numSolutions", len(allHypers))
 	print ("time taken", end - start)

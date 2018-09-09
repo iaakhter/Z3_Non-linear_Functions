@@ -242,18 +242,19 @@ def inverterScMosfet(inputVoltage, numSolutions = "all"):
 	outputVolt = Variable("outputVolt")
 	iP = Variable("iP")
 	iN = Variable("iN")
+
+	allConstraints = []	
+	allConstraints.append(outputVolt >= 0.0)
+	allConstraints.append(outputVolt <= Vdd)
+	allConstraints.append(-iP-iN == 0)
+	allConstraints += mvs_id("n", 0.0, inputVoltage, outputVolt, iN, sn)
+	allConstraints += mvs_id("p", Vdd, inputVoltage, outputVolt, iP, sp)
 	
 
 	allSolutions = []
 	while True:
 		if numSolutions != "all" and len(allSolutions) == numSolutions:
 			break
-		allConstraints = []	
-		allConstraints.append(outputVolt >= 0.0)
-		allConstraints.append(outputVolt <= Vdd)
-		allConstraints.append(-iP-iN == 0)
-		allConstraints += mvs_id("n", 0.0, inputVoltage, outputVolt, iN, sn)
-		allConstraints += mvs_id("p", Vdd, inputVoltage, outputVolt, iP, sp)
 		
 		# Store constraints pruning search space so that
 		# old hyperrectangles are not considered
@@ -316,22 +317,23 @@ def rambusOscillatorScMosfet(numStages, g_cc = 0.5, numSolutions = "all"):
 		iccNs.append(Variable("iccN" + str(i)))
 		iccPs.append(Variable("iccP" + str(i)))
 
+	allConstraints = []	
+	for i in range(lenV):
+		allConstraints.append(vs[i] >= 0.0)
+		allConstraints.append(vs[i] <= Vdd)
+		allConstraints.append(g_fwd*(-ifwdNs[i]-ifwdPs[i]) + g_cc*(-iccNs[i]-iccPs[i]) == 0)
+		fwdInd = (i-1)%lenV
+		ccInd = (i+lenV//2)%lenV
+		fwdConstraints = mvs_id("n", 0.0, vs[fwdInd], vs[i], ifwdNs[i], sn)
+		fwdConstraints += mvs_id("p", Vdd, vs[fwdInd], vs[i], ifwdPs[i], sp)
+		ccConstraints = mvs_id("n", 0.0, vs[ccInd], vs[i], iccNs[i], sn)
+		ccConstraints += mvs_id("p", Vdd, vs[ccInd], vs[i], iccPs[i], sp)
+		allConstraints += fwdConstraints + ccConstraints
+
 	allSolutions = []
 	while True:
 		if numSolutions != "all" and len(allSolutions) == numSolutions:
 			break
-		allConstraints = []	
-		for i in range(lenV):
-			allConstraints.append(vs[i] >= 0.0)
-			allConstraints.append(vs[i] <= Vdd)
-			allConstraints.append(g_fwd*(-ifwdNs[i]-ifwdPs[i]) + g_cc*(-iccNs[i]-iccPs[i]) == 0)
-			fwdInd = (i-1)%lenV
-			ccInd = (i+lenV//2)%lenV
-			fwdConstraints = mvs_id("n", 0.0, vs[fwdInd], vs[i], ifwdNs[i], sn)
-			fwdConstraints += mvs_id("p", Vdd, vs[fwdInd], vs[i], ifwdPs[i], sp)
-			ccConstraints = mvs_id("n", 0.0, vs[ccInd], vs[i], iccNs[i], sn)
-			ccConstraints += mvs_id("p", Vdd, vs[ccInd], vs[i], iccPs[i], sp)
-			allConstraints += fwdConstraints + ccConstraints
 		
 		# Store constraints pruning search space so that
 		# old hyperrectangles are not considered

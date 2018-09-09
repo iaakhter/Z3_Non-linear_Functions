@@ -29,21 +29,22 @@ def rambusOscillatorTanh(numStages, g_cc = 0.5, numSolutions = "all", a= -5.0):
 		vfwds.append(Variable("vfwd" + str(i)))
 		vccs.append(Variable("vcc" + str(i)))
 
+	allConstraints = []
+		
+	# Store rambus oscillator constraints
+	for i in range(lenV):
+		allConstraints.append(vs[i] >= -1)
+		allConstraints.append(vs[i] <= 1)
+		fwdInd = (i-1)%lenV
+		ccInd = (i+lenV//2)%lenV
+		allConstraints.append(vfwds[i] == tanh(a*vs[fwdInd]))
+		allConstraints.append(vccs[i] == tanh(a*vs[ccInd]))
+		allConstraints.append(g_fwd*vfwds[i] + (-g_fwd-g_cc)*vs[i] + g_cc*vccs[i] == 0)
+
 	allSolutions = []
 	while True:
 		if numSolutions != "all" and len(allSolutions) == numSolutions:
 			break
-		allConstraints = []
-		
-		# Store rambus oscillator constraints
-		for i in range(lenV):
-			allConstraints.append(vs[i] >= -1)
-			allConstraints.append(vs[i] <= 1)
-			fwdInd = (i-1)%lenV
-			ccInd = (i+lenV//2)%lenV
-			allConstraints.append(vfwds[i] == tanh(a*vs[fwdInd]))
-			allConstraints.append(vccs[i] == tanh(a*vs[ccInd]))
-			allConstraints.append(g_fwd*vfwds[i] + (-g_fwd-g_cc)*vs[i] + g_cc*vccs[i] == 0)
 
 		# Store constraints pruning search space so that
 		# old hyperrectangles are not considered

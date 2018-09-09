@@ -33,22 +33,23 @@ def rambusOscillatorTanh(numStages, g_cc = 0.5, numSolutions = "all", a = -5.0):
 	vfwds = RealVector("vfwd", lenV)
 	vccs = RealVector("vcc", lenV)
 
+	allConstraints = []
+		
+	# Store rambus oscillator constraints
+	for i in range(lenV):
+		allConstraints.append(vs[i] >= -1)
+		allConstraints.append(vs[i] <= 1)
+		fwdInd = (i-1)%lenV
+		ccInd = (i+lenV//2)%lenV
+		allConstraints += tanhCurrent(a, vs[fwdInd], vfwds[i])
+		allConstraints += tanhCurrent(a, vs[ccInd], vccs[i])
+		allConstraints.append(g_fwd*vfwds[i] + (-g_fwd-g_cc)*vs[i] + g_cc*vccs[i] == 0)
+
 	s = Solver()
 	allSolutions = []
 	while True:
 		if numSolutions != "all" and len(allSolutions) == numSolutions:
 			break
-		allConstraints = []
-		
-		# Store rambus oscillator constraints
-		for i in range(lenV):
-			allConstraints.append(vs[i] >= -1)
-			allConstraints.append(vs[i] <= 1)
-			fwdInd = (i-1)%lenV
-			ccInd = (i+lenV//2)%lenV
-			allConstraints += tanhCurrent(a, vs[fwdInd], vfwds[i])
-			allConstraints += tanhCurrent(a, vs[ccInd], vccs[i])
-			allConstraints.append(g_fwd*vfwds[i] + (-g_fwd-g_cc)*vs[i] + g_cc*vccs[i] == 0)
 
 		# Store constraints pruning search space so that
 		# old solutions are not considered

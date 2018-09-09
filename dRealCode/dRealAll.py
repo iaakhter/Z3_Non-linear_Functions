@@ -14,7 +14,7 @@ from dRealTanh import *
 #allSolutions = rambusOscillatorScMosfet(numStages = 2, g_cc = 0.5)
 
 # Schmitt trigger with long channel mosfet model
-allSolutions = schmittTriggerLcMosfet(inputVoltage = 1.8)
+#allSolutions = schmittTriggerLcMosfet(inputVoltage = 0.9)
 # Schmitt trigger with short channel mosfet model
 #allSolutions = schmittTriggerScMosfet(inputVoltage = 0.0)
 

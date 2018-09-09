@@ -137,22 +137,23 @@ def rambusOscillatorLcMosfet(numStages, numSolutions = "all", g_cc = 0.5, Vtp = 
 		iccNs.append(Variable("iccN" + str(i)))
 		iccPs.append(Variable("iccP" + str(i)))
 
+	allConstraints = []	
+	for i in range(lenV):
+		allConstraints.append(vs[i] >= 0.0)
+		allConstraints.append(vs[i] <= Vdd)
+		allConstraints.append(g_fwd*(-ifwdNs[i]-ifwdPs[i]) + g_cc*(-iccNs[i]-iccPs[i]) == 0)
+		fwdInd = (i-1)%lenV
+		ccInd = (i+lenV//2)%lenV
+		fwdConstraints = nFet(Vtn, Vdd, Kn, Sn, 0.0, vs[fwdInd], vs[i], ifwdNs[i])
+		fwdConstraints += pFet(Vtp, Vdd, Kp, Sp, Vdd, vs[fwdInd], vs[i], ifwdPs[i])
+		ccConstraints = nFet(Vtn, Vdd, Kn, Sn, 0.0, vs[ccInd], vs[i], iccNs[i])
+		ccConstraints += pFet(Vtp, Vdd, Kp, Sp, Vdd, vs[ccInd], vs[i], iccPs[i])
+		allConstraints += fwdConstraints + ccConstraints
+
 	allSolutions = []
 	while True:
 		if numSolutions != "all" and len(allSolutions) == numSolutions:
 			break
-		allConstraints = []	
-		for i in range(lenV):
-			allConstraints.append(vs[i] >= 0.0)
-			allConstraints.append(vs[i] <= Vdd)
-			allConstraints.append(g_fwd*(-ifwdNs[i]-ifwdPs[i]) + g_cc*(-iccNs[i]-iccPs[i]) == 0)
-			fwdInd = (i-1)%lenV
-			ccInd = (i+lenV//2)%lenV
-			fwdConstraints = nFet(Vtn, Vdd, Kn, Sn, 0.0, vs[fwdInd], vs[i], ifwdNs[i])
-			fwdConstraints += pFet(Vtp, Vdd, Kp, Sp, Vdd, vs[fwdInd], vs[i], ifwdPs[i])
-			ccConstraints = nFet(Vtn, Vdd, Kn, Sn, 0.0, vs[ccInd], vs[i], iccNs[i])
-			ccConstraints += pFet(Vtp, Vdd, Kp, Sp, Vdd, vs[ccInd], vs[i], iccPs[i])
-			allConstraints += fwdConstraints + ccConstraints
 		
 		# Store constraints pruning search space so that
 		# old hyperrectangles are not considered
@@ -215,25 +216,26 @@ def schmittTriggerLcMosfet(inputVoltage, Vtp = -0.4, Vtn = 0.4, Vdd = 1.8, Kn = 
 	for i in range(lenV*2):
 		tIs.append(Variable("tI" + str(i)))
 
+	allConstraints = []	
+	for i in range(lenV):
+		allConstraints.append(vs[i] >= 0.0)
+		allConstraints.append(vs[i] <= 1.8)
+	allConstraints += nFetLeak(Vtn, Vdd, Kn, Sn, 0.0, inputVoltage, vs[1], tIs[0])
+	allConstraints += nFetLeak(Vtn, Vdd, Kn, Sn, vs[1], inputVoltage, vs[0], tIs[1])
+	allConstraints += nFetLeak(Vtn, Vdd, Kn, Sn, vs[1], vs[0], Vdd, tIs[2])
+	allConstraints += pFetLeak(Vtp, Vdd, Kp, Sp, Vdd, inputVoltage, vs[2], tIs[3])
+	allConstraints += pFetLeak(Vtp, Vdd, Kp, Sp, vs[2], inputVoltage, vs[0], tIs[4])
+	allConstraints += pFetLeak(Vtp, Vdd, Kp, Sp, vs[2], vs[0], 0.0, tIs[5])
+	allConstraints.append(nIs[0] == -tIs[4] - tIs[1])
+	allConstraints.append(nIs[1] == -tIs[0] + tIs[1] + tIs[2])
+	allConstraints.append(nIs[2] == -tIs[3] + tIs[5] + tIs[4])
+	for i in range(lenV):
+		allConstraints.append(nIs[i] == 0.0)
+
 	allSolutions = []
 	while True:
 		if numSolutions != "all" and len(allSolutions) == numSolutions:
 			break
-		allConstraints = []	
-		for i in range(lenV):
-			allConstraints.append(vs[i] >= 0.0)
-			allConstraints.append(vs[i] <= 1.8)
-		allConstraints += nFetLeak(Vtn, Vdd, Kn, Sn, 0.0, inputVoltage, vs[1], tIs[0])
-		allConstraints += nFetLeak(Vtn, Vdd, Kn, Sn, vs[1], inputVoltage, vs[0], tIs[1])
-		allConstraints += nFetLeak(Vtn, Vdd, Kn, Sn, vs[1], vs[0], Vdd, tIs[2])
-		allConstraints += pFetLeak(Vtp, Vdd, Kp, Sp, Vdd, inputVoltage, vs[2], tIs[3])
-		allConstraints += pFetLeak(Vtp, Vdd, Kp, Sp, vs[2], inputVoltage, vs[0], tIs[4])
-		allConstraints += pFetLeak(Vtp, Vdd, Kp, Sp, vs[2], vs[0], 0.0, tIs[5])
-		allConstraints.append(nIs[0] == -tIs[4] - tIs[1])
-		allConstraints.append(nIs[1] == -tIs[0] + tIs[1] + tIs[2])
-		allConstraints.append(nIs[2] == -tIs[3] + tIs[5] + tIs[4])
-		for i in range(lenV):
-			allConstraints.append(nIs[i] == 0.0)
 		
 		# Store constraints pruning search space so that
 		# old hyperrectangles are not considered
@@ -288,17 +290,17 @@ def inverterLcMosfet(inputVoltage, Vtp = -0.4, Vtn = 0.4, Vdd = 1.8, Kn = 270*1e
 	iP = Variable("iP")
 	iN = Variable("iN")
 	
+	allConstraints = []	
+	allConstraints.append(outputVolt >= 0.0)
+	allConstraints.append(outputVolt <= Vdd)
+	allConstraints.append(-iP-iN == 0)
+	allConstraints += nFet(Vtn, Vdd, Kn, Sn, 0.0, inputVoltage, outputVolt, iN)
+	allConstraints += pFet(Vtp, Vdd, Kp, Sp, Vdd, inputVoltage, outputVolt, iP)
 
 	allSolutions = []
 	while True:
 		if numSolutions != "all" and len(allSolutions) == numSolutions:
 			break
-		allConstraints = []	
-		allConstraints.append(outputVolt >= 0.0)
-		allConstraints.append(outputVolt <= Vdd)
-		allConstraints.append(-iP-iN == 0)
-		allConstraints += nFet(Vtn, Vdd, Kn, Sn, 0.0, inputVoltage, outputVolt, iN)
-		allConstraints += pFet(Vtp, Vdd, Kp, Sp, Vdd, inputVoltage, outputVolt, iP)
 		
 		# Store constraints pruning search space so that
 		# old hyperrectangles are not considered

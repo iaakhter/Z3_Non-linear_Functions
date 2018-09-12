@@ -30,7 +30,7 @@ class MosfetModel:
 
 
 # Short channel model
-class StMosfet:
+class ScMosfet:
 	# s, g, d: Indices indicating source, gate and drain
 	# model: MosfetModel
 	# shape: shape
@@ -210,7 +210,7 @@ class StMosfet:
 # s, g, d: Indices indicating source, gate and drain
 # model: MosfetModel
 # shape: shape
-class Mosfet:
+class LcMosfet:
 	def __init__(self, s, g, d, model, shape=3.0):
 		self.s = s
 		self.g = g

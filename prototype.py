@@ -2,9 +2,9 @@ import numpy as np
 import time
 import intervalUtils
 from intervalBasics import *
-from circuitModels import RambusTanh, RambusLcMosfet, RambusScMosfet
-from circuitModels import SchmittLcMosfet, SchmittScMosfet
-from circuitModels import InverterScMosfet, InverterLcMosfet
+from circuitModels import RambusTanh, RambusMosfet
+from circuitModels import SchmittMosfet
+from circuitModels import InverterMosfet
 import flyspeckProblems
 import metiProblems
 import dcUtils
@@ -45,6 +45,11 @@ def bisectMax(hyper, options=None):
 #	is done by solverLoop. If this argument is None then the hyperrectangle defined
 #	by the bounds of the model is used
 def solverLoop(uniqueHypers, model, statVars, volRedThreshold, bisectFun, numSolutions, kAlpha, hyperRectangle = None):
+	if statVars is None:
+		statVars = {}
+		statVars.update({'numBisection':0, 'numLp':0, 'numK':0, 'numSingleKill':0, 'numDoubleKill':0,
+					'totalKTime':0, 'totalLPTime':0, 'avgKTime':0, 'avgLPTime':0, 'stringHyperList':[],
+					'numLpCalls':0, 'numSuccessLpCalls':0, 'numUnsuccessLpCalls':0})
 	lenV = len(model.bounds)
 	
 	if hyperRectangle is None:
@@ -175,7 +180,12 @@ def solverLoop(uniqueHypers, model, statVars, volRedThreshold, bisectFun, numSol
 # @param hyperRectangle the initial hyperrectangle over which the search for solutions
 #	is done by solverLoop. If this argument is None then the hyperrectangle defined
 #	by the bounds of the model is used
-def solverLoopNoLp(uniqueHypers, model, statVars, bisectFun, numSolutions, kAlpha, hyperRectangle = None):
+def solverLoopNoLp(uniqueHypers, model, statVars=None, bisectFun=bisectMax, numSolutions="all", kAlpha=1.0, hyperRectangle = None):
+	if statVars is None:
+		statVars = {}
+		statVars.update({'numBisection':0, 'numLp':0, 'numK':0, 'numSingleKill':0, 'numDoubleKill':0,
+					'totalKTime':0, 'totalLPTime':0, 'avgKTime':0, 'avgLPTime':0, 'stringHyperList':[],
+					'numLpCalls':0, 'numSuccessLpCalls':0, 'numUnsuccessLpCalls':0})
 	lenV = len(model.bounds)
 	
 	if hyperRectangle is None:
@@ -361,16 +371,15 @@ def schmittTrigger(modelType, inputVoltage, statVars, numSolutions = "all", useL
 	statVars.update({'numBisection':0, 'numLp':0, 'numK':0, 'numSingleKill':0, 'numDoubleKill':0,
 					'totalKTime':0, 'totalLPTime':0, 'avgKTime':0, 'avgLPTime':0, 'stringHyperList':[],
 					'numLpCalls':0, 'numSuccessLpCalls':0, 'numUnsuccessLpCalls':0})
-	stringHyperList = []
 
 	#load the schmitt trigger model
 	if modelType == "lcMosfet":
 		#modelParam = [Vtp, Vtn, Vdd, Kn, Kp, Sn]
 		modelParam = [-0.4, 0.4, 1.8, 270*1e-6, -90*1e-6, 8/3.0]
-		model = SchmittLcMosfet(modelParam = modelParam, inputVoltage = inputVoltage)
+		model = SchmittMosfet(modelType = modelType, modelParam = modelParam, inputVoltage = inputVoltage)
 	elif modelType == "scMosfet":
 		modelParam = [1.0] #Vdd
-		model = SchmittScMosfet(modelParam = modelParam, inputVoltage = inputVoltage)
+		model = SchmittMosfet(modelType = modelType, modelParam = modelParam, inputVoltage = inputVoltage)
 
 	startExp = time.time()
 
@@ -425,10 +434,10 @@ def inverter(modelType, inputVoltage, statVars, numSolutions="all" , useLp=False
 	if modelType == "lcMosfet":
 		#modelParam = [Vtp, Vtn, Vdd, Kn, Kp, Sn]
 		modelParam = [-0.4, 0.4, 1.8, 270*1e-6, -90*1e-6, 8/3.0]
-		model = InverterLcMosfet(modelParam = modelParam, inputVoltage = inputVoltage)
+		model = InverterMosfet(modelType = modelType, modelParam = modelParam, inputVoltage = inputVoltage)
 	if modelType == "scMosfet":
 		modelParam = [1.0] #Vdd
-		model = InverterScMosfet(modelParam = modelParam, inputVoltage = inputVoltage)
+		model = InverterMosfet(modelType = modelType, modelParam = modelParam, inputVoltage = inputVoltage)
 
 	startExp = time.time()
 	
@@ -459,6 +468,14 @@ def inverter(modelType, inputVoltage, statVars, numSolutions="all" , useLp=False
 	#print ("numLpCalls", statVars['numLpCalls'], "numSuccessLpCalls", statVars['numSuccessLpCalls'], "numUnsuccessLpCalls", statVars['numUnsuccessLpCalls'])
 	return allHypers
 
+def ownCircuit():
+	modelParam = [-0.4, 0.4, 1.8, 270*1e-6, -90*1e-6, 8/3.0]
+	model = RambusLcMosfet(modelParam = modelParam, g_cc = 0.5, g_fwd = 1.0, numStages = 2)
+	uniqueHypers = []
+	solverLoopNoLp(uniqueHypers, model)	
+	print ("uniqueHypers")
+	print (uniqueHypers)
+
 
 # Find the dc equilibrium points for a rambus ring oscillator
 # @param modelType indicates the type of inverter used in the rambus oscillator
@@ -484,10 +501,10 @@ def rambusOscillator(modelType, numStages, g_cc, statVars, numSolutions="all", u
 		#modelParam = [-0.25, 0.25, 1.0, 1.0, -0.5, 1.0]
 		#modelParam = [-0.4, 0.4, 1.8, 1.5, -0.5, 8/3.0]
 		modelParam = [-0.4, 0.4, 1.8, 270*1e-6, -90*1e-6, 8/3.0]
-		model = RambusLcMosfet(modelParam = modelParam, g_cc = g_cc, g_fwd = 1.0, numStages = numStages)	
+		model = RambusMosfet(modelType = modelType, modelParam = modelParam, g_cc = g_cc, g_fwd = 1.0, numStages = numStages)	
 	elif modelType == "scMosfet":
 		modelParam = [1.0] #Vdd
-		model = RambusScMosfet(modelParam = modelParam, g_cc = g_cc, g_fwd = 1.0, numStages = numStages)
+		model = RambusMosfet(modelType = modelType, modelParam = modelParam, g_cc = g_cc, g_fwd = 1.0, numStages = numStages)
 
 	startExp = time.time()
 	
@@ -631,8 +648,8 @@ def singleVariableInequalities(problemType, statVars, useLp=False):
 if __name__ == "__main__":
 	statVars = {}
 	start = time.time()
-	#allHypers = schmittTrigger(modelType="lcMosfet", inputVoltage = 0.5, statVars=statVars, numSolutions = "all")
-	#allHypers = inverter(modelType="lcMosfet", inputVoltage=1.8, statVars=statVars, numSolutions="all")
+	#allHypers = schmittTrigger(modelType="scMosfet", inputVoltage = 0.5, statVars=statVars, numSolutions = "all")
+	#allHypers = inverter(modelType="scMosfet", inputVoltage=1.0, statVars=statVars, numSolutions="all")
 	#allHypers = rambusOscillator(modelType="tanh", numStages=2, g_cc=0.5, statVars=statVars, numSolutions="all")
 	#allHypers = singleVariableInequalities(problemType="flyspeck172", statVars=statVars)
 	end = time.time()

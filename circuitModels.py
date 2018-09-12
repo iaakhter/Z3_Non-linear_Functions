@@ -17,7 +17,13 @@ import circuit
 import funCompUtils as fcUtils
 from intervalBasics import *
 
-'''Rambus ring oscillator with tanh as the inverter model'''
+'''
+Rambus ring oscillator with tanh as the inverter model
+@param modelParam gain in tanh
+@param g_cc strength of cross coupled inverters
+@param g_fwd strength of forward inverters
+@param numStages number of stages in the rambus oscillator
+'''
 class RambusTanh:
 	def __init__(self, modelParam, g_cc, g_fwd, numStages):
 		self.modelParam = modelParam
@@ -145,24 +151,40 @@ class RambusTanh:
 
 		return [feasible, newHyperRectangle, numTotalLp, numSuccessLp, numUnsuccessLp]
 
-'''Rambus ring oscillator with 2 CMOS transistors having long channel
-	Mosfet models used as an inverter'''
-class RambusLcMosfet:
-	def __init__(self, modelParam, g_cc, g_fwd, numStages):
-		# gradient of tanh -- y = tanh(modelParam*x)
-		self.Vtp = modelParam[0]
-		self.Vtn = modelParam[1]
-		self.Vdd = modelParam[2]
-		self.Kn = modelParam[3]
-		self.Kp = modelParam[4]
+'''
+Rambus ring oscillator with 2 CMOS transistors having
+	Mosfet models used as an inverter
+@param modelType "lcMosfet" if transistors are long channel and
+				"scMosfet" if transistors are short channel
+@param modelParam parameters of model depending on whether modelType
+				is long channel or short channel
+@param g_cc strength of cross coupled inverters
+@param g_fwd strength of forward inverters
+@param numStages number of stages in the rambus oscillator
+'''
+class RambusMosfet:
+	def __init__(self, modelType, modelParam, g_cc, g_fwd, numStages):
 		s0 = 3.0
 		self.g_cc = g_cc
 		self.g_fwd = g_fwd
 		self.numStages = numStages
 		lenV = numStages*2
 
-		nfet = circuit.MosfetModel('nfet', self.Vtn, self.Kn)
-		pfet = circuit.MosfetModel('pfet', self.Vtp, self.Kp)
+		if modelType == "lcMosfet":
+			model = circuit.LcMosfet
+			self.Vtp = modelParam[0]
+			self.Vtn = modelParam[1]
+			self.Vdd = modelParam[2]
+			self.Kn = modelParam[3]
+			self.Kp = modelParam[4]
+			nfet = circuit.MosfetModel('nfet', self.Vtn, self.Kn)
+			pfet = circuit.MosfetModel('pfet', self.Vtp, self.Kp)
+
+		elif modelType == "scMosfet":
+			model = circuit.ScMosfet
+			self.Vdd = modelParam[0]
+			nfet = circuit.MosfetModel('nfet')
+			pfet = circuit.MosfetModel('pfet')
 
 		# for 4 stage oscillator for example
 		# V is like this for Mark's model V = [V0, V1, V2, V3, V4, V5, V6, V7, src, Vdd]
@@ -171,10 +193,10 @@ class RambusLcMosfet:
 		for i in range(lenV):
 			fwdInd = (i-1)%(lenV)
 			ccInd = (i+lenV//2)%(lenV)
-			transistorList.append(circuit.Mosfet(lenV, fwdInd, i, nfet, s0*g_fwd))
-			transistorList.append(circuit.Mosfet(lenV+1, fwdInd, i, pfet, 2.0*s0*g_fwd))
-			transistorList.append(circuit.Mosfet(lenV, ccInd, i, nfet, s0*g_cc))
-			transistorList.append(circuit.Mosfet(lenV+1, ccInd, i, pfet, 2.0*s0*g_cc))
+			transistorList.append(model(lenV, fwdInd, i, nfet, s0*g_fwd))
+			transistorList.append(model(lenV+1, fwdInd, i, pfet, 2.0*s0*g_fwd))
+			transistorList.append(model(lenV, ccInd, i, nfet, s0*g_cc))
+			transistorList.append(model(lenV+1, ccInd, i, pfet, 2.0*s0*g_cc))
 
 		self.c = circuit.Circuit(transistorList)
 
@@ -206,83 +228,42 @@ class RambusLcMosfet:
 		return [feasible, newHyperMat, numTotalLp, numSuccessLp, numUnsuccessLp]
 
 
-'''Rambus ring oscillator with 2 CMOS transistors having short channel
-	Mosfet models used as an inverter'''
-class RambusScMosfet:
-	def __init__(self, modelParam, g_cc, g_fwd, numStages):
-		s0 = 3
-		self.Vdd = modelParam[0]
-		self.g_cc = g_cc
-		self.g_fwd = g_fwd
-		self.numStages = numStages
-		lenV = numStages*2
-
-		nfet = circuit.MosfetModel('nfet')
-		pfet = circuit.MosfetModel('pfet')
-
-		# for 4 stage oscillator for example
-		# V is like this for Mark's model V = [V0, V1, V2, V3, V4, V5, V6, V7, src, Vdd]
-
-		transistorList = []
-		for i in range(lenV):
-			fwdInd = (i-1)%(lenV)
-			ccInd = (i+lenV//2)%(lenV)
-			transistorList.append(circuit.StMosfet(lenV, fwdInd, i, nfet, s0*g_fwd))
-			transistorList.append(circuit.StMosfet(lenV+1, fwdInd, i, pfet, s0*2*g_fwd))
-			transistorList.append(circuit.StMosfet(lenV, ccInd, i, nfet, s0*g_cc))
-			transistorList.append(circuit.StMosfet(lenV+1, ccInd, i, pfet, s0*2*g_cc))
-
-		self.c = circuit.Circuit(transistorList)
-		
-		self.bounds = []
-		for i in range(numStages*2):
-			self.bounds.append([0.0, self.Vdd])
-
-
-	def f(self,V):
-		myV = [x for x in V] + [0.0, self.Vdd]
-		# print 'rambusMosfetMark.f: myV = ' + str(myV)
-		funcVal = self.c.f(myV)
-		# print 'rambusMosfetMark.f: funcVal = ' + str(funcVal)
-		return funcVal[:-2]
-
-	def jacobian(self,V):
-		myV = [x for x in V] + [0.0, self.Vdd]
-		myJac = self.c.jacobian(myV)
-		return np.array(myJac[:-2,:-2])	
-
-	def linearConstraints(self, hyperRectangle):
-		lenV = len(hyperRectangle)
-		cHyper = [x for x in hyperRectangle] + [0.0, self.Vdd]
-		[feasible, newHyper, numTotalLp, numSuccessLp, numUnsuccessLp] = self.c.linearConstraints(cHyper, [lenV, lenV + 1])
-		newHyper = newHyper[:-2]
-		newHyperMat = np.zeros((lenV,2))
-		for i in range(lenV):
-			newHyperMat[i,:] = [newHyper[i][0], newHyper[i][1]]
-		return [feasible, newHyperMat, numTotalLp, numSuccessLp, numUnsuccessLp]
-
 
 '''
-An inverter modeled by 2 CMOS transistors having long channel Mosfet models
+An inverter modeled by 2 CMOS transistors having long channel or 
+short channel Mosfet models
+@param modelType "lcMosfet" if transistors are long channel and
+				"scMosfet" if transistors are short channel
+@param modelParam parameters of model depending on whether modelType
+				is long channel or short channel
+@param inputVoltage specific inputVoltage for which we are looking for 
+				DC equilibrium points
 '''
-class InverterLcMosfet:
-	def __init__(self, modelParam, inputVoltage):		
-		self.Vtp = modelParam[0]
-		self.Vtn = modelParam[1]
-		self.Vdd = modelParam[2]
-		self.Kn = modelParam[3]
-		self.Kp = modelParam[4]
+class InverterMosfet:
+	def __init__(self, modelType, modelParam, inputVoltage):
 		self.inputVoltage = inputVoltage
 		s0 = 3.0
+		if modelType == "lcMosfet":
+			model = circuit.LcMosfet
+			self.Vtp = modelParam[0]
+			self.Vtn = modelParam[1]
+			self.Vdd = modelParam[2]
+			self.Kn = modelParam[3]
+			self.Kp = modelParam[4]
+			nfet = circuit.MosfetModel('nfet', self.Vtn, self.Kn)
+			pfet = circuit.MosfetModel('pfet', self.Vtp, self.Kp)
 
-		nfet = circuit.MosfetModel('nfet', self.Vtn, self.Kn)
-		pfet = circuit.MosfetModel('pfet', self.Vtp, self.Kp)
+		elif modelType == "scMosfet":
+			model = circuit.ScMosfet
+			self.Vdd = modelParam[0]
+			nfet = circuit.MosfetModel('nfet')
+			pfet = circuit.MosfetModel('pfet')
 
-		# V = [outputVoltage, inputVoltage, grnd, Vdd]
-		
+
+		# V = [outputVoltage, inputVoltage, grnd, Vdd]	
 		transistorList = []
-		transistorList.append(circuit.Mosfet(2, 1, 0, nfet, s0))
-		transistorList.append(circuit.Mosfet(3, 1, 0, pfet, s0*2))
+		transistorList.append(model(2, 1, 0, nfet, s0))
+		transistorList.append(model(3, 1, 0, pfet, s0*2))
 
 		self.c = circuit.Circuit(transistorList)
 
@@ -314,71 +295,37 @@ class InverterLcMosfet:
 			newHyperMat[i,:] = [newHyper[i][0], newHyper[i][1]]
 		return [feasible, newHyperMat, numTotalLp, numSuccessLp, numUnsuccessLp]
 
-'''
-An inverter modeled by 2 CMOS transistors having short channel Mosfet models
-'''
-class InverterScMosfet:
-	def __init__(self, modelParam, inputVoltage):		
-		s0 = 3
-		self.Vdd = modelParam[0]
-		self.inputVoltage = inputVoltage
-
-		nfet = circuit.MosfetModel('nfet')
-		pfet = circuit.MosfetModel('pfet')
-
-		# V = [outputVoltage, inputVoltage, grnd, Vdd]
-		
-		transistorList = []
-		transistorList.append(circuit.StMosfet(2, 1, 0, nfet, s0))
-		transistorList.append(circuit.StMosfet(3, 1, 0, pfet, s0*2))
-
-		self.c = circuit.Circuit(transistorList)
-
-		self.bounds = []
-		# for input voltage and output voltage
-		self.bounds.append([0.0, self.Vdd])
-
-
-
-	def f(self,V):
-		myV = [x for x in V] + [self.inputVoltage, 0.0, self.Vdd]
-		#print 'InverterStMosfet.f: myV = ' + str(myV)
-		funcVal = self.c.f(myV)
-		#print 'InverterStMosfet.f: funcVal = ' + str(funcVal)
-		return funcVal[:-3]
-
-	def jacobian(self,V):
-		myV = [x for x in V] + [self.inputVoltage, 0.0, self.Vdd]
-		myJac = self.c.jacobian(myV)
-		return np.array(myJac[:-3,:-3])	
-
-	def linearConstraints(self, hyperRectangle):
-		lenV = len(hyperRectangle)
-		cHyper = [x for x in hyperRectangle] + [self.inputVoltage, 0.0, self.Vdd]
-		[feasible, newHyper, numTotalLp, numSuccessLp, numUnsuccessLp] = self.c.linearConstraints(cHyper, [lenV, lenV + 1])
-		newHyper = newHyper[:-3]
-		newHyperMat = np.zeros((lenV,2))
-		for i in range(lenV):
-			newHyperMat[i,:] = [newHyper[i][0], newHyper[i][1]]
-		return [feasible, newHyperMat, numTotalLp, numSuccessLp, numUnsuccessLp]
-
 
 '''
 Schmitt Trigger where each transistor is modeled by a CMOS transistor
-with long channel Mosfet model
+with long channel and short channel Mosfet models
+@param modelType "lcMosfet" if transistors are long channel and
+				"scMosfet" if transistors are short channel
+@param modelParam parameters of model depending on whether modelType
+				is long channel or short channel
+@param inputVoltage specific inputVoltage for which we are looking for 
+				DC equilibrium points
 '''
-class SchmittLcMosfet:
-	def __init__(self, modelParam, inputVoltage):
-		self.Vtp = modelParam[0]
-		self.Vtn = modelParam[1]
-		self.Vdd = modelParam[2]
-		self.Kn = modelParam[3]
-		self.Kp = modelParam[4]
+class SchmittMosfet:
+	def __init__(self, modelType, modelParam, inputVoltage):
 		s0 = 3.0
 		self.inputVoltage = inputVoltage
 
-		nfet = circuit.MosfetModel('nfet', self.Vtn, self.Kn, "default")
-		pfet = circuit.MosfetModel('pfet', self.Vtp, self.Kp, "default")
+		if modelType == "lcMosfet":
+			model = circuit.LcMosfet
+			self.Vtp = modelParam[0]
+			self.Vtn = modelParam[1]
+			self.Vdd = modelParam[2]
+			self.Kn = modelParam[3]
+			self.Kp = modelParam[4]
+			nfet = circuit.MosfetModel('nfet', self.Vtn, self.Kn)
+			pfet = circuit.MosfetModel('pfet', self.Vtp, self.Kp)
+
+		elif modelType == "scMosfet":
+			model = circuit.ScMosfet
+			self.Vdd = modelParam[0]
+			nfet = circuit.MosfetModel('nfet')
+			pfet = circuit.MosfetModel('pfet')
 
 
 		# with the voltage array containing [grnd, Vdd, input, X[0], X[1], X[2]]
@@ -386,22 +333,22 @@ class SchmittLcMosfet:
 		# nfets and X[2] is the voltage at node with pfets
 
 		# src, gate, drain = grnd, input, X[1]
-		m0 = circuit.Mosfet(0, 2, 4, nfet, s0)
+		m0 = model(0, 2, 4, nfet, s0)
 
 		# src, gate, drain = X[1], input, X[0]
-		m1 = circuit.Mosfet(4, 2, 3, nfet, s0)
+		m1 = model(4, 2, 3, nfet, s0)
 
 		# src, gate, drain = X[1], X[0], Vdd
-		m2 = circuit.Mosfet(4, 3, 1, nfet, s0)
+		m2 = model(4, 3, 1, nfet, s0)
 
 		# src, gate, drain = Vdd, input, X[2]
-		m3 = circuit.Mosfet(1, 2, 5, pfet, s0*2.0)
+		m3 = model(1, 2, 5, pfet, s0*2.0)
 
 		# src, gate, drain = X[2], in, X[0]
-		m4 = circuit.Mosfet(5, 2, 3, pfet, s0*2.0)
+		m4 = model(5, 2, 3, pfet, s0*2.0)
 
 		# src, gate, drain = X[2], X[0], grnd
-		m5 = circuit.Mosfet(5, 3, 0, pfet, s0*2.0)
+		m5 = model(5, 3, 0, pfet, s0*2.0)
 
 		self.c = circuit.Circuit([m0, m1, m2, m3, m4, m5])
 
@@ -435,82 +382,5 @@ class SchmittLcMosfet:
 		for i in range(lenV):
 			newHyperMat[i,:] = [newHyper[i][0], newHyper[i][1]]
 		return [feasible, newHyperMat, numTotalLp, numSuccessLp, numUnsuccessLp]
-
-
-'''
-Schmitt Trigger where each transistor is modeled by a CMOS transistor
-with short channel Mosfet model
-'''
-class SchmittScMosfet:
-	def __init__(self, modelParam, inputVoltage):
-		self.Vdd = modelParam[0]
-
-		self.inputVoltage = inputVoltage
-
-		nfet = circuit.MosfetModel('nfet')
-		pfet = circuit.MosfetModel('pfet')
-
-		s0 = 3
-
-		# with the voltage array containing [grnd, Vdd, input, X[0], X[1], X[2]]
-		# where X[0] is the output voltage and X[1] is the voltage at node with 
-		# nfets and X[2] is the voltage at node with pfets
-
-		# src, gate, drain = grnd, input, X[1]
-		m0 = circuit.StMosfet(0, 2, 4, nfet, s0)
-
-		# src, gate, drain = X[1], input, X[0]
-		m1 = circuit.StMosfet(4, 2, 3, nfet, s0)
-
-		# src, gate, drain = X[1], X[0], Vdd
-		m2 = circuit.StMosfet(4, 3, 1, nfet, s0)
-
-		# src, gate, drain = Vdd, input, X[2]
-		m3 = circuit.StMosfet(1, 2, 5, pfet, s0*2)
-
-		# src, gate, drain = X[2], in, X[0]
-		m4 = circuit.StMosfet(5, 2, 3, pfet, s0*2)
-
-		# src, gate, drain = X[2], X[0], grnd
-		m5 = circuit.StMosfet(5, 3, 0, pfet, s0*2)
-
-		self.c = circuit.Circuit([m0, m1, m2, m3, m4, m5])
-
-		self.bounds = []
-		for i in range(3):
-			self.bounds.append([0.0,self.Vdd])
-
-
-	def f(self,V):
-		myV = [0.0, self.Vdd, self.inputVoltage] + [x for x in V]
-		funcVal = self.c.f(myV)
-		return funcVal[3:]
-
-
-	def jacobian(self,V):
-		#print ("calculating jacobian")
-		myV = [0.0, self.Vdd, self.inputVoltage] + [x for x in V]
-		#print ("V", V)
-		jac = self.c.jacobian(myV)
-		#print ("jac before")
-		#print (jac)
-		return jac[3:,3:]
-
-
-	def linearConstraints(self, hyperRectangle):
-		lenV = len(hyperRectangle)
-		cHyper = [0.0, self.Vdd, self.inputVoltage] + [x for x in hyperRectangle]
-		[feasible, newHyper, numTotalLp, numSuccessLp, numUnsuccessLp]  = self.c.linearConstraints(cHyper, [0, 1])
-		newHyper = newHyper[3:]
-		newHyperMat = np.zeros((lenV,2))
-		for i in range(lenV):
-			newHyperMat[i,:] = [newHyper[i][0], newHyper[i][1]]
-		return [feasible, newHyperMat, numTotalLp, numSuccessLp, numUnsuccessLp]
-
-		
-
-
-
-
 
 

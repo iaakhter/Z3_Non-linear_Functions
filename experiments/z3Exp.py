@@ -78,6 +78,7 @@ if __name__ == '__main__':
 				p.terminate()
 				p.join()
 
+	# Run inverter experiments
 	modelTypesL = ["lcMosfet"]
 	inputVoltages = []
 	for modelType in modelTypesL:

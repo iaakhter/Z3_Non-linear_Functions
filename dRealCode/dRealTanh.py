@@ -73,7 +73,7 @@ def rambusOscillatorTanh(numStages, g_cc = 0.5, numSolutions = "all", a= -5.0):
 		for i in range(lenV):
 			hyper[i,:] = [result[vs[i]].lb() - 2*epsilon, result[vs[i]].ub() + 2*epsilon]
 
-		print ("hyper", hyper)
+		#print ("hyper", hyper)
 		allSolutions.append(hyper)
 
 		print ("num solutions found", len(allSolutions))

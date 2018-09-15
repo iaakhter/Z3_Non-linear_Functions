@@ -144,9 +144,9 @@ def rambusOscillatorLcMosfet(numStages, numSolutions = "all", g_cc = 0.5, Vtp = 
 		print ("num solutions found", len(allSolutions))
 
 	
-	print ("all solutions")
+	'''print ("all solutions")
 	for solution in allSolutions:
-		print (solution)
+		print (solution)'''
 
 	end = time.time()
 	print ("time taken", end - start)
@@ -234,9 +234,9 @@ def schmittTriggerLcMosfet(inputVoltage, Vtp = -0.4, Vtn = 0.4, Vdd = 1.8, Kn = 
 		print ("num solutions found", len(allSolutions))
 
 	
-	print ("all solutions")
+	'''print ("all solutions")
 	for solution in allSolutions:
-		print (solution)
+		print (solution)'''
 
 	end = time.time()
 	print ("time taken", end - start)
@@ -311,9 +311,9 @@ def inverterLcMosfet(inputVoltage, Vtp = -0.4, Vtn = 0.4, Vdd = 1.8, Kn = 270*1e
 		print ("num solutions found", len(allSolutions))
 
 	
-	print ("all solutions")
+	'''print ("all solutions")
 	for solution in allSolutions:
-		print (solution)
+		print (solution)'''
 
 	end = time.time()
 	print ("time taken", end - start)

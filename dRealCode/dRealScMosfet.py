@@ -281,7 +281,7 @@ def inverterScMosfet(inputVoltage, numSolutions = "all"):
 		hyper = np.zeros((1,2))
 		hyper[0,:] = [result[outputVolt].lb() - 2*epsilon, result[outputVolt].ub() + 2*epsilon]
 
-		print ("hyper", hyper)
+		#print ("hyper", hyper)
 		allSolutions.append(hyper)
 
 		print ("num solutions found", len(allSolutions))
@@ -355,14 +355,14 @@ def rambusOscillatorScMosfet(numStages, g_cc = 0.5, numSolutions = "all"):
 		#print ("f_sat")
 		#print (f_sat)
 		result = CheckSatisfiability(f_sat, epsilon)
-		print (result)
+		#print (result)
 		if result is None:
 			break
 		hyper = np.zeros((lenV,2))
 		for i in range(lenV):
 			hyper[i,:] = [result[vs[i]].lb() - 1000*epsilon, result[vs[i]].ub() + 1000*epsilon]
 
-		print ("hyper", hyper)
+		#print ("hyper", hyper)
 		allSolutions.append(hyper)
 
 		print ("num solutions found", len(allSolutions))
@@ -441,7 +441,7 @@ def schmittTriggerScMosfet(inputVoltage, numSolutions = "all"):
 		for i in range(lenV):
 			hyper[i,:] = [result[vs[i]].lb() - 1000*epsilon, result[vs[i]].ub() + 1000*epsilon]
 
-		print ("hyper", hyper)
+		#print ("hyper", hyper)
 		allSolutions.append(hyper)
 
 		print ("num solutions found", len(allSolutions))

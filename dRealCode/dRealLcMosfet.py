@@ -175,14 +175,14 @@ def rambusOscillatorLcMosfet(numStages, numSolutions = "all", g_cc = 0.5, Vtp = 
 		#print ("f_sat")
 		#print (f_sat)
 		result = CheckSatisfiability(f_sat, epsilon)
-		print (result)
+		#print (result)
 		if result is None:
 			break
 		hyper = np.zeros((lenV,2))
 		for i in range(lenV):
 			hyper[i,:] = [result[vs[i]].lb() - 1000*epsilon, result[vs[i]].ub() + 1000*epsilon]
 
-		print ("hyper", hyper)
+		#print ("hyper", hyper)
 		allSolutions.append(hyper)
 
 		print ("num solutions found", len(allSolutions))
@@ -200,7 +200,7 @@ def rambusOscillatorLcMosfet(numStages, numSolutions = "all", g_cc = 0.5, Vtp = 
 def schmittTriggerLcMosfet(inputVoltage, Vtp = -0.4, Vtn = 0.4, Vdd = 1.8, Kn = 270*1e-6, Kp = -90*1e-6, Sn = 3.0, numSolutions = "all"):
 	epsilon = 1e-14
 	start = time.time()
-	print ("Vtp", Vtp, "Vtn", Vtn, "Vdd", Vdd, "Kn", Kn, "Kp", Kp, "Sn", Sn)
+	#print ("Vtp", Vtp, "Vtn", Vtn, "Vdd", Vdd, "Kn", Kn, "Kp", Kp, "Sn", Sn)
 	Sp = Sn *2.0
 
 	lenV = 3
@@ -266,7 +266,7 @@ def schmittTriggerLcMosfet(inputVoltage, Vtp = -0.4, Vtn = 0.4, Vdd = 1.8, Kn = 
 		for i in range(lenV):
 			hyper[i,:] = [result[vs[i]].lb() - 1000*epsilon, result[vs[i]].ub() + 1000*epsilon]
 
-		print ("hyper", hyper)
+		#print ("hyper", hyper)
 		allSolutions.append(hyper)
 
 		print ("num solutions found", len(allSolutions))
@@ -327,7 +327,7 @@ def inverterLcMosfet(inputVoltage, Vtp = -0.4, Vtn = 0.4, Vdd = 1.8, Kn = 270*1e
 		hyper = np.zeros((1,2))
 		hyper[0,:] = [result[outputVolt].lb() - 2*epsilon, result[outputVolt].ub() + 2*epsilon]
 
-		print ("hyper", hyper)
+		#print ("hyper", hyper)
 		allSolutions.append(hyper)
 
 		print ("num solutions found", len(allSolutions))

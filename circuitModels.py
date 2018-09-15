@@ -318,8 +318,8 @@ class SchmittMosfet:
 			self.Vdd = modelParam[2]
 			self.Kn = modelParam[3]
 			self.Kp = modelParam[4]
-			nfet = circuit.MosfetModel('nfet', self.Vtn, self.Kn)
-			pfet = circuit.MosfetModel('pfet', self.Vtp, self.Kp)
+			nfet = circuit.MosfetModel('nfet', self.Vtn, self.Kn, gds = "default")
+			pfet = circuit.MosfetModel('pfet', self.Vtp, self.Kp, gds = "default")
 
 		elif modelType == "scMosfet":
 			model = circuit.ScMosfet

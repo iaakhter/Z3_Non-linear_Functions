@@ -17,34 +17,14 @@ It is also possible to define a custom circuit with long channel and short chann
 
 The `Circuit` class in **circuit.py** takes a list of transistors. Each transistor can be a short channel transistor or long channel transistor. The transistor object will take in indices for source, drain and gate from an array of voltages. We can specify these requirements in a model class and extract the required function and jacobian information from the `Circuit` object. An example of creating and using a circuit with long channel or short channel MOSFET in a model object can be seen in `RambusMosfet` class in **circuitModels.py**.
 
-# Running Our Examples:
+# Running Our Experiments:
 
-Our rambus oscillator and schmitt trigger examples can be run from **examples.py**. Comment and uncomment to run a specific specific example with a specific model.
-For example to run the rambus oscillator example uncomment the following line
+To run the experiments related to rambus oscillator and schmitt trigger, `cd` into experiments directory. 
 
-`#allHypers = rambusOscillator(modelType="tanh", numStages=2, g_cc=0.5, statVars=statVars, numSolutions="all")`
+To run the experiments related to our method, run **solverExp.py**.
 
-The modelType indicates the way each inverter in the oscillator has been modeled. 
-When `modelType == "tanh"`, each inverter is represented by a tanh model with a negative gain. 
-When `modelType == "lcMosfet"`, each inverter is represented by 2 CMOS transistors with a long channel MOSFET model.
-When `modelType == "scMosfet"`, each inverter is represented by 2 CMOS transistors with a short channel MOSFET model.
-numStages is the number of stages in the oscillator (Should be even)
-g_cc represents the strength of the cross-coupled nodes in the oscillator in relation to the forward nodes. For example if g_cc = 0.5, the cross coupled nodes are 0.5 times stronger than the forward nodes.
+To run the dReal experiments, run **dRealExp.py**. Follow the instructions in https://github.com/dreal/dreal4 to install dReal with python bindings.
 
-To run the schmitt trigger example for a specific input voltage, uncomment the line:
+To run the z3 experiments, run **z3Exp.py**. Follow the instructions in https://github.com/Z3Prover/z3 to install Z3 with python bindings.
 
-`#allHypers = schmittTrigger(modelType="lcMosfet", inputVoltage = 0.5, statVars=statVars, numSolutions = "all")`
-
-Again, like the rambus oscillator, `modelType == "lcMosfet"` indicates long channel model and `modelType == "scMosfet"` indicates short channel model.  
-
-# Comparisons with dReal and Z3
-
-We also compare our results with dReal and Z3. 
-
-To install dReal with python bindings - follow the instructions in:
-https://github.com/dreal/dreal4. 
-To run the dReal versions of our problem, cd into dRealCode directory and run `python dRealAll.py` in the terminal. Comment and uncomment the relevant lines to run specific examples.
-
-To install z3 with python bindings - follow the instructions in:
-https://github.com/Z3Prover/z3.
-To run the z3 versions of our problem, cd into z3Code directory and run `python z3All.py` in the terminal. Comment and uncomment the relevant lines to run the specific examples.
+Note that we kill the process running an example if it takes more than 10 hours to run. This is what we consider to be timeout.

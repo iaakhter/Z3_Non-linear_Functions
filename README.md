@@ -9,7 +9,13 @@ Our main main method is implemented in **prototype.py**. It gives a list of hype
 
 Note that this method will only work properly with well-conditioned systems where the jacobians are not singular or badly conditioned at the solutions.
 
-Our main algorithm is implemented in the function `solverLoopNoLp` in **prototype.py**. The two main parameters for this function is uniqueHypers (which should be an empty list when the function is called) and a model object. uniqueHypers will hold the list of hyperrectangles containing unique solution to a function f. The model class should have a method called f which gives point and interval evaluation of the function we are trying to solve. f should take a numpy array of variable values. If any entry in the array is an interval, f returns an interval value. Otherwise it returns a point. Similarly, the model class should also have a method called jacobian that returns jacobian and jacobian interval depending on the arguments. The model class should also have a field called bounds that specifies bounds for each variable. Look at `RambusTanh` class in **circuitModels.py** for more details. After having defined the model class, in prototype.py it is enough to call `solverLoop(uniqueHypers, model)` to find all the hyperrectangles containing unique solutions. uniqueHypers will contain them.
+Our main algorithm is implemented in the function `solverLoopNoLp` in **prototype.py**. The two main parameters for this function is uniqueHypers (which should be an empty list when the function is called) and a model object. uniqueHypers will hold the list of hyperrectangles containing unique solution to a function f. The model class should have a method called f which gives point and interval evaluation of the function we are trying to solve. f should take a numpy array of variable values. If any entry in the array is an interval, f returns an interval value. Otherwise it returns a point. Similarly, the model class should also have a method called jacobian that returns jacobian and jacobian interval depending on the arguments. The model class should also have a field called bounds that specifies bounds for each variable. Look at `RambusTanh` class in **circuitModels.py** for more details. After having defined the model class, in prototype.py it is enough to write
+
+`uniqueHypers = []`
+
+`solverLoop(uniqueHypers, model)` 
+
+to find all the hyperrectangles containing unique solutions. uniqueHypers will contain them.
 
 # Defining Custom Circuit
 

@@ -295,6 +295,75 @@ class InverterMosfet:
 			newHyperMat[i,:] = [newHyper[i][0], newHyper[i][1]]
 		return [feasible, newHyperMat, numTotalLp, numSuccessLp, numUnsuccessLp]
 
+'''
+An inverter loop modeled by 2 CMOS transistors having long channel or 
+short channel Mosfet models
+@param modelType "lcMosfet" if transistors are long channel and
+				"scMosfet" if transistors are short channel
+@param modelParam parameters of model depending on whether modelType
+				is long channel or short channel
+@param inputVoltage specific inputVoltage for which we are looking for 
+				DC equilibrium points
+'''
+class InverterLoopMosfet:
+	def __init__(self, modelType, modelParam):
+		#self.inputVoltage = inputVoltage
+		s0 = 3.0
+		if modelType == "lcMosfet":
+			model = circuit.LcMosfet
+			self.Vtp = modelParam[0]
+			self.Vtn = modelParam[1]
+			self.Vdd = modelParam[2]
+			self.Kn = modelParam[3]
+			self.Kp = modelParam[4]
+			nfet = circuit.MosfetModel('nfet', self.Vtn, self.Kn)
+			pfet = circuit.MosfetModel('pfet', self.Vtp, self.Kp)
+
+		elif modelType == "scMosfet":
+			model = circuit.ScMosfet
+			self.Vdd = modelParam[0]
+			nfet = circuit.MosfetModel('nfet')
+			pfet = circuit.MosfetModel('pfet')
+
+
+		# V = [outputVoltage, inputVoltage, grnd, Vdd]	
+		transistorList = []
+		transistorList.append(model(2, 1, 0, nfet, s0))
+		transistorList.append(model(3, 1, 0, pfet, s0*2))
+		transistorList.append(model(2, 0, 1, nfet, s0))
+		transistorList.append(model(3, 0, 1, pfet, s0*2))
+
+		self.c = circuit.Circuit(transistorList)
+
+		self.bounds = []
+		# output voltage
+		self.bounds.append([0.0, self.Vdd])
+		self.bounds.append([0.0, self.Vdd])
+
+
+
+	def f(self,V):
+		myV = [x for x in V] + [0.0, self.Vdd]
+		#print 'InverterStMosfet.f: myV = ' + str(myV)
+		funcVal = self.c.f(myV)
+		#print 'InverterStMosfet.f: funcVal = ' + str(funcVal)
+		return funcVal[:-2]
+
+	def jacobian(self,V):
+		myV = [x for x in V] + [0.0, self.Vdd]
+		myJac = self.c.jacobian(myV)
+		return np.array(myJac[:-2,:-2])	
+
+	def linearConstraints(self, hyperRectangle):
+		lenV = len(hyperRectangle)
+		cHyper = [x for x in hyperRectangle] + [self.inputVoltage, 0.0, self.Vdd]
+		[feasible, newHyper, numTotalLp, numSuccessLp, numUnsuccessLp] = self.c.linearConstraints(cHyper, [lenV, lenV + 1])
+		newHyper = newHyper[:-3]
+		newHyperMat = np.zeros((lenV,2))
+		for i in range(lenV):
+			newHyperMat[i,:] = [newHyper[i][0], newHyper[i][1]]
+		return [feasible, newHyperMat, numTotalLp, numSuccessLp, numUnsuccessLp]
+
 
 '''
 Schmitt Trigger where each transistor is modeled by a CMOS transistor

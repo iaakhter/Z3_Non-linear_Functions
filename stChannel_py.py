@@ -225,9 +225,9 @@ Vd[:] = [0.94, 0.94]
 Vg[:] = [0.04, 0.04]
 Vs[:] = [0.86, 0.86]
 Vb[:] = [0.0, 0.0]
-idn = stMosfet.mvs_idnMon(Vd, Vg, Vs, Vb)
+'''idn = stMosfet.mvs_idnMon(Vd, Vg, Vs, Vb)
 print ("idn", idn[0], idn[1])
-'''idnJac = stMosfet.mvs_idnJac(Vd, Vg, Vs, Vb)
+idnJac = stMosfet.mvs_idnJac(Vd, Vg, Vs, Vb)
 print ("idn", idn[0], idn[1])
 print ("jac der0", idnJac[0][0], idnJac[0][1],
 	"der1", idnJac[1][0], idnJac[1][1],
@@ -248,10 +248,10 @@ print ("jac der0", idpJac[0][0], idpJac[0][1],
 	"der2", idpJac[2][0], idpJac[2][1],
 	"der3", idpJac[3][0], idpJac[3][1])'''
 
-#print ("testing nfet")
-#testFetCurrent('n')
-#print ("testing pfet")
-#testFetCurrent('p')
+print ("testing nfet")
+testFetCurrent('n')
+print ("testing pfet")
+testFetCurrent('p')
 print ("testing nfetJac")
 testFetJac('n')
 print ("testing pfetJac")

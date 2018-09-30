@@ -91,7 +91,7 @@ class ScMosfet:
 		iVal = fetFunc(VdC, VgC, VsC, VbC)
 
 		if(interval_p(Vs) or interval_p(Vg) or interval_p(Vd)):
-			funVal =  self.shape*np.array([iVal[0], iVal[1]])
+			funVal =  self.shape*np.array([np.nextafter(iVal[0], float("-inf")), np.nextafter(iVal[1], float("inf"))])
 		else:
 			funVal = self.shape*iVal[0]
 
@@ -152,9 +152,9 @@ class ScMosfet:
 		jac = fetGrad(VdC, VgC, VsC, VbC)
 
 		if(interval_p(Vs) or interval_p(Vg) or interval_p(Vd)):
-			grad = self.shape*np.array([np.array([jac[2][0], jac[2][1]]),
-							np.array([jac[1][0], jac[1][1]]),
-							np.array([jac[0][0], jac[0][1]])])
+			grad = self.shape*np.array([np.array([np.nextafter(jac[2][0], float("-inf")), np.nextafter(jac[2][1], float("inf"))]),
+							np.array([np.nextafter(jac[1][0], float("-inf")), np.nextafter(jac[1][1], float("inf"))]),
+							np.array([np.nextafter(jac[0][0], float("-inf")), np.nextafter(jac[0][1], float("inf"))])])
 		else:
 			grad = self.shape*np.array([jac[2][0],jac[1][0],jac[0][0]])
 

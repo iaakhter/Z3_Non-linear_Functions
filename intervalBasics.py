@@ -75,11 +75,11 @@ def interval_round(x):
 def interval_add(x, y):
 	if((x is None) or (y is None)): return None
 	if(interval_p(x) and interval_p(y)):
-		return np.array([x[0]+y[0], x[1]+y[1]])
+		return interval_round(np.array([x[0]+y[0], x[1]+y[1]]))
 	elif(interval_p(x)):
-		return np.array([x[0]+y, x[1]+y])
+		return interval_round(np.array([x[0]+y, x[1]+y]))
 	elif(interval_p(y)):
-		return np.array([x+y[0], x+y[1]])
+		return interval_round(np.array([x+y[0], x+y[1]]))
 	else: return(x+y)
 
 def interval_neg(x):
@@ -96,12 +96,12 @@ def interval_mult(x, y):
 	if((x is None) or (y is None)): return None
 	if(interval_p(x) and interval_p(y)):
 		p = [xx*yy for xx in x for yy in y]
-		return np.array([min(p), max(p)])
+		return interval_round(np.array([min(p), max(p)]))
 	elif(interval_p(x)):
 		if(y >= 0):
-			return np.array([y*x[0], y*x[1]])
+			return interval_round(np.array([y*x[0], y*x[1]]))
 		else:
-			return np.array([y*x[1], y*x[0]])
+			return interval_round(np.array([y*x[1], y*x[0]]))
 	elif(interval_p(y)):
 		return interval_mult(y,x)
 	else: return(x*y)
@@ -109,15 +109,15 @@ def interval_mult(x, y):
 def interval_div(x, y):
 	if((x is None) or (y is None)): return None
 	if((interval_p(y) and y[0]*y[1] <= 0) or tiny_p(y)):
-		return np.array([float('-inf'), float('+inf')])
+		return interval_round(np.array([float('-inf'), float('+inf')]))
 	elif(interval_p(y)):
 		q = [xx/yy for xx in interval_fix(x) for yy in y]
-		return np.array([min(q), max(q)])
+		return interval_round(np.array([min(q), max(q)]))
 	elif(interval_p(x)):
 		if(y >= 0): 
-			return np.array([x[0]/y, x[1]/y])
+			return interval_round(np.array([x[0]/y, x[1]/y]))
 		else: 
-			return np.array[x[1]/y, x[0]/y]
+			return interval_round(np.array[x[1]/y, x[0]/y])
 	else: return((x+0.0)/y)
 
 def interval_dotprod(x, y):

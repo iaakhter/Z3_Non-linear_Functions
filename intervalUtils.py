@@ -18,7 +18,7 @@ def multiplyRegularMatWithIntervalMat(regMat,intervalMat):
 		for j in range(intervalMat.shape[1]):
 			intervalVal = np.zeros(2)
 			for k in range(intervalMat.shape[1]):
-				intervalVal += interval_round(interval_mult(regMat[i,k],intervalMat[k,j]))
+				intervalVal += interval_mult(regMat[i,k],intervalMat[k,j])
 				intervalVal = interval_round(intervalVal)
 			result[i,j,:] = interval_round(intervalVal)
 
@@ -66,7 +66,7 @@ def multiplyMatWithVec(mat,vec):
 		for j in range(mat.shape[1]):
 			mult = interval_mult(mat[i,j],vec[j])
 			if isInterval:
-				intervalVal += interval_round(mult)
+				intervalVal += mult
 				intervalVal = interval_round(intervalVal)
 			else:
 				intervalVal += mult
@@ -189,8 +189,10 @@ def krawczykHelp(startBounds, jacInterval, samplePoint, fSamplePoint, jacSampleP
 	for i in range(numV):
 		kInterval[i,:] = interval_round(kInterval[i,:])
 
-	#print ("startBounds", startBounds)
-	#print ("kInterval", kInterval)
+	#print ("startBounds")
+	#printHyper(startBounds)
+	#print ("kInterval")
+	#printHyper(kInterval)
 	# if kInterval is in the interior of startBounds, found a unique solution
 	if(all([ (interval_lo(kInterval[i]) > interval_lo(startBounds[i])) and (interval_hi(kInterval[i]) < interval_hi(startBounds[i]))
 		 for i in range(numV) ])):
@@ -217,6 +219,28 @@ def krawczykHelp(startBounds, jacInterval, samplePoint, fSamplePoint, jacSampleP
 def printHyper(hyper):
 	for i in range(hyper.shape[0]):
 		print (hyper[i,0], hyper[i,1])
+
+def checkInflatedHyper(model, hyper, epsilonBounds):
+	startBounds = np.copy(hyper)
+	prevIntersect, intersect = newtonInflation(model, startBounds, epsilonBounds)
+
+	if prevIntersect is None:
+		return [False, hyper]
+
+	startBounds = np.copy(intersect)
+	samplePoint = (startBounds[:,0] + startBounds[:,1])/2.0
+	fSamplePoint = np.array(model.f(samplePoint))
+	jacSamplePoint = model.jacobian(samplePoint)
+	jacInterval = model.jacobian(startBounds)
+	
+	# Krawczyk update
+	kHelpResult = krawczykHelp(startBounds, jacInterval, samplePoint, fSamplePoint, jacSamplePoint)
+
+	if kHelpResult[0]:
+		return [True, kHelpResult[1]]
+	else:
+		return [False, hyper]
+
 
 '''
 Check whether hyperrectangle hyperRectangle contains
@@ -262,6 +286,22 @@ def checkExistenceOfSolution(model,hyperRectangle, alpha = 1.0):
 	iteration = 0
 	prevIntersect = None
 	while True:
+		oldVolume = volume(startBounds)
+		#print ("startBounds before")
+		#printHyper(startBounds)
+		dist = startBounds[:,1] - startBounds[:,0]
+		#print ("dist.shape", 0.1*dist+ epsilonBounds)
+		#print ("startBounds before")
+		#printHyper(startBounds)
+		startBounds[:,0] = startBounds[:,0] - (0.01*dist + epsilonBounds)
+		startBounds[:,1] = startBounds[:,1] + (0.01*dist + epsilonBounds)
+		'''for di in range(numV):
+			if model.bounds[di][0] - startBounds[di,0] > epsilonBounds:
+				startBounds[di,0] = model.bounds[di][0] - epsilonBounds
+			if startBounds[di,1] - model.bounds[di][1] > epsilonBounds:
+				startBounds[di,1] = model.bounds[di][1] + epsilonBounds'''
+		#print ("startBounds after")
+		#printHyper(startBounds)
 		samplePoint = (startBounds[:,0] + startBounds[:,1])/2.0
 		fSamplePoint = np.array(model.f(samplePoint))
 		jacSamplePoint = model.jacobian(samplePoint)
@@ -271,16 +311,17 @@ def checkExistenceOfSolution(model,hyperRectangle, alpha = 1.0):
 		kHelpResult = krawczykHelp(startBounds, jacInterval, samplePoint, fSamplePoint, jacSamplePoint)
 
 		if kHelpResult[0] or kHelpResult[1] is None:
-			if kHelpResult[0]:
-				return [True, kHelpResult[1]]
+			'''if kHelpResult[0]:
+				return [True, startBounds]'''
 			return kHelpResult
 		
 		intersect = kHelpResult[1]
+		#print("intersect")
+		#printHyper(intersect)
 
-
-		oldVolume = volume(startBounds)
 		newVolume = volume(intersect)
 		volReduc = (oldVolume - newVolume)/(oldVolume*1.0)
+		#print ("volReduc", volReduc)
 
 		# If the reduction of volume is less than equal to alpha
 		# then do no more Krawczyk updates. We are done
@@ -289,7 +330,7 @@ def checkExistenceOfSolution(model,hyperRectangle, alpha = 1.0):
 			# in the intersect and construct a bigger hyper than intersect
 			# with the solution at the center. This is to take care of cases
 			# when the solution is at the boundary
-			if constructBiggerHyper == False:
+			'''if constructBiggerHyper == False:
 				constructBiggerHyper = True
 				prevIntersect, intersect = newtonInflation(model, intersect, epsilonBounds)
 				if prevIntersect is None:
@@ -299,12 +340,16 @@ def checkExistenceOfSolution(model,hyperRectangle, alpha = 1.0):
 
 			else:
 				intersect[:,0] = np.maximum(prevIntersect[:,0], intersect[:,0])
-				intersect[:,1] = np.minimum(prevIntersect[:,1], intersect[:,1])
-				return [False,intersect]
+				intersect[:,1] = np.minimum(prevIntersect[:,1], intersect[:,1])'''
+			intersect[:,0] = np.maximum(hyperRectangle[0,:], intersect[:,0])
+			intersect[:,1] = np.minimum(hyperRectangle[1,:], intersect[:,1])
+			return [False,intersect]
 		else:
 			startBounds = intersect
 
 		iteration += 1
+
+
 
 
 '''

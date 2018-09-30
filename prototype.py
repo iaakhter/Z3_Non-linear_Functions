@@ -533,7 +533,7 @@ def inverter(modelType, inputVoltage, statVars, kAlpha=1.0, bisectType="bisectNe
 
 	#load the inverter model
 	if modelType == "tanh":
-		modelParam = [-5.0] # inverter gain
+		modelParam = [-5.0, 0.0] # y = tanh(modelParam[0]*x + modelParam[1])
 		model = InverterTanh(modelParam = modelParam, inputVoltage = inputVoltage)
 	if modelType == "lcMosfet":
 		#modelParam = [Vtp, Vtn, Vdd, Kn, Kp, Sn]
@@ -603,8 +603,8 @@ def rambusOscillator(modelType, numStages, g_cc, statVars, kAlpha=1.0, bisectTyp
 					'numLpCalls':0, 'numSuccessLpCalls':0, 'numUnsuccessLpCalls':0})
 	
 	if modelType == "tanh":
-		a = -5.0
-		model = RambusTanh(modelParam = a, g_cc = g_cc, g_fwd = 1.0, numStages=numStages)
+		modelParam = [-5.0, 0.0] # y = tanh(modelParam[0]*x + modelParam[1])
+		model = RambusTanh(modelParam = modelParam, g_cc = g_cc, g_fwd = 1.0, numStages=numStages)
 	elif modelType == "lcMosfet":
 		#modelParam = [Vtp, Vtn, Vdd, Kn, Kp, Sn]
 		#modelParam = [-0.25, 0.25, 1.0, 1.0, -0.5, 1.0]
@@ -814,8 +814,8 @@ if __name__ == "__main__":
 	statVars = {}
 	start = time.time()
 	#allHypers = schmittTrigger(modelType="scMosfet", inputVoltage = 0.0, statVars=statVars, numSolutions = "all")
-	allHypers = inverter(modelType="tanh", inputVoltage=1.0, statVars=statVars, numSolutions="all")
-	#allHypers = rambusOscillator(modelType="lcMosfet", numStages=2, g_cc=4.0, statVars=statVars, kAlpha = 1.0, numSolutions="all", bisectType="bisectNewton")
+	#allHypers = inverter(modelType="tanh", inputVoltage=1.0, statVars=statVars, numSolutions="all")
+	#allHypers = rambusOscillator(modelType="tanh", numStages=2, g_cc=4.0, statVars=statVars, kAlpha = 1.0, numSolutions="all", bisectType="bisectNewton")
 	#allHypers = singleVariableInequalities(problemType="flyspeck172", statVars=statVars)
 	#ownCircuit()
 	end = time.time()

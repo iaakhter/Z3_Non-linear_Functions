@@ -26,7 +26,7 @@ Rambus ring oscillator with tanh as the inverter model
 '''
 class RambusTanh:
 	def __init__(self, modelParam, g_cc, g_fwd, numStages):
-		self.modelParam = modelParam
+		self.modelParam = modelParam # y = tanh(modelParam[0]*x + modelParam[1])
 		self.g_cc = g_cc
 		self.g_fwd = g_fwd
 		self.numStages = numStages
@@ -54,8 +54,8 @@ class RambusTanh:
 		for i in range(lenV):
 			fwdInd = (i-1)%lenV
 			ccInd = (i + lenV//2) % lenV
-			tanhFwd = fcUtils.tanhFun(V[fwdInd], self.modelParam)
-			tanhCc = fcUtils.tanhFun(V[ccInd], self.modelParam)
+			tanhFwd = fcUtils.tanhFun(V[fwdInd], self.modelParam[0], self.modelParam[1])
+			tanhCc = fcUtils.tanhFun(V[ccInd], self.modelParam[0], self.modelParam[1])
 			fwdTerm = interval_sub(tanhFwd, V[i])
 			ccTerm = interval_sub(tanhCc, V[i])
 			fVal[i] = interval_add(interval_mult(self.g_fwd, fwdTerm),interval_mult(self.g_cc, ccTerm))
@@ -78,8 +78,8 @@ class RambusTanh:
 				jac[i,i] = interval_fix(-(self.g_fwd + self.g_cc))
 			else:
 				jac[i,i] = -(self.g_fwd + self.g_cc)
-			jac[i,(i-1)%lenV] = interval_mult(self.g_fwd, fcUtils.tanhFunder(V[(i-1)%lenV], self.modelParam))
-			jac[i,(i + lenV//2) % lenV] = interval_mult(self.g_cc, fcUtils.tanhFunder(V[(i + lenV//2) % lenV], self.modelParam))
+			jac[i,(i-1)%lenV] = interval_mult(self.g_fwd, fcUtils.tanhFunder(V[(i-1)%lenV], self.modelParam[0], self.modelParam[1]))
+			jac[i,(i + lenV//2) % lenV] = interval_mult(self.g_cc, fcUtils.tanhFunder(V[(i + lenV//2) % lenV], self.modelParam[0], self.modelParam[1]))
 
 		return jac
 
@@ -97,11 +97,11 @@ class RambusTanh:
 			#print ("fwdInd ", fwdInd, " ccInd ", ccInd)
 			#print "hyperRectangle[fwdInd][0]", hyperRectangle[fwdInd][0], "hyperRectangle[fwdInd][1]", hyperRectangle[fwdInd][1]
 			
-			triangleClaimFwd = fcUtils.tanhLinearConstraints(self.modelParam, self.xs[fwdInd], self.ys[i], hyperRectangle[fwdInd,0],hyperRectangle[fwdInd,1])
+			triangleClaimFwd = fcUtils.tanhLinearConstraints(self.modelParam[0], self.modelParam[1], self.xs[fwdInd], self.ys[i], hyperRectangle[fwdInd,0],hyperRectangle[fwdInd,1])
 			#print ("triangleClaimFwd", triangleClaimFwd)
 			allConstraints += triangleClaimFwd
 
-			triangleClaimCc = fcUtils.tanhLinearConstraints(self.modelParam, self.xs[ccInd], self.zs[i], hyperRectangle[ccInd,0],hyperRectangle[ccInd,1])
+			triangleClaimCc = fcUtils.tanhLinearConstraints(self.modelParam[0], self.modelParam[1], self.xs[ccInd], self.zs[i], hyperRectangle[ccInd,0],hyperRectangle[ccInd,1])
 			#print ("triangleClaimCc", triangleClaimCc)
 			allConstraints += triangleClaimCc
 				
@@ -154,13 +154,13 @@ class RambusTanh:
 
 class InverterTanh:
 	def __init__(self, modelParam, inputVoltage):
-		self.modelParam = modelParam[0]
+		self.modelParam = modelParam # y = tanh(modelParam[0]*x + modelParam[1])
 		self.bounds = []
 		self.bounds.append([-1.0,1.0])
 		self.inputVoltage = inputVoltage
 
 	def f(self, V):
-		return interval_sub(fcUtils.tanhFun(self.inputVoltage, self.modelParam), V)
+		return interval_sub(fcUtils.tanhFun(self.inputVoltage, self.modelParam[0], self.modelParam[1]), V)
 
 	def jacobian(self,V):
 		lenV = len(V)

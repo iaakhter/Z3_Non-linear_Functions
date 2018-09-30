@@ -59,23 +59,24 @@ def cosFunder(x,const):
 	return interval_mult(const,interval_neg(sinFun(x,const)))
 
 
-#tanh(const*x)
-def tanhFun(x, const):
-	tanhVal = np.tanh(const*x)
+#tanh(a*x + b)
+def tanhFun(x, a, b):
+	tanhVal = np.tanh(a*x + b)
 	if interval_p(x):
 		return np.array([min(tanhVal[0], tanhVal[1]), max(tanhVal[0], tanhVal[1])])
 
 	return tanhVal
 
-def tanhFunder(x, const):
-	den = np.cosh(const*x)*np.cosh(const*x)
-	grad = np.divide(const,den)
+def tanhFunder(x, a, b):
+	den = np.cosh(a*x + b)*np.cosh(a*x + b)
+	grad = np.divide(a,den)
+	separX = b/(-a*1.0)
 	if interval_p(x):
-		if x[0]*x[1] >= 0:
+		if (x[0] - separX)*(x[1] - separX) >= 0:
 			grad = np.array([min(grad[0], grad[1]), max(grad[0], grad[1])])
 		else:
-			den0 = np.cosh(0.0)*np.cosh(0.0)
-			grad0 = np.divide(const,den0)
+			den0 = np.cosh(separX)*np.cosh(separX)
+			grad0 = np.divide(a,den0)
 			grad = np.array([min(grad[0], grad[1], grad0), max(grad[0], grad[1], grad0)])
 
 	return grad
@@ -142,9 +143,9 @@ def sinLinearConstraints(constant, inputVar, outputVar, inputLow, inputHigh):
 
 	if inputLowPi == inputHighPi:
 		if inputLowPi%2 == 0:
-			return triangleBounds(sinFun, sinFunder, constant, inputVar, outputVar, inputLow, inputHigh, "pos")
+			return triangleBounds(sinFun, sinFunder, inputVar, outputVar, inputLow, inputHigh, "pos", constant)
 		else:
-			return triangleBounds(sinFun, sinFunder, constant, inputVar, outputVar, inputLow, inputHigh, "neg")
+			return triangleBounds(sinFun, sinFunder, inputVar, outputVar, inputLow, inputHigh, "neg", constant)
 
 	overallConstraint = "1 " + inputVar + " >= " + str(inputLow) + "\n"
 	overallConstraint += "1 " + inputVar + " <= " + str(inputHigh) + "\n"
@@ -180,9 +181,9 @@ def cosLinearConstraints(constant, inputVar, outputVar, inputLow, inputHigh):
 	if inputLowPi == inputHighPi:
 		if inputLowPi%2 == 0:
 			#print ("coming here?")
-			return triangleBounds(cosFun, cosFunder, constant, inputVar, outputVar, inputLow, inputHigh, "pos")
+			return triangleBounds(cosFun, cosFunder, inputVar, outputVar, inputLow, inputHigh, "pos", constant)
 		else:
-			return triangleBounds(cosFun, cosFunder, constant, inputVar, outputVar, inputLow, inputHigh, "neg")
+			return triangleBounds(cosFun, cosFunder, inputVar, outputVar, inputLow, inputHigh, "neg", constant)
 
 	overallConstraint = "1 " + inputVar + " >= " + str(inputLow) + "\n"
 	overallConstraint += "1 " + inputVar + " <= " + str(inputHigh) + "\n"
@@ -215,11 +216,11 @@ def inverseLinearConstraints(constant, inputVar, outputVar, inputLow, inputHigh)
 	if inputLow == 0.0 or inputHigh == 0.0:
 		raise  Exception("invalid lowBound or highBound for exponential" + str(inputLow) + " " + str(inputHigh))
 	if inputLow > 0.0 and inputHigh > 0:
-		return triangleBounds(invFun, invFunder, constant, inputVar, outputVar, inputLow, inputHigh, "pos")
+		return triangleBounds(invFun, invFunder, inputVar, outputVar, inputLow, inputHigh, "pos", constant)
 	elif inputLow < 0.0 and inputHigh < 0.0:
-		return triangleBounds(invFun, invFunder, constant, inputVar, outputVar, inputLow, inputHigh, "neg")
+		return triangleBounds(invFun, invFunder, inputVar, outputVar, inputLow, inputHigh, "neg", constant)
 	elif inputLow < 0.0 and inputHigh > 0.0:
-		return triangleBounds(invFun, invFunder, constant, inputVar, outputVar, inputLow, inputHigh, None)
+		return triangleBounds(invFun, invFunder, inputVar, outputVar, inputLow, inputHigh, None, constant)
 
 #linear constraints in the form of a string for arcsin(constant*x)
 def arcsinLinearConstraints(constant, inputVar, outputVar, inputLow, inputHigh):
@@ -228,10 +229,10 @@ def arcsinLinearConstraints(constant, inputVar, outputVar, inputLow, inputHigh):
 		return None
 
 	if inputLow >= 0.0 and inputHigh >= 0.0:
-		return triangleBounds(arcsinFun, arcsinFunder, constant, inputVar, outputVar, inputLow, inputHigh, "pos")
+		return triangleBounds(arcsinFun, arcsinFunder, inputVar, outputVar, inputLow, inputHigh, "pos", constant)
 
 	elif inputLow <= 0.0 and inputHigh <= 0.0:
-		return triangleBounds(arcsinFun, arcsinFunder, constant, inputVar, outputVar, inputLow, inputHigh, "neg")
+		return triangleBounds(arcsinFun, arcsinFunder, inputVar, outputVar, inputLow, inputHigh, "neg", constant)
 
 	overallConstraint = "1 " + inputVar + " >= " + str(inputLow) + "\n"
 	overallConstraint += "1 " + inputVar + " <= " + str(inputHigh) + "\n"
@@ -245,17 +246,18 @@ def arcsinLinearConstraints(constant, inputVar, outputVar, inputLow, inputHigh):
 	return overallConstraint + convexHullConstraints2D(allTrianglePoints, inputVar, outputVar)
 
 #linear constraints in the form of a string for tanh
-def tanhLinearConstraints(constant, inputVar, outputVar, inputLow, inputHigh):
-	if constant < 0:
-		if inputLow <= 0.0 and inputHigh <= 0.0:
-			return triangleBounds(tanhFun, tanhFunder, constant, inputVar, outputVar, inputLow, inputHigh, "neg")
-		if inputLow >= 0.0 and inputHigh >= 0.0:
-			return triangleBounds(tanhFun, tanhFunder, constant, inputVar, outputVar, inputLow, inputHigh, "pos")
-	elif constant >= 0:
-		if inputLow <= 0.0 and inputHigh <= 0.0:
-			return triangleBounds(tanhFun, tanhFunder, constant, inputVar, outputVar, inputLow, inputHigh, "pos")
-		if inputLow >= 0.0 and inputHigh >= 0.0:
-			return triangleBounds(tanhFun, tanhFunder, constant, inputVar, outputVar, inputLow, inputHigh, "neg")
+def tanhLinearConstraints(a, b, inputVar, outputVar, inputLow, inputHigh):
+	separX = b/(-a*1.0)
+	if a < 0:
+		if inputLow <= separX and inputHigh <= separX:
+			return triangleBounds(tanhFun, tanhFunder, inputVar, outputVar, inputLow, inputHigh, "neg", a, b)
+		if inputLow >= separX and inputHigh >= separX:
+			return triangleBounds(tanhFun, tanhFunder, inputVar, outputVar, inputLow, inputHigh, "pos", a, b)
+	elif a >= 0:
+		if inputLow <= separX and inputHigh <= separX:
+			return triangleBounds(tanhFun, tanhFunder, inputVar, outputVar, inputLow, inputHigh, "pos", a, b)
+		if inputLow >= separX and inputHigh >= separX:
+			return triangleBounds(tanhFun, tanhFunder, inputVar, outputVar, inputLow, inputHigh, "neg", a, b)
 
 	overallConstraint = "1 " + inputVar + " >= " + str(inputLow) + "\n"
 	overallConstraint += "1 " + inputVar + " <= " + str(inputHigh) + "\n"
@@ -277,13 +279,19 @@ def tanhLinearConstraints(constant, inputVar, outputVar, inputLow, inputHigh):
 # and finds the intersection between the tangents. 
 # It returns the three points of a triangle:
 # (inputLow, function(inputLow)), (inputHigh, function(inputHigh)), (intersectionX, function(intersectionX))
-def trianglePoints(function, functionDer, inputLow, inputHigh, constant):
+def trianglePoints(function, functionDer, inputLow, inputHigh, a, b=None):
 	if inputLow > inputHigh:
 		return []
-	funLow = function(inputLow, constant)
-	dLow = functionDer(inputLow, constant)
-	funHigh = function(inputHigh, constant)
-	dHigh = functionDer(inputHigh, constant)
+	if b is None:
+		funLow = function(inputLow, a)
+		dLow = functionDer(inputLow, a)
+		funHigh = function(inputHigh, a)
+		dHigh = functionDer(inputHigh, a)
+	else:
+		funLow = function(inputLow, a, b)
+		dLow = functionDer(inputLow, a, b)
+		funHigh = function(inputHigh, a, b)
+		dHigh = functionDer(inputHigh, a, b)
 	
 	cLow = funLow - dLow*inputLow
 	cHigh = funHigh - dHigh*inputHigh
@@ -312,11 +320,17 @@ def trianglePoints(function, functionDer, inputLow, inputHigh, constant):
 # then it returns triangle constraints formed from the tangents at the interval bounds
 # and a secant line between the interval bounds depending on the convexity of the
 # function. Otherwise it just returns constraints indicating the interval bounds
-def triangleBounds(function, functionDer, constant, inputVar, outputVar, inputLow, inputHigh, secDer):
-	funLow = function(np.array([inputLow]), constant)[0]
-	dLow = functionDer(np.array([inputLow]), constant)[0]
-	funHigh = function(np.array([inputHigh]), constant)[0]
-	dHigh = functionDer(np.array([inputHigh]), constant)[0]
+def triangleBounds(function, functionDer, inputVar, outputVar, inputLow, inputHigh, secDer, a, b=None):
+	if b is None:
+		funLow = function(np.array([inputLow]), a)[0]
+		dLow = functionDer(np.array([inputLow]), a)[0]
+		funHigh = function(np.array([inputHigh]), a)[0]
+		dHigh = functionDer(np.array([inputHigh]), a)[0]
+	else:
+		funLow = function(np.array([inputLow]), a, b)[0]
+		dLow = functionDer(np.array([inputLow]), a, b)[0]
+		funHigh = function(np.array([inputHigh]), a, b)[0]
+		dHigh = functionDer(np.array([inputHigh]), a, b)[0]
 	
 	cLow = funLow - dLow*inputLow
 	cHigh = funHigh - dHigh*inputHigh

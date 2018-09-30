@@ -79,10 +79,12 @@ if __name__ == '__main__':
 				p.join()
 
 	# Run inverter experiments
-	modelTypesL = ["lcMosfet"]
+	modelTypesL = ["tanh", "lcMosfet"]
 	inputVoltages = []
 	for modelType in modelTypesL:
-		if modelType == "lcMosfet":
+		if modelType == "tanh":
+			inputVoltages = [-1.0, 1.0]
+		elif modelType == "lcMosfet":
 			inputVoltages = [0.0, 1.8]
 		elif modelType == "scMosfet":
 			inputVoltages = [0.0, 1.0]

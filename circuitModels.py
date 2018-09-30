@@ -151,6 +151,29 @@ class RambusTanh:
 
 		return [feasible, newHyperRectangle, numTotalLp, numSuccessLp, numUnsuccessLp]
 
+
+class InverterTanh:
+	def __init__(self, modelParam, inputVoltage):
+		self.modelParam = modelParam[0]
+		self.bounds = []
+		self.bounds.append([-1.0,1.0])
+		self.inputVoltage = inputVoltage
+
+	def f(self, V):
+		return interval_sub(fcUtils.tanhFun(self.inputVoltage, self.modelParam), V)
+
+	def jacobian(self,V):
+		lenV = len(V)
+		intervalVal = any([interval_p(x) for x in V])
+
+		if intervalVal:
+			jac = np.zeros((1, 1, 2))
+			jac[0,0] = [-1.0, -1.0]
+		else:
+			jac = np.zeros((1, 1))
+			jac[0,0] = -1.0
+		return jac
+
 '''
 Rambus ring oscillator with 2 CMOS transistors having
 	Mosfet models used as an inverter

@@ -291,6 +291,75 @@ def inverterScMosfet(inputVoltage, numSolutions = "all"):
 	print ("time taken", end - start)
 	return allSolutions
 
+def inverterLoopScMosfet(numInverters, numSolutions = "all"):
+	epsilon = 1e-14
+	start = time.time()
+	#print ("Vtp", Vtp, "Vtn", Vtn, "Vdd", Vdd, "Kn", Kn, "Kp", Kp, "Sn", Sn)
+	Vdd = 1.0
+	sn = 3
+	sp = 2*sn
+
+	vs = []
+	iNs = []
+	iPs = []
+
+	for i in range(numInverters):
+		vs.append(Variable("v" + str(i)))
+		iNs.append(Variable("iN" + str(i)))
+		iPs.append(Variable("iP" + str(i)))
+
+	allConstraints = []	
+	for i in range(numInverters):
+		allConstraints.append(vs[i] >= 0.0)
+		allConstraints.append(vs[i] <= Vdd)
+		allConstraints.append(-iNs[i]-iPs[i] == 0)
+		inputInd = i
+		outputInd = (i+1)%numInverters
+		allConstraints += mvs_id("n", 0.0, vs[inputInd], vs[outputInd], iNs[i], sn)
+		allConstraints += mvs_id("p", Vdd, vs[inputInd], vs[outputInd], iPs[i], sp)
+
+	allSolutions = []
+	while True:
+		if numSolutions != "all" and len(allSolutions) == numSolutions:
+			break
+		
+		# Store constraints pruning search space so that
+		# old hyperrectangles are not considered
+		excludingConstraints = []
+		for solution in allSolutions:
+			singleExcludingConstraints = []
+			for i in range(numInverters):
+				singleExcludingConstraints.append(vs[i] <= solution[i][0])
+				singleExcludingConstraints.append(vs[i] >= solution[i][1])
+			excludingConstraints.append(singleExcludingConstraints)
+		
+		#print ("allConstraints")
+		#print (allConstraints)
+		f_sat = logical_and(*allConstraints)
+		if len(excludingConstraints) > 0:
+			for constraints in excludingConstraints:
+				f_sat = logical_and(f_sat, logical_or(*constraints))
+		
+		#print ("f_sat")
+		#print (f_sat)
+		result = CheckSatisfiability(f_sat, epsilon)
+		#print (result)
+		if result is None:
+			break
+		hyper = np.zeros((numInverters,2))
+		for i in range(numInverters):
+			hyper[i,:] = [result[vs[i]].lb() - 1000*epsilon, result[vs[i]].ub() + 1000*epsilon]
+
+		#print ("hyper", hyper)
+		allSolutions.append(hyper)
+
+		print ("num solutions found", len(allSolutions))
+
+
+	end = time.time()
+	print ("time taken", end - start)
+	return allSolutions
+
 
 # Try and find dc equilibrium points for rambus oscillator with short channel mosfet model
 # numStages indicates the number of stages in the rambus oscillator
@@ -394,25 +463,26 @@ def schmittTriggerScMosfet(inputVoltage, numSolutions = "all"):
 	for i in range(lenV*2):
 		tIs.append(Variable("tI" + str(i)))
 
+	allConstraints = []	
+	for i in range(lenV):
+		allConstraints.append(vs[i] >= 0.0)
+		allConstraints.append(vs[i] <= Vdd)
+	allConstraints += mvs_id('n', 0.0, inputVoltage, vs[1], tIs[0], sn)
+	allConstraints += mvs_id('n', vs[1], inputVoltage, vs[0], tIs[1], sn)
+	allConstraints += mvs_id('n', vs[1], vs[0], Vdd, tIs[2], sn)
+	allConstraints += mvs_id('p', Vdd, inputVoltage, vs[2], tIs[3], sp)
+	allConstraints += mvs_id('p', vs[2], inputVoltage, vs[0], tIs[4], sp)
+	allConstraints += mvs_id('p', vs[2], vs[0], 0.0, tIs[5], sp)
+	allConstraints.append(nIs[0] == -tIs[4] - tIs[1])
+	allConstraints.append(nIs[1] == -tIs[0] + tIs[1] + tIs[2])
+	allConstraints.append(nIs[2] == -tIs[3] + tIs[5] + tIs[4])
+	for i in range(lenV):
+		allConstraints.append(nIs[i] == 0.0)
+
 	allSolutions = []
 	while True:
 		if numSolutions != "all" and len(allSolutions) == numSolutions:
 			break
-		allConstraints = []	
-		for i in range(lenV):
-			allConstraints.append(vs[i] >= 0.0)
-			allConstraints.append(vs[i] <= Vdd)
-		allConstraints += mvs_id('n', 0.0, inputVoltage, vs[1], tIs[0], sn)
-		allConstraints += mvs_id('n', vs[1], inputVoltage, vs[0], tIs[1], sn)
-		allConstraints += mvs_id('n', vs[1], vs[0], Vdd, tIs[2], sn)
-		allConstraints += mvs_id('p', Vdd, inputVoltage, vs[2], tIs[3], sp)
-		allConstraints += mvs_id('p', vs[2], inputVoltage, vs[0], tIs[4], sp)
-		allConstraints += mvs_id('p', vs[2], vs[0], 0.0, tIs[5], sp)
-		allConstraints.append(nIs[0] == -tIs[4] - tIs[1])
-		allConstraints.append(nIs[1] == -tIs[0] + tIs[1] + tIs[2])
-		allConstraints.append(nIs[2] == -tIs[3] + tIs[5] + tIs[4])
-		for i in range(lenV):
-			allConstraints.append(nIs[i] == 0.0)
 		
 		# Store constraints pruning search space so that
 		# old hyperrectangles are not considered
@@ -450,4 +520,12 @@ def schmittTriggerScMosfet(inputVoltage, numSolutions = "all"):
 	end = time.time()
 	print ("time taken", end - start)
 	return allSolutions
+
+if __name__ == "__main__":
+	allSolutions = inverterLoopScMosfet(1)
+	print ("allSolutions")
+	for solution in allSolutions:
+		print ("solution")
+		for i in range(solution.shape[0]):
+			print (solution[i,0], solution[i,1])
 

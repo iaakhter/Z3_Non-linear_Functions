@@ -4,7 +4,8 @@ import intervalUtils
 from intervalBasics import *
 from circuitModels import RambusTanh, RambusMosfet
 from circuitModels import SchmittMosfet
-from circuitModels import InverterTanh, InverterMosfet, InverterLoopMosfet
+from circuitModels import InverterTanh, InverterMosfet
+from circuitModels import InverterLoopTanh, InverterLoopMosfet
 import flyspeckProblems
 import metiProblems
 import dcUtils
@@ -575,6 +576,56 @@ def inverter(modelType, inputVoltage, statVars, kAlpha=1.0, bisectType="bisectNe
 	#print ("numLpCalls", statVars['numLpCalls'], "numSuccessLpCalls", statVars['numSuccessLpCalls'], "numUnsuccessLpCalls", statVars['numUnsuccessLpCalls'])
 	return allHypers
 
+def inverterLoop(modelType, numInverters, statVars, kAlpha=1.0, bisectType="bisectNewton", numSolutions="all" , useLp=False):
+	statVars.update({'numBisection':0, 'numLp':0, 'numK':0, 'numSingleKill':0, 'numDoubleKill':0,
+					'totalKTime':0, 'totalLPTime':0, 'avgKTime':0, 'avgLPTime':0, 'stringHyperList':[],
+					'numLpCalls':0, 'numSuccessLpCalls':0, 'numUnsuccessLpCalls':0})
+	
+
+	#load the inverter model
+	if modelType == "tanh":
+		modelParam = [-5.0, 0.0] # y = tanh(modelParam[0]*x + modelParam[1])
+		model = InverterLoopTanh(modelParam = modelParam, numInverters = numInverters)
+	if modelType == "lcMosfet":
+		#modelParam = [Vtp, Vtn, Vdd, Kn, Kp, Sn]
+		modelParam = [-0.4, 0.4, 1.8, 270*1e-6, -90*1e-6, 8/3.0]
+		model = InverterLoopMosfet(modelType = modelType, modelParam = modelParam, numInverters = numInverters)
+	if modelType == "scMosfet":
+		modelParam = [1.0] #Vdd
+		model = InverterLoopMosfet(modelType = modelType, modelParam = modelParam, numInverters = numInverters)
+
+	startExp = time.time()
+	
+	allHypers = []
+	if bisectType == "bisectMax":
+		bisectFun = bisectMax
+	if bisectType == "bisectNewton":
+		bisectFun = bisectNewton
+	if useLp:
+		volRedThreshold = 1.0
+		solverLoop(uniqueHypers=allHypers, model=model, statVars=statVars, volRedThreshold=volRedThreshold, bisectFun=bisectFun, numSolutions=numSolutions, kAlpha=kAlpha)
+	else:
+		solverLoopNoLp(uniqueHypers=allHypers, model=model, statVars=statVars, bisectFun=bisectFun, numSolutions=numSolutions, kAlpha=kAlpha)
+	
+	#print ("allHypers")
+	#print (allHypers)
+	#print ("numSolutions", len(allHypers))
+	
+	endExp = time.time()
+	#print ("TOTAL TIME ", endExp - startExp)
+
+	if statVars['numLp'] != 0:
+		statVars['avgLPTime'] = (statVars['totalLPTime']*1.0)/statVars['numLp']
+	if statVars['numK'] != 0:
+		statVars['avgKTime'] = (statVars['totalKTime']*1.0)/statVars['numK']
+	
+	#print ("numBisection", statVars['numBisection'], "numLp", statVars['numLp'], "numK", statVars['numK'],
+	#	"numSingleKill", statVars['numSingleKill'], "numDoubleKill", statVars['numDoubleKill'])
+	#print ("totalKTime", statVars['totalKTime'], "totalLPTime", statVars['totalLPTime'], "avgKTime", 
+	#	statVars['avgKTime'], "avgLPTime", statVars['avgLPTime'])
+	#print ("numLpCalls", statVars['numLpCalls'], "numSuccessLpCalls", statVars['numSuccessLpCalls'], "numUnsuccessLpCalls", statVars['numUnsuccessLpCalls'])
+	return allHypers
+
 def ownCircuit():
 	inputVoltage = 0.7
 	modelParam = [0.9] #Vdd
@@ -815,6 +866,7 @@ if __name__ == "__main__":
 	start = time.time()
 	#allHypers = schmittTrigger(modelType="scMosfet", inputVoltage = 0.0, statVars=statVars, numSolutions = "all")
 	#allHypers = inverter(modelType="tanh", inputVoltage=1.0, statVars=statVars, numSolutions="all")
+	allHypers = inverterLoop(modelType="scMosfet", numInverters=1, statVars=statVars, numSolutions="all")
 	#allHypers = rambusOscillator(modelType="tanh", numStages=2, g_cc=4.0, statVars=statVars, kAlpha = 1.0, numSolutions="all", bisectType="bisectNewton")
 	#allHypers = singleVariableInequalities(problemType="flyspeck172", statVars=statVars)
 	#ownCircuit()

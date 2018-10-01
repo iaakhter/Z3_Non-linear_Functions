@@ -337,3 +337,79 @@ def inverterLcMosfet(inputVoltage, Vtp = -0.4, Vtn = 0.4, Vdd = 1.8, Kn = 270*1e
 	print ("time taken", end - start)
 	return allSolutions
 
+
+def inverterLoopLcMosfet(numInverters, numSolutions = "all", Vtp = -0.4, Vtn = 0.4, Vdd = 1.8, Kn = 270*1e-6, Kp = -90*1e-6, Sn = 3.0):
+	epsilon = 1e-14
+	start = time.time()
+	#print ("Vtp", Vtp, "Vtn", Vtn, "Vdd", Vdd, "Kn", Kn, "Kp", Kp, "Sn", Sn)
+	Sp = 2*Sn
+
+	vs = []
+	iNs = []
+	iPs = []
+
+	for i in range(numInverters):
+		vs.append(Variable("v" + str(i)))
+		iNs.append(Variable("iN" + str(i)))
+		iPs.append(Variable("iP" + str(i)))
+
+	allConstraints = []	
+	for i in range(numInverters):
+		allConstraints.append(vs[i] >= 0.0)
+		allConstraints.append(vs[i] <= Vdd)
+		allConstraints.append(-iNs[i]-iPs[i] == 0)
+		inputInd = i
+		outputInd = (i+1)%numInverters
+		allConstraints += nFet(Vtn, Vdd, Kn, Sn, 0.0, vs[inputInd], vs[outputInd], iNs[i])
+		allConstraints += pFet(Vtp, Vdd, Kp, Sp, Vdd, vs[inputInd], vs[outputInd], iPs[i])
+
+	allSolutions = []
+	while True:
+		if numSolutions != "all" and len(allSolutions) == numSolutions:
+			break
+		
+		# Store constraints pruning search space so that
+		# old hyperrectangles are not considered
+		excludingConstraints = []
+		for solution in allSolutions:
+			singleExcludingConstraints = []
+			for i in range(numInverters):
+				singleExcludingConstraints.append(vs[i] <= solution[i][0])
+				singleExcludingConstraints.append(vs[i] >= solution[i][1])
+			excludingConstraints.append(singleExcludingConstraints)
+		
+		#print ("allConstraints")
+		#print (allConstraints)
+		f_sat = logical_and(*allConstraints)
+		if len(excludingConstraints) > 0:
+			for constraints in excludingConstraints:
+				f_sat = logical_and(f_sat, logical_or(*constraints))
+		
+		#print ("f_sat")
+		#print (f_sat)
+		result = CheckSatisfiability(f_sat, epsilon)
+		#print (result)
+		if result is None:
+			break
+		hyper = np.zeros((numInverters,2))
+		for i in range(numInverters):
+			hyper[i,:] = [result[vs[i]].lb() - 1000*epsilon, result[vs[i]].ub() + 1000*epsilon]
+
+		#print ("hyper", hyper)
+		allSolutions.append(hyper)
+
+		print ("num solutions found", len(allSolutions))
+
+
+	end = time.time()
+	print ("time taken", end - start)
+	return allSolutions
+
+if __name__ == "__main__":
+	allSolutions = inverterLoopLcMosfet(1)
+	print ("allSolutions")
+	for solution in allSolutions:
+		print ("solution")
+		for i in range(solution.shape[0]):
+			print (solution[i,0], solution[i,1])
+

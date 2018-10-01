@@ -55,8 +55,8 @@ def rambusOscillatorTanh(numStages, g_cc = 0.5, numSolutions = "all", a= -5.0):
 		for solution in allSolutions:
 			singleExcludingConstraints = []
 			for i in range(lenV):
-				singleExcludingConstraints.append(vs[i] <= solution[i][0])
-				singleExcludingConstraints.append(vs[i] >= solution[i][1])
+				singleExcludingConstraints.append(vs[i] < solution[i][0])
+				singleExcludingConstraints.append(vs[i] > solution[i][1])
 			excludingConstraints.append(singleExcludingConstraints)
 		
 		# Add all the rambus oscillator constraints
@@ -111,8 +111,8 @@ def inverterTanh(inputVoltage, a = -5.0, numSolutions = "all"):
 		excludingConstraints = []
 		for solution in allSolutions:
 			singleExcludingConstraints = []
-			singleExcludingConstraints.append(outputVolt <= solution[0][0])
-			singleExcludingConstraints.append(outputVolt >= solution[0][1])
+			singleExcludingConstraints.append(outputVolt < solution[0][0])
+			singleExcludingConstraints.append(outputVolt > solution[0][1])
 			excludingConstraints.append(singleExcludingConstraints)
 		
 		#print ("allConstraints")
@@ -142,10 +142,73 @@ def inverterTanh(inputVoltage, a = -5.0, numSolutions = "all"):
 	return allSolutions
 
 
+def inverterLoopTanh(numInverters, numSolutions = "all", a= -5.0):
+	epsilon = 1e-14
+	start = time.time()
+	vs = []
+	for i in range(numInverters):
+		vs.append(Variable("v" + str(i)))
+
+	allConstraints = []
+		
+	# Store rambus oscillator constraints
+	for i in range(numInverters):
+		allConstraints.append(vs[i] >= -1)
+		allConstraints.append(vs[i] <= 1)
+		inputInd = i
+		outputInd = (i+1)%numInverters
+		allConstraints.append(tanh(a*vs[inputInd]) - vs[outputInd] == 0.0)
+
+	allSolutions = []
+	while True:
+		if numSolutions != "all" and len(allSolutions) == numSolutions:
+			break
+
+		# Store constraints pruning search space so that
+		# old hyperrectangles are not considered
+		excludingConstraints = []
+		for solution in allSolutions:
+			singleExcludingConstraints = []
+			for i in range(numInverters):
+				singleExcludingConstraints.append(vs[i] < solution[i][0])
+				singleExcludingConstraints.append(vs[i] > solution[i][1])
+			excludingConstraints.append(singleExcludingConstraints)
+		
+		# Add all the rambus oscillator constraints
+		f_sat = logical_and(*allConstraints)
+		# Add constraints so that old hyperrectangles are not considered
+		if len(excludingConstraints) > 0:
+			for constraints in excludingConstraints:
+				f_sat = logical_and(f_sat, logical_or(*constraints))
+		
+		#print ("f_sat")
+		#print (f_sat)
+		result = CheckSatisfiability(f_sat, epsilon)
+		#print (result)
+		if result is None:
+			break
+		hyper = np.zeros((numInverters,2))
+		for i in range(numInverters):
+			hyper[i,:] = [result[vs[i]].lb() - 2*epsilon, result[vs[i]].ub() + 2*epsilon]
+
+		#print ("hyper", hyper)
+		allSolutions.append(hyper)
+
+		print ("num solutions found", len(allSolutions))
+		
+
+	end = time.time()
+	print ("time taken", end - start)
+	return allSolutions
+
+
+
 if __name__ == "__main__":
-	allSolutions = inverterTanh(1.0)
+	#allSolutions = inverterTanh(1.0)
+	allSolutions = inverterLoopTanh(1)
 	print ("allSolutions")
 	for solution in allSolutions:
+		print ("solution")
 		for i in range(solution.shape[0]):
 			print (solution[i,0], solution[i,1])
 

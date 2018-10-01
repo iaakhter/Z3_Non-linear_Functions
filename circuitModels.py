@@ -174,6 +174,50 @@ class InverterTanh:
 			jac[0,0] = -1.0
 		return jac
 
+class InverterLoopTanh:
+	def __init__(self, modelParam, numInverters):
+		self.modelParam = modelParam # y = tanh(modelParam[0]*x + modelParam[1])
+		self.numInverters = numInverters
+		self.bounds = []
+		for i in range(numInverters):
+			self.bounds.append([-1.0, 1.0])
+
+	def f(self, V):
+		intervalVal = any([interval_p(x) for x in V])
+		lenV = len(V)
+		
+		if intervalVal:
+			fVal = np.zeros((lenV,2))
+		else:
+			fVal = np.zeros((lenV))
+
+		for i in range(lenV):
+			inputInd = i
+			outputInd = (i+1)%lenV
+			fVal[i] = interval_sub(fcUtils.tanhFun(V[inputInd], self.modelParam[0], self.modelParam[1]),
+									V[outputInd])
+
+		return fVal
+
+	def jacobian(self,V):
+		lenV = len(V)
+		intervalVal = any([interval_p(x) for x in V])
+
+		if intervalVal:
+			jac = np.zeros((lenV, lenV, 2))
+		else:
+			jac = np.zeros((lenV, lenV))
+		for i in range(lenV):
+			inputInd = i
+			outputInd = (i+1)%lenV
+			jac[i,inputInd] = fcUtils.tanhFunder(V[inputInd], self.modelParam[0], self.modelParam[1])
+			if intervalVal:
+				jac[i,outputInd] = interval_fix(-1.0)
+			else:
+				jac[i,outputInd] = -1.0
+
+		return jac
+
 '''
 Rambus ring oscillator with 2 CMOS transistors having
 	Mosfet models used as an inverter
@@ -329,7 +373,7 @@ short channel Mosfet models
 				DC equilibrium points
 '''
 class InverterLoopMosfet:
-	def __init__(self, modelType, modelParam):
+	def __init__(self, modelType, modelParam, numInverters):
 		#self.inputVoltage = inputVoltage
 		s0 = 3.0
 		if modelType == "lcMosfet":
@@ -348,20 +392,19 @@ class InverterLoopMosfet:
 			nfet = circuit.MosfetModel('nfet')
 			pfet = circuit.MosfetModel('pfet')
 
+		self.numInverters = numInverters
 
-		# V = [outputVoltage, inputVoltage, grnd, Vdd]	
+		# V = [V0, V1, V2, ... grnd, Vdd]
 		transistorList = []
-		transistorList.append(model(2, 1, 0, nfet, s0))
-		transistorList.append(model(3, 1, 0, pfet, s0*2))
-		transistorList.append(model(2, 0, 1, nfet, s0))
-		transistorList.append(model(3, 0, 1, pfet, s0*2))
+		for i in range(numInverters):
+			transistorList.append(model(numInverters, i, (i+1)%numInverters, nfet, s0))
+			transistorList.append(model(numInverters+1, i, (i+1)%numInverters, pfet, s0*2))
 
 		self.c = circuit.Circuit(transistorList)
 
 		self.bounds = []
-		# output voltage
-		self.bounds.append([0.0, self.Vdd])
-		self.bounds.append([0.0, self.Vdd])
+		for i in range(numInverters):
+			self.bounds.append([0.0, self.Vdd])
 
 
 
@@ -379,9 +422,9 @@ class InverterLoopMosfet:
 
 	def linearConstraints(self, hyperRectangle):
 		lenV = len(hyperRectangle)
-		cHyper = [x for x in hyperRectangle] + [self.inputVoltage, 0.0, self.Vdd]
+		cHyper = [x for x in hyperRectangle] + [0.0, self.Vdd]
 		[feasible, newHyper, numTotalLp, numSuccessLp, numUnsuccessLp] = self.c.linearConstraints(cHyper, [lenV, lenV + 1])
-		newHyper = newHyper[:-3]
+		newHyper = newHyper[:-2]
 		newHyperMat = np.zeros((lenV,2))
 		for i in range(lenV):
 			newHyperMat[i,:] = [newHyper[i][0], newHyper[i][1]]

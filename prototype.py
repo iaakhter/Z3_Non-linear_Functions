@@ -50,7 +50,7 @@ def findBisectingIndexProportion(model, hyper):
 	hyperDist = hyper[:,1] - hyper[:,0]
 	#trialSoln = hyper[:,0] + np.multiply(np.random.rand((hyper.shape[0])), hyperDist)
 	trialSoln = hyper[:,0] + 0.5*hyperDist
-	finalSoln = intervalUtils.newton(model, trialSoln)
+	finalSoln = intervalUtils.newton(model, trialSoln,1e-4)
 	if finalSoln[0]:
 		if np.all(finalSoln[1] >= hyper[:,0]) and np.all(finalSoln[1] <= hyper[:,1]):
 			distFromLow = finalSoln[1] - hyper[:,0]

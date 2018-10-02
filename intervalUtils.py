@@ -100,7 +100,7 @@ function defined by model
 @return (True, soln) if Newton's method can find a solution within
 					the bounds defined by model
 '''
-def newton(model,soln):
+def newton(model,soln,normThresh=1e-8):
 	h = soln
 	count = 0
 	maxIter = 100
@@ -110,7 +110,7 @@ def newton(model,soln):
 	for i in range(lenV):
 		overallHyper[i,0] = bounds[i][0]
 		overallHyper[i,1] = bounds[i][1]
-	while count < maxIter and (np.linalg.norm(h) > 1e-8 or count == 0):
+	while count < maxIter and (np.linalg.norm(h) > normThresh or count == 0):
 		res = model.f(soln)
 		res = -np.array(res)
 		jac = model.jacobian(soln)
@@ -122,7 +122,7 @@ def newton(model,soln):
 		if np.less(soln, overallHyper[:,0] - 0.001).any() or np.greater(soln, overallHyper[:,1]+0.001).any():
 			return (False, soln)
 		count+=1
-	if count >= maxIter and np.linalg.norm(h) > 1e-8:
+	if count >= maxIter and np.linalg.norm(h) > normThresh:
 		return(False, soln)
 	return (True,soln)
 
@@ -295,11 +295,7 @@ def checkExistenceOfSolution(model,hyperRectangle, alpha = 1.0):
 		#printHyper(startBounds)
 		startBounds[:,0] = startBounds[:,0] - (0.01*dist + epsilonBounds)
 		startBounds[:,1] = startBounds[:,1] + (0.01*dist + epsilonBounds)
-		'''for di in range(numV):
-			if model.bounds[di][0] - startBounds[di,0] > epsilonBounds:
-				startBounds[di,0] = model.bounds[di][0] - epsilonBounds
-			if startBounds[di,1] - model.bounds[di][1] > epsilonBounds:
-				startBounds[di,1] = model.bounds[di][1] + epsilonBounds'''
+	
 		#print ("startBounds after")
 		#printHyper(startBounds)
 		samplePoint = (startBounds[:,0] + startBounds[:,1])/2.0
@@ -311,8 +307,6 @@ def checkExistenceOfSolution(model,hyperRectangle, alpha = 1.0):
 		kHelpResult = krawczykHelp(startBounds, jacInterval, samplePoint, fSamplePoint, jacSamplePoint)
 
 		if kHelpResult[0] or kHelpResult[1] is None:
-			'''if kHelpResult[0]:
-				return [True, startBounds]'''
 			return kHelpResult
 		
 		intersect = kHelpResult[1]
@@ -326,21 +320,6 @@ def checkExistenceOfSolution(model,hyperRectangle, alpha = 1.0):
 		# If the reduction of volume is less than equal to alpha
 		# then do no more Krawczyk updates. We are done
 		if (math.isnan(volReduc) or volReduc <= alpha):
-			# Use newton's method to find a solution
-			# in the intersect and construct a bigger hyper than intersect
-			# with the solution at the center. This is to take care of cases
-			# when the solution is at the boundary
-			'''if constructBiggerHyper == False:
-				constructBiggerHyper = True
-				prevIntersect, intersect = newtonInflation(model, intersect, epsilonBounds)
-				if prevIntersect is None:
-					return [False, intersect]
-				else:
-					startBounds = intersect
-
-			else:
-				intersect[:,0] = np.maximum(prevIntersect[:,0], intersect[:,0])
-				intersect[:,1] = np.minimum(prevIntersect[:,1], intersect[:,1])'''
 			intersect[:,0] = np.maximum(hyperRectangle[0,:], intersect[:,0])
 			intersect[:,1] = np.minimum(hyperRectangle[1,:], intersect[:,1])
 			return [False,intersect]

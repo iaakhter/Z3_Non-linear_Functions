@@ -261,8 +261,8 @@ def inverterScMosfet(inputVoltage, numSolutions = "all"):
 		excludingConstraints = []
 		for solution in allSolutions:
 			singleExcludingConstraints = []
-			singleExcludingConstraints.append(outputVolt <= solution[0][0])
-			singleExcludingConstraints.append(outputVolt >= solution[0][1])
+			singleExcludingConstraints.append(outputVolt < solution[0][0])
+			singleExcludingConstraints.append(outputVolt > solution[0][1])
 			excludingConstraints.append(singleExcludingConstraints)
 		
 		#print ("allConstraints")
@@ -329,8 +329,8 @@ def inverterLoopScMosfet(numInverters, numSolutions = "all"):
 		for solution in allSolutions:
 			singleExcludingConstraints = []
 			for i in range(numInverters):
-				singleExcludingConstraints.append(vs[i] <= solution[i][0])
-				singleExcludingConstraints.append(vs[i] >= solution[i][1])
+				singleExcludingConstraints.append(vs[i] < solution[i][0])
+				singleExcludingConstraints.append(vs[i] > solution[i][1])
 			excludingConstraints.append(singleExcludingConstraints)
 		
 		#print ("allConstraints")
@@ -410,8 +410,8 @@ def rambusOscillatorScMosfet(numStages, g_cc = 0.5, numSolutions = "all"):
 		for solution in allSolutions:
 			singleExcludingConstraints = []
 			for i in range(lenV):
-				singleExcludingConstraints.append(vs[i] <= solution[i][0])
-				singleExcludingConstraints.append(vs[i] >= solution[i][1])
+				singleExcludingConstraints.append(vs[i] < solution[i][0])
+				singleExcludingConstraints.append(vs[i] > solution[i][1])
 			excludingConstraints.append(singleExcludingConstraints)
 		
 		#print ("allConstraints")
@@ -490,8 +490,8 @@ def schmittTriggerScMosfet(inputVoltage, numSolutions = "all"):
 		for solution in allSolutions:
 			singleExcludingConstraints = []
 			for i in range(lenV):
-				singleExcludingConstraints.append(vs[i] <= solution[i][0])
-				singleExcludingConstraints.append(vs[i] >= solution[i][1])
+				singleExcludingConstraints.append(vs[i] < solution[i][0])
+				singleExcludingConstraints.append(vs[i] > solution[i][1])
 			excludingConstraints.append(singleExcludingConstraints)
 		
 		#print ("allConstraints")

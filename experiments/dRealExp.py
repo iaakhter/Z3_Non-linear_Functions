@@ -27,10 +27,22 @@ def runSchmittExperiment(modelType, inputVoltage):
 
 def runInverterExperiment(modelType, inputVoltage):
 	print ("inverter modelType", modelType, "inputVoltage", inputVoltage)
+	if modelType == "tanh":
+		allHypers = inverterTanh(inputVoltage = inputVoltage)
 	if modelType == "lcMosfet":
 		allHypers = inverterLcMosfet(inputVoltage = inputVoltage)
 	if modelType == "scMosfet":
 		allHypers = inverterScMosfet(inputVoltage = inputVoltage)
+
+def runInverterLoopExperiment(modelType, numInverters):
+	print ("inverterLoop modelType", modelType, "numInverters", numInverters)
+	if modelType == "tanh":
+		allHypers = inverterLoopTanh(inputVoltage = inputVoltage)
+	if modelType == "lcMosfet":
+		allHypers = inverterLoopLcMosfet(inputVoltage = inputVoltage)
+	if modelType == "scMosfet":
+		allHypers = inverterLoopScMosfet(inputVoltage = inputVoltage)
+
 
 
 if __name__ == '__main__':
@@ -97,7 +109,7 @@ if __name__ == '__main__':
 		elif modelType == "scMosfet":
 			inputVoltages = [0.0, 1.0]
 		for inputVoltage in inputVoltages:
-			p = multiprocessing.Process(target=runInverterExperiment, name="RunSchmittExperiment", args=(modelType, inputVoltage))
+			p = multiprocessing.Process(target=runInverterExperiment, name="RunInverterExperiment", args=(modelType, inputVoltage))
 			p.start()
 
 			# Wait a maximum of timeout seconds for process
@@ -111,3 +123,26 @@ if __name__ == '__main__':
 				# Terminate process
 				p.terminate()
 				p.join()
+
+
+	# Run inverter loop experiments
+	modelTypesL = ["tanh", "lcMosfet", "scMosfet"]
+	numInvertersL = [1, 2, 3, 4]
+	for modelType in modelTypesL:
+		for numInverters in numInvertersL:
+			p = multiprocessing.Process(target=runInverterLoopExperiment, name="RunInverterLoopExperiment", args=(timingFilename, modelType, numInverters))
+			p.start()
+
+
+			# Wait a maximum of timeout seconds for process
+			# Usage: join([timeout in seconds])
+			p.join(timeout)
+
+			# If thread is active
+			if p.is_alive():
+				print "After 10 hours... let's kill it..."
+
+				# Terminate process
+				p.terminate()
+				p.join()
+

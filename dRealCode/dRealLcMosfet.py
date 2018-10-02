@@ -161,8 +161,8 @@ def rambusOscillatorLcMosfet(numStages, numSolutions = "all", g_cc = 0.5, Vtp = 
 		for solution in allSolutions:
 			singleExcludingConstraints = []
 			for i in range(lenV):
-				singleExcludingConstraints.append(vs[i] <= solution[i][0])
-				singleExcludingConstraints.append(vs[i] >= solution[i][1])
+				singleExcludingConstraints.append(vs[i] < solution[i][0])
+				singleExcludingConstraints.append(vs[i] > solution[i][1])
 			excludingConstraints.append(singleExcludingConstraints)
 		
 		#print ("allConstraints")
@@ -243,8 +243,8 @@ def schmittTriggerLcMosfet(inputVoltage, Vtp = -0.4, Vtn = 0.4, Vdd = 1.8, Kn = 
 		for solution in allSolutions:
 			singleExcludingConstraints = []
 			for i in range(lenV):
-				singleExcludingConstraints.append(vs[i] <= solution[i][0])
-				singleExcludingConstraints.append(vs[i] >= solution[i][1])
+				singleExcludingConstraints.append(vs[i] < solution[i][0])
+				singleExcludingConstraints.append(vs[i] > solution[i][1])
 			excludingConstraints.append(singleExcludingConstraints)
 		
 		#print ("allConstraints")
@@ -307,8 +307,8 @@ def inverterLcMosfet(inputVoltage, Vtp = -0.4, Vtn = 0.4, Vdd = 1.8, Kn = 270*1e
 		excludingConstraints = []
 		for solution in allSolutions:
 			singleExcludingConstraints = []
-			singleExcludingConstraints.append(outputVolt <= solution[0][0])
-			singleExcludingConstraints.append(outputVolt >= solution[0][1])
+			singleExcludingConstraints.append(outputVolt < solution[0][0])
+			singleExcludingConstraints.append(outputVolt > solution[0][1])
 			excludingConstraints.append(singleExcludingConstraints)
 		
 		#print ("allConstraints")
@@ -374,8 +374,8 @@ def inverterLoopLcMosfet(numInverters, numSolutions = "all", Vtp = -0.4, Vtn = 0
 		for solution in allSolutions:
 			singleExcludingConstraints = []
 			for i in range(numInverters):
-				singleExcludingConstraints.append(vs[i] <= solution[i][0])
-				singleExcludingConstraints.append(vs[i] >= solution[i][1])
+				singleExcludingConstraints.append(vs[i] < solution[i][0])
+				singleExcludingConstraints.append(vs[i] > solution[i][1])
 			excludingConstraints.append(singleExcludingConstraints)
 		
 		#print ("allConstraints")

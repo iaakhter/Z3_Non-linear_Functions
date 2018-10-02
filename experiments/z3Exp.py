@@ -22,19 +22,28 @@ def runSchmittExperiment(modelType, inputVoltage):
 
 def runInverterExperiment(modelType, inputVoltage):
 	print ("inverter modelType", modelType, "inputVoltage", inputVoltage)
+	if modelType == "tanh":
+		allHypers = inverterTanh(inputVoltage = inputVoltage)
 	if modelType == "lcMosfet":
 		allHypers = inverterLcMosfet(inputVoltage = inputVoltage)
+
+def runInverterLoopExperiment(modelType, numInverters):
+	print ("inverter modelType", modelType, "numInverters", numInverters)
+	if modelType == "tanh":
+		allHypers = inverterLoopTanh(numInverters = numInverters)
+	if modelType == "lcMosfet":
+		allHypers = inverterLoopLcMosfet(numInverters = numInverters)
 
 
 if __name__ == '__main__':
 	timeout = 36000 # in seconds (10 hours)
 
 	# Run rambus experiments
-	modelTypesL = ["tanh", "lcMosfet"]
+	modelTypesL = ["tanh"]
 	#modelTypesL = ["tanh"]
-	numStagesL = [2, 4, 6]
+	numStagesL = [2]
 	#numStagesL = [2]
-	gccL = [0.5, 4.0]
+	gccL = [0.5]
 	for modelType in modelTypesL:
 		for numStages in numStagesL:
 			for gcc in gccL:	
@@ -55,7 +64,7 @@ if __name__ == '__main__':
 					p.join()
 
 	# Run schmitt trigger experiments
-	modelTypesL = ["lcMosfet"]
+	'''modelTypesL = ["lcMosfet"]
 	inputVoltages = []
 	for modelType in modelTypesL:
 		if modelType == "lcMosfet":
@@ -89,7 +98,7 @@ if __name__ == '__main__':
 		elif modelType == "scMosfet":
 			inputVoltages = [0.0, 1.0]
 		for inputVoltage in inputVoltages:
-			p = multiprocessing.Process(target=runInverterExperiment, name="RunSchmittExperiment", args=(modelType, inputVoltage))
+			p = multiprocessing.Process(target=runInverterExperiment, name="RunInverterExperiment", args=(modelType, inputVoltage))
 			p.start()
 
 			# Wait a maximum of timeout seconds for process
@@ -103,3 +112,24 @@ if __name__ == '__main__':
 				# Terminate process
 				p.terminate()
 				p.join()
+
+	# Run inverter loop experiments
+	modelTypesL = ["tanh", "lcMosfet"]
+	numInvertersL = [1, 2, 3, 4]
+	for modelType in modelTypesL:
+		for numInverters in numInvertersL:
+			p = multiprocessing.Process(target=runInverterLoopExperiment, name="RunInverterLoopExperiment", args=(timingFilename, modelType, numInverters))
+			p.start()
+
+
+			# Wait a maximum of timeout seconds for process
+			# Usage: join([timeout in seconds])
+			p.join(timeout)
+
+			# If thread is active
+			if p.is_alive():
+				print "After 10 hours... let's kill it..."
+
+				# Terminate process
+				p.terminate()
+				p.join()'''

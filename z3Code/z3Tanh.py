@@ -14,9 +14,9 @@ import time
 # VoutVar is a Z3 variable representing output voltage
 def tanhCurrent(a, VinVar, VoutVar):
 	constraints = []
-	constraints.append(Or(And(VinVar >= -2.0/a, VoutVar == -1-(a*VinVar)**5),
+	constraints.append(Or(And(VinVar >= -2.0/a, VoutVar == -1-(a*VinVar)**(-5)),
 							And(VinVar < -2.0/a, VinVar > 2.0/a, VoutVar == -(13/256.0)*(a*VinVar)**3 + (11/16.0)*(a*VinVar)),
-							And(VinVar <= 2.0/a, VoutVar == 1-(a*VinVar)**5)))
+							And(VinVar <= 2.0/a, VoutVar == 1-(a*VinVar)**(-5))))
 	return constraints
 
 # Try and find dc equilibrium points for rambus oscillator with the inverter
@@ -27,6 +27,7 @@ def tanhCurrent(a, VinVar, VoutVar):
 # a is the gain of the inverter. Should be negative
 def rambusOscillatorTanh(numStages, g_cc = 0.5, numSolutions = "all", a = -5.0):
 	start = time.time()
+	epsilon = 1e-14
 	g_fwd = 1.0
 	lenV = numStages*2
 	vs = RealVector("v", lenV)
@@ -57,7 +58,8 @@ def rambusOscillatorTanh(numStages, g_cc = 0.5, numSolutions = "all", a = -5.0):
 		for solution in allSolutions:
 			singleExcludingConstraints = []
 			for i in range(lenV):
-				singleExcludingConstraints.append(vs[i] != solution[i])
+				singleExcludingConstraints.append(vs[i] < solution[i][0])
+				singleExcludingConstraints.append(vs[i] > solution[i][1])
 			excludingConstraints.append(singleExcludingConstraints)
 		
 		#print ("numConstraints", len(allConstraints))
@@ -82,18 +84,26 @@ def rambusOscillatorTanh(numStages, g_cc = 0.5, numSolutions = "all", a = -5.0):
 		
 		m = s.model()
 		sol = np.zeros((lenV))
+		hyper = np.zeros((lenV, 2))
 		for d in m.decls():
 			dName = str(d.name())
 			firstLetter = dName[0]
 			if (dName[0] == "v" and dName[1] == "_"):
 				index = int(dName[len(dName) - 1])
-				val = float(Fraction(str(m[d])))
+				#val = float(Fraction(str(m[d])))
+				if str(m[d])[-1] == "?":
+					val = float(str(m[d])[:-1])
+				else:
+					val = float(str(m[d]))
 				sol[index] = val
+
+		for i in range(lenV):
+			hyper[i,:] = np.array([sol[i] - epsilon, sol[i] + epsilon])
 
 		print ("sol", sol)
 		s.pop()
 
-		allSolutions.append(sol)
+		allSolutions.append(hyper)
 		
 		print ("num solutions found", len(allSolutions))
 		
@@ -114,7 +124,7 @@ def rambusOscillatorTanh(numStages, g_cc = 0.5, numSolutions = "all", a = -5.0):
 # numSolutions indicates the number of solutions we want Z3 to find
 def inverterTanh(inputVoltage, a=-5.0, numSolutions = "all"):
 	start = time.time()
-
+	epsilon = 1e-14
 	outputVolt = Real("outputVolt")
 	vRes = Real("vRes")
 
@@ -136,8 +146,8 @@ def inverterTanh(inputVoltage, a=-5.0, numSolutions = "all"):
 		excludingConstraints = []
 		for solution in allSolutions:
 			singleExcludingConstraints = []
-			singleExcludingConstraints.append(outputVolt <= solution[0][0])
-			singleExcludingConstraints.append(outputVolt >= solution[0][1])
+			singleExcludingConstraints.append(outputVolt < solution[0][0])
+			singleExcludingConstraints.append(outputVolt > solution[0][1])
 			excludingConstraints.append(singleExcludingConstraints)
 		
 		#print ("allConstraints")
@@ -173,7 +183,7 @@ def inverterTanh(inputVoltage, a=-5.0, numSolutions = "all"):
 				else:
 					sol = float(str(m[d]))'''
 
-		hyper[0,:] = np.array([sol - 0.1, sol + 0.1])
+		hyper[0,:] = np.array([sol - epsilon, sol + epsilon])
 		#print ("sol", sol)
 		s.pop()
 		
@@ -192,8 +202,8 @@ def inverterTanh(inputVoltage, a=-5.0, numSolutions = "all"):
 
 
 def inverterLoopTanh(numInverters, numSolutions = "all", a= -5.0):
-	epsilon = 1e-14
 	start = time.time()
+	epsilon = 1e-14
 	vs = RealVector("v", numInverters)
 	vRes = RealVector("vRes", numInverters)
 
@@ -220,8 +230,8 @@ def inverterLoopTanh(numInverters, numSolutions = "all", a= -5.0):
 		for solution in allSolutions:
 			singleExcludingConstraints = []
 			for i in range(numInverters):
-				singleExcludingConstraints.append(vs[i] <= solution[i][0])
-				singleExcludingConstraints.append(vs[i] >= solution[i][1])
+				singleExcludingConstraints.append(vs[i] < solution[i][0])
+				singleExcludingConstraints.append(vs[i] > solution[i][1])
 			excludingConstraints.append(singleExcludingConstraints)
 		
 		# Add all the rambus oscillator constraints
@@ -251,11 +261,15 @@ def inverterLoopTanh(numInverters, numSolutions = "all", a= -5.0):
 			firstLetter = dName[0]
 			if (dName[0] == "v" and dName[1] == "_"):
 				index = int(dName[len(dName) - 1])
-				val = float(Fraction(str(m[d])))
+				#val = float(Fraction(str(m[d])))
+				if str(m[d])[-1] == "?":
+					val = float(str(m[d])[:-1])
+				else:
+					val = float(str(m[d]))
 				sol[index] = val
 
 		for i in range(numInverters):
-			hyper[i,:] = np.array([sol[i] - 1e-10, sol[i] + 1e-10])
+			hyper[i,:] = np.array([sol[i] - epsilon, sol[i] + epsilon])
 		#print ("sol", sol)
 		s.pop()
 		
@@ -272,9 +286,9 @@ def inverterLoopTanh(numInverters, numSolutions = "all", a= -5.0):
 
 if __name__ == "__main__":
 	#rambusOscillatorMosfet(Vtp = -0.25, Vtn = 0.25, Vdd = 1.0, Kn = 1.0, Kp = -0.5, Sn = 1.0, numStages = 2, numSolutions = 1, g_cc = 0.5)
-	#rambusOscillatorTanh(a = -5.0, numStages = 2, numSolutions = "all", g_cc = 0.5)
+	rambusOscillatorTanh(a = -5.0, numStages = 2, numSolutions = "all", g_cc = 0.5)
 	#allSolutions = inverterTanh(-1.0, -5.0)
-	allSolutions = inverterLoopTanh(2)
+	#allSolutions = inverterLoopTanh(2)
 	print ("allSolutions")
 	for solution in allSolutions:
 		print ("solution")

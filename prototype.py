@@ -376,24 +376,31 @@ def addToSolutions(model, allHypers, solHyper, kAlpha):
 	epsilon = 1e-12
 	lenV = len(model.bounds)
 	foundOverlap = False
+	exampleVolt = (solHyper[:,0] + solHyper[:,1])/2.0
+	soln = intervalUtils.newton(model,exampleVolt)
+	
+	if not(soln[0]):
+		raise Exception("prototype.py addToSolutions: Something went wrong. Should contain a unique solution")
+	
 	for hi in range(len(allHypers)):
 		oldHyper = allHypers[hi]
 
 		#Check if solHyper overlaps with oldHyper
-		#if all(interval_intersect(solHyper[i], oldHyper[i]) is not None for i in range(lenV)):
-		#if (all(interval_intersect(solHyper[i], oldHyper[i]) is not None for i in range(lenV)) or 
-		#	all(abs(solHyper[i,0] - oldHyper[i,0]) < 1e-12 and abs(solHyper[i,1] - oldHyper[i,1]) < 1e-12 for i in range(lenV))):
 		if all(interval_intersect(solHyper[i], oldHyper[i]) is not None for i in range(lenV)):
-			unionHyper = np.zeros((lenV,2))
+			intersectHyper = np.zeros((lenV,2))
 			for ui in range(lenV):
-				unionHyper[ui,:] = interval_union(solHyper[ui], oldHyper[ui])
+				intersectHyper[ui,:] = interval_intersect(solHyper[ui], oldHyper[ui])
 
-			feasibility = intervalUtils.checkExistenceOfSolution(model, unionHyper.transpose(), alpha = kAlpha)
-			#print ("feasibility in addToSolutions", feasibility)
-			if feasibility[0]:
-				foundOverlap = True
-				allHypers[hi] = unionHyper
-				break
+			if np.all(soln[1] >= intersectHyper[:,0]) and np.all(soln[1] <= intersectHyper[:,1]):
+				hyperAroundNewton = np.zeros((lenV, 2))
+				for si in range(lenV):
+					minDiff = min(abs(intersectHyper[si,1] - soln[1][si]), abs(soln[1][si] - intersectHyper[si,0]))
+					hyperAroundNewton[si,0] = soln[1][si] - minDiff
+					hyperAroundNewton[si,1] = soln[1][si] + minDiff
+				feasibility = intervalUtils.checkExistenceOfSolution(model, hyperAroundNewton.transpose(), alpha = kAlpha)
+				if feasibility[0]:
+					foundOverlap = True
+					break
 
 	if not(foundOverlap):
 		allHypers.append(solHyper)
@@ -626,15 +633,6 @@ def inverterLoop(modelType, numInverters, statVars, kAlpha=1.0, bisectType="bise
 	#print ("numLpCalls", statVars['numLpCalls'], "numSuccessLpCalls", statVars['numSuccessLpCalls'], "numUnsuccessLpCalls", statVars['numUnsuccessLpCalls'])
 	return allHypers
 
-def ownCircuit():
-	inputVoltage = 0.7
-	modelParam = [0.9] #Vdd
-	modelParam = [-0.4, 0.4, 1.8, 270*1e-6, -90*1e-6, 8/3.0]
-	model = InverterLoopMosfet(modelType = "lcMosfet", modelParam = modelParam, inputVoltage = inputVoltage)
-	allHypers = []
-	solverLoopNoLp(allHypers, model)
-	print ("allHypers")
-	print (allHypers)
 
 
 # Find the dc equilibrium points for a rambus ring oscillator
@@ -742,10 +740,10 @@ def rambusOscillator(modelType, numStages, g_cc, statVars, kAlpha=1.0, bisectTyp
 	if statVars['numK'] != 0:
 		statVars['avgKTime'] = (statVars['totalKTime']*1.0)/statVars['numK']
 	
-	'''print ("numBisection", statVars['numBisection'], "numLp", statVars['numLp'], "numK", statVars['numK'],
+	print ("numBisection", statVars['numBisection'], "numLp", statVars['numLp'], "numK", statVars['numK'],
 		"numSingleKill", statVars['numSingleKill'], "numDoubleKill", statVars['numDoubleKill'])
 	print ("totalKTime", statVars['totalKTime'], "totalLPTime", statVars['totalLPTime'], "avgKTime", 
-		statVars['avgKTime'], "avgLPTime", statVars['avgLPTime'])'''
+		statVars['avgKTime'], "avgLPTime", statVars['avgLPTime'])
 	#print ("numLpCalls", statVars['numLpCalls'], "numSuccessLpCalls", statVars['numSuccessLpCalls'], "numUnsuccessLpCalls", statVars['numUnsuccessLpCalls'])
 	return allHypers
 
@@ -866,14 +864,14 @@ if __name__ == "__main__":
 	start = time.time()
 	#allHypers = schmittTrigger(modelType="scMosfet", inputVoltage = 0.0, statVars=statVars, numSolutions = "all")
 	#allHypers = inverter(modelType="tanh", inputVoltage=1.0, statVars=statVars, numSolutions="all")
-	allHypers = inverterLoop(modelType="scMosfet", numInverters=1, statVars=statVars, numSolutions="all")
-	#allHypers = rambusOscillator(modelType="tanh", numStages=2, g_cc=4.0, statVars=statVars, kAlpha = 1.0, numSolutions="all", bisectType="bisectNewton")
+	#allHypers = inverterLoop(modelType="scMosfet", numInverters=1, statVars=statVars, numSolutions="all")
+	allHypers = rambusOscillator(modelType="scMosfet", numStages=4, g_cc=4.0, statVars=statVars, kAlpha = 1.0, numSolutions="all", bisectType="bisectNewton")
 	#allHypers = singleVariableInequalities(problemType="flyspeck172", statVars=statVars)
 	#ownCircuit()
 	end = time.time()
-	print ("allHypers")
+	'''print ("allHypers")
 	for hyper in allHypers:
 		print ("hyper")
-		intervalUtils.printHyper(hyper)
+		intervalUtils.printHyper(hyper)'''
 	print ("numSolutions", len(allHypers))
 	print ("time taken", end - start)

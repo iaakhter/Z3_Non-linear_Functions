@@ -264,8 +264,8 @@ def tanhLinearConstraints(a, b, inputVar, outputVar, inputLow, inputHigh):
 	overallConstraint += "1 " + outputVar + " <= 1.0\n"
 	overallConstraint += "1 " + outputVar + " >= -1.0\n"
 	allTrianglePoints = []
-	allTrianglePoints += trianglePoints(tanhFun, tanhFunder, inputLow, 0.0, constant)
-	allTrianglePoints += trianglePoints(tanhFun, tanhFunder, 0.0, inputHigh, constant)
+	allTrianglePoints += trianglePoints(tanhFun, tanhFunder, inputLow, 0.0, a, b)
+	allTrianglePoints += trianglePoints(tanhFun, tanhFunder, 0.0, inputHigh, a, b)
 	allTrianglePoints = np.array(allTrianglePoints)
 	try:
 		cHullConstraints = convexHullConstraints2D(allTrianglePoints, inputVar, outputVar)

@@ -348,7 +348,7 @@ def inverterLoopScMosfet(numInverters, numSolutions = "all"):
 			break
 		hyper = np.zeros((numInverters,2))
 		for i in range(numInverters):
-			hyper[i,:] = [result[vs[i]].lb() - 1000*epsilon, result[vs[i]].ub() + 1000*epsilon]
+			hyper[i,:] = [result[vs[i]].lb() - 2*epsilon, result[vs[i]].ub() + 2*epsilon]
 
 		#print ("hyper", hyper)
 		allSolutions.append(hyper)
@@ -429,7 +429,7 @@ def rambusOscillatorScMosfet(numStages, g_cc = 0.5, numSolutions = "all"):
 			break
 		hyper = np.zeros((lenV,2))
 		for i in range(lenV):
-			hyper[i,:] = [result[vs[i]].lb() - 1000*epsilon, result[vs[i]].ub() + 1000*epsilon]
+			hyper[i,:] = [result[vs[i]].lb() - 2*epsilon, result[vs[i]].ub() + 2*epsilon]
 
 		#print ("hyper", hyper)
 		allSolutions.append(hyper)
@@ -509,7 +509,7 @@ def schmittTriggerScMosfet(inputVoltage, numSolutions = "all"):
 			break
 		hyper = np.zeros((lenV,2))
 		for i in range(lenV):
-			hyper[i,:] = [result[vs[i]].lb() - 1000*epsilon, result[vs[i]].ub() + 1000*epsilon]
+			hyper[i,:] = [result[vs[i]].lb() - 2*epsilon, result[vs[i]].ub() + 2*epsilon]
 
 		#print ("hyper", hyper)
 		allSolutions.append(hyper)

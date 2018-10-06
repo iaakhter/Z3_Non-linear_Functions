@@ -325,7 +325,7 @@ def inverterLcMosfet(inputVoltage, Vtp = -0.4, Vtn = 0.4, Vdd = 1.8, Kn = 270*1e
 		if result is None:
 			break
 		hyper = np.zeros((1,2))
-		hyper[0,:] = [result[outputVolt].lb() - 2*epsilon, result[outputVolt].ub() + 2*epsilon]
+		hyper[0,:] = [result[outputVolt].lb() - 1000*epsilon, result[outputVolt].ub() + 1000*epsilon]
 
 		#print ("hyper", hyper)
 		allSolutions.append(hyper)

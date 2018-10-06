@@ -14,9 +14,9 @@ import time
 # VoutVar is a Z3 variable representing output voltage
 def tanhCurrent(a, VinVar, VoutVar):
 	constraints = []
-	constraints.append(Or(And(VinVar >= -2.0/a, VoutVar == -1-(a*VinVar)**(-5)),
-							And(VinVar < -2.0/a, VinVar > 2.0/a, VoutVar == -(13/256.0)*(a*VinVar)**3 + (11/16.0)*(a*VinVar)),
-							And(VinVar <= 2.0/a, VoutVar == 1-(a*VinVar)**(-5))))
+	constraints.append(Or(And(VinVar > -2.0/a, VoutVar == -1-(a*VinVar)**(-5)),
+							And(VinVar <= -2.0/a, VinVar >= 2.0/a, VoutVar == -(13/256.0)*(a*VinVar)**3 + (11/16.0)*(a*VinVar)),
+							And(VinVar < 2.0/a, VoutVar == 1-(a*VinVar)**(-5))))
 	return constraints
 
 # Try and find dc equilibrium points for rambus oscillator with the inverter
@@ -98,7 +98,7 @@ def rambusOscillatorTanh(numStages, g_cc = 0.5, numSolutions = "all", a = -5.0):
 				sol[index] = val
 
 		for i in range(lenV):
-			hyper[i,:] = np.array([sol[i] - epsilon, sol[i] + epsilon])
+			hyper[i,:] = np.array([sol[i] - 1e+5*epsilon, sol[i] + 1e+5*epsilon])
 
 		print ("sol", sol)
 		s.pop()
@@ -183,7 +183,7 @@ def inverterTanh(inputVoltage, a=-5.0, numSolutions = "all"):
 				else:
 					sol = float(str(m[d]))'''
 
-		hyper[0,:] = np.array([sol - epsilon, sol + epsilon])
+		hyper[0,:] = np.array([sol - 1e+5*epsilon, sol + 1e+5*epsilon])
 		#print ("sol", sol)
 		s.pop()
 		
@@ -269,7 +269,7 @@ def inverterLoopTanh(numInverters, numSolutions = "all", a= -5.0):
 				sol[index] = val
 
 		for i in range(numInverters):
-			hyper[i,:] = np.array([sol[i] - epsilon, sol[i] + epsilon])
+			hyper[i,:] = np.array([sol[i] - 1e+5*epsilon, sol[i] + 1e+5*epsilon])
 		#print ("sol", sol)
 		s.pop()
 		

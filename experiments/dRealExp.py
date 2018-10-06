@@ -37,11 +37,11 @@ def runInverterExperiment(modelType, inputVoltage):
 def runInverterLoopExperiment(modelType, numInverters):
 	print ("inverterLoop modelType", modelType, "numInverters", numInverters)
 	if modelType == "tanh":
-		allHypers = inverterLoopTanh(inputVoltage = inputVoltage)
+		allHypers = inverterLoopTanh(numInverters = numInverters)
 	if modelType == "lcMosfet":
-		allHypers = inverterLoopLcMosfet(inputVoltage = inputVoltage)
+		allHypers = inverterLoopLcMosfet(numInverters = numInverters)
 	if modelType == "scMosfet":
-		allHypers = inverterLoopScMosfet(inputVoltage = inputVoltage)
+		allHypers = inverterLoopScMosfet(numInverters = numInverters)
 
 
 
@@ -49,7 +49,7 @@ if __name__ == '__main__':
 	timeout = 36000 # in seconds (10 hours)
 
 	# Run rambus experiments
-	modelTypesL = ["tanh", "lcMosfet", "scMosfet"]
+	'''modelTypesL = ["tanh", "lcMosfet", "scMosfet"]
 	#modelTypesL = ["scMosfet"]
 	numStagesL = [2, 4, 6]
 	#numStagesL = [2]
@@ -96,14 +96,14 @@ if __name__ == '__main__':
 
 				# Terminate process
 				p.terminate()
-				p.join()
+				p.join()'''
 
 	# Run inverter experiments
-	modelTypesL = ["tanh","lcMosfet", "scMosfet"]
+	'''modelTypesL = ["tanh","lcMosfet", "scMosfet"]
 	inputVoltages = []
 	for modelType in modelTypesL:
 		if modelType == "tanh":
-			inputVoltages = [-0.9, 0.9]
+			inputVoltages = [-1.0, 1.0]
 		elif modelType == "lcMosfet":
 			inputVoltages = [0.0, 1.8]
 		elif modelType == "scMosfet":
@@ -122,7 +122,7 @@ if __name__ == '__main__':
 
 				# Terminate process
 				p.terminate()
-				p.join()
+				p.join()'''
 
 
 	# Run inverter loop experiments
@@ -130,7 +130,7 @@ if __name__ == '__main__':
 	numInvertersL = [1, 2, 3, 4]
 	for modelType in modelTypesL:
 		for numInverters in numInvertersL:
-			p = multiprocessing.Process(target=runInverterLoopExperiment, name="RunInverterLoopExperiment", args=(timingFilename, modelType, numInverters))
+			p = multiprocessing.Process(target=runInverterLoopExperiment, name="RunInverterLoopExperiment", args=(modelType, numInverters))
 			p.start()
 
 

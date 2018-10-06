@@ -39,7 +39,7 @@ if __name__ == '__main__':
 	timeout = 36000 # in seconds (10 hours)
 
 	# Run rambus experiments
-	modelTypesL = ["tanh"]
+	'''modelTypesL = ["tanh"]
 	#modelTypesL = ["tanh"]
 	numStagesL = [2]
 	#numStagesL = [2]
@@ -61,7 +61,7 @@ if __name__ == '__main__':
 
 					# Terminate process
 					p.terminate()
-					p.join()
+					p.join()'''
 
 	# Run schmitt trigger experiments
 	'''modelTypesL = ["lcMosfet"]
@@ -85,10 +85,10 @@ if __name__ == '__main__':
 
 				# Terminate process
 				p.terminate()
-				p.join()
+				p.join()'''
 
 	# Run inverter experiments
-	modelTypesL = ["tanh", "lcMosfet"]
+	'''modelTypesL = ["tanh", "lcMosfet"]
 	inputVoltages = []
 	for modelType in modelTypesL:
 		if modelType == "tanh":
@@ -111,14 +111,14 @@ if __name__ == '__main__':
 
 				# Terminate process
 				p.terminate()
-				p.join()
+				p.join()'''
 
 	# Run inverter loop experiments
-	modelTypesL = ["tanh", "lcMosfet"]
+	modelTypesL = ["lcMosfet"]
 	numInvertersL = [1, 2, 3, 4]
 	for modelType in modelTypesL:
 		for numInverters in numInvertersL:
-			p = multiprocessing.Process(target=runInverterLoopExperiment, name="RunInverterLoopExperiment", args=(timingFilename, modelType, numInverters))
+			p = multiprocessing.Process(target=runInverterLoopExperiment, name="RunInverterLoopExperiment", args=(modelType, numInverters))
 			p.start()
 
 
@@ -132,4 +132,4 @@ if __name__ == '__main__':
 
 				# Terminate process
 				p.terminate()
-				p.join()'''
+				p.join()

@@ -22,10 +22,13 @@ def sinFun(x,const):
 			return np.array([-1.0, 1.0])
 
 		if int(lowVal) %2 == 0:
-			return np.array([min(funVal[0], funVal[1]), 1.0])
+			lVal = np.nextafter(min(funVal[0], funVal[1]), float("-inf"))
+			return np.array([lVal, 1.0])
 
 		else:
-			return np.array([-1.0, max(funVal[0], funVal[1])])
+			uVal = np.nextafter(max(funVal[0], funVal[1]), float("inf"))
+			return np.array([-1.0, uVal])
+		funVal = interval_round(funVal)
 
 	return funVal
 	
@@ -48,9 +51,12 @@ def cosFun(x,const):
 			return np.array([-1.0, 1.0])
 			
 		if int(lowVal) %2 == 0:
-			return np.array([min(funVal[0], funVal[1]), 1.0])
+			lVal = np.nextafter(min(funVal[0], funVal[1]), float("-inf"))
+			return np.array([lVal, 1.0])
 		else:
-			return np.array([-1.0, max(funVal[0], funVal[1])])
+			uVal = np.nextafter(max(funVal[0], funVal[1]), float("inf"))
+			return np.array([-1.0, uVal])
+		funVal = interval_round(funVal)
 	
 	return funVal
 	
@@ -63,7 +69,9 @@ def cosFunder(x,const):
 def tanhFun(x, a, b):
 	tanhVal = np.tanh(a*x + b)
 	if interval_p(x):
-		return np.array([min(tanhVal[0], tanhVal[1]), max(tanhVal[0], tanhVal[1])])
+		lVal = np.nextafter(min(tanhVal[0], tanhVal[1]), float("-inf"))
+		uVal = np.nextafter(max(tanhVal[0], tanhVal[1]), float("inf"))
+		return np.array([lVal, uVal])
 
 	return tanhVal
 
@@ -78,6 +86,7 @@ def tanhFunder(x, a, b):
 			den0 = np.cosh(separX)*np.cosh(separX)
 			grad0 = np.divide(a,den0)
 			grad = np.array([min(grad[0], grad[1], grad0), max(grad[0], grad[1], grad0)])
+		grad = interval_round(grad)
 
 	return grad
 
@@ -89,9 +98,12 @@ def invFun(x, const):
 	funVal = np.divide(1, (const*x))
 	if interval_p(x):
 		if x[0]*x[1] > 0.0:
-			return np.array([min(funVal[0], funVal[1]), max(funVal[0], funVal[1])])
+			lVal = np.nextafter(min(funVal[0], funVal[1]), float("-inf"))
+			uVal = np.nextafter(max(funVal[0], funVal[1]), float("inf"))
+			return np.array([lVal, uVal])
 		else:
 			return np.array([-float("inf"), float("inf")])
+		funVal = interval_round(funVal)
 	return funVal
 	
 
@@ -101,9 +113,13 @@ def invFunder(x,const):
 	der = -np.divide(const,(const*const*x*x))
 	if interval_p(x):
 		if x[0]*x[1] > 0.0:
-			return np.array([min(der[0], der[1]), max(der[0], der[1])])
+			lVal = np.nextafter(min(der[0], der[1]), float("-inf"))
+			uVal = np.nextafter(max(der[0], der[1]), float("inf"))
+			return np.array([lVal, uVal])
 		else:
-			return np.array([-float("inf"), max(der[0], der[1])])
+			uVal = np.nextafter(max(der[0], der[1]), float("inf"))
+			return np.array([-float("inf"), uVal])
+		der = interval_round(der)
 
 	return der
 
@@ -115,7 +131,9 @@ def arcsinFun(x, const):
 		raise Exception('Invalid argument for arcsin ' + str(x))
 	fun = np.arcsin(const*x)
 	if interval_p(x):
-		return np.array([min(fun[0], fun[1]), max(fun[0], fun[1])])
+		lVal = np.nextafter(min(fun[0], fun[1]), float("-inf"))
+		uVal = np.nextafter(max(fun[0], fun[1]), float("inf"))
+		return np.array([lVal, uVal])
 	return fun
 
 
@@ -129,7 +147,8 @@ def arcsinFunder(x, const):
 		else:
 			grad0 = np.divide(const,(1.0))
 			grad = np.array([min(grad[0], grad[1], grad0), max(grad[0], grad[1], grad0)])
-
+		grad = interval_round(grad)
+	
 	return grad
 
 

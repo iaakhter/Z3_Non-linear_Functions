@@ -7,41 +7,44 @@ from intervalBasics import *
 
 
 '''
-Multiply regular matrix with interval matrix
-@param regMat regular matrix
-@param intervalMat interval matrix
-@return resulting interval matrix
+Multiply 2 matrices and return the resulting matrix. 
+Any matrix can be an interval matrix
 '''
-def multiplyRegularMatWithIntervalMat(regMat,intervalMat):
-	result = np.zeros((regMat.shape[0],intervalMat.shape[1],2))
-	for i in range(regMat.shape[0]):
-		for j in range(intervalMat.shape[1]):
-			intervalVal = np.zeros(2)
-			for k in range(intervalMat.shape[1]):
-				intervalVal += interval_mult(regMat[i,k],intervalMat[k,j])
+def multiplyMats(mat1, mat2):
+	isInterval = len(mat1.shape) == 3 or len(mat2.shape) == 3
+	if isInterval:
+		result = np.zeros((mat1.shape[0],mat2.shape[1],2))
+	else:
+		result = np.zeros((mat1.shape[0],mat2.shape[1]))
+	
+	for i in range(mat1.shape[0]):
+		for j in range(mat2.shape[1]):
+			if isInterval:
+				intervalVal = np.zeros(2)
+			else:
+				intervalVal = 0.0
+			for k in range(mat2.shape[1]):
+				intervalVal += interval_mult(mat1[i,k],mat2[k,j])
 				intervalVal = interval_round(intervalVal)
-			result[i,j,:] = interval_round(intervalVal)
+			result[i,j] = interval_round(intervalVal)
 
 	return result
 
 
 '''
-Subtract interval matrix from regular matrix
+Subtract 2 matrices. Either of the matrix can be an interval matrix
 and return the resulting matrix
-@param regMat regular matrix
-@param intervalMat interval matrix
-@return resulting matrix
 '''
-def subtractIntervalMatFromRegularMat(regMat,intervalMat):
-	mat1 = regMat - intervalMat[:,:,0]
-	mat2 = regMat - intervalMat[:,:,1]
-	result = np.zeros((regMat.shape[0],regMat.shape[1],2))
-	result[:,:,0] = np.minimum(mat1,mat2)
-	result[:,:,1] = np.maximum(mat1,mat2)
+def subtractMats(mat1, mat2):
+	isInterval = len(mat1.shape) == 3 or len(mat2.shape) == 3
+	if isInterval:
+		result = np.zeros((mat1.shape[0],mat2.shape[1],2))
+	else:
+		result = np.zeros((mat1.shape[0],mat2.shape[1]))
+
 	for i in range(result.shape[0]):
 		for j in range(result.shape[1]):
-			result[i,j,0] = np.nextafter(result[i,j,0], np.float("-inf"))
-			result[i,j,1] = np.nextafter(result[i,j,1], np.float("inf"))
+			result[i,j] = interval_sub(mat1[i,j], mat2[i,j])
 	return result
 
 '''
@@ -65,16 +68,38 @@ def multiplyMatWithVec(mat,vec):
 			intervalVal = np.zeros((1))
 		for j in range(mat.shape[1]):
 			mult = interval_mult(mat[i,j],vec[j])
-			if isInterval:
-				intervalVal += mult
-				intervalVal = interval_round(intervalVal)
-			else:
-				intervalVal += mult
-		if isInterval:
-			result[i,:] = interval_round(intervalVal)
-		else:
-			result[i,:] = intervalVal
+			intervalVal += mult
+			intervalVal = interval_round(intervalVal)
+
+		result[i,:] = interval_round(intervalVal)
+	
 	return result
+
+
+'''
+Turn a regular matrix into an interval matrix by 
+subtracting ulp from each element to create a lower bound and 
+adding ulp to each element to create an upper bound
+'''
+def turnRegMatToIntervalMat(mat):
+	intervalMat = np.zeros((mat.shape[0], mat.shape[1], 2))
+	for i in range(mat.shape[0]):
+		for j in range(mat.shape[1]):
+			intervalMat[i,j] = np.array([np.nextafter(mat[i,j], float("-inf")), np.nextafter(mat[i,j], float("inf"))])
+
+	return intervalMat
+
+'''
+Turn a regular vector into an interval vector by 
+subtracting ulp from each element to create a lower bound and 
+adding ulp to each element to create an upper bound
+'''
+def turnRegVecToIntervalVec(vec):
+	intervalVec = np.zeros((len(vec), 2))
+	for i in range(len(vec)):
+		intervalVec[i] = np.array([np.nextafter(vec[i], float("-inf")), np.nextafter(vec[i], float("inf"))])
+
+	return intervalVec
 
 
 '''
@@ -127,6 +152,7 @@ def newton(model,soln,normThresh=1e-8):
 	return (True,soln)
 
 
+
 '''
 Do a krawczyk update on hyperrectangle defined by startBounds
 @param startBounds hyperrectangle
@@ -145,8 +171,9 @@ Do a krawczyk update on hyperrectangle defined by startBounds
 '''
 def krawczykHelp(startBounds, jacInterval, samplePoint, fSamplePoint, jacSamplePoint):
 	numV = startBounds.shape[0]
-	I = np.identity(numV)
-	epsilonBounds = 1e-12
+	ISing = np.identity(numV)
+	I = turnRegMatToIntervalMat(ISing)
+	
 
 	'''print ("startBounds")
 	printHyper(startBounds)
@@ -157,26 +184,30 @@ def krawczykHelp(startBounds, jacInterval, samplePoint, fSamplePoint, jacSampleP
 
 
 	try:
-		C = np.linalg.inv(jacSamplePoint)
+		CSing = np.linalg.inv(jacSamplePoint)
 	except:
 		# In case jacSamplePoint is singular
-		C = np.linalg.pinv(jacSamplePoint)
+		CSing = np.linalg.pinv(jacSamplePoint)
 
+	C = turnRegMatToIntervalMat(CSing)
+	
 	#print ("C", C)
-	C_fSamplePoint = np.dot(C,fSamplePoint)
+	#print ("fSamplePoint", fSamplePoint)
+	C_fSamplePoint = multiplyMatWithVec(C,fSamplePoint)
 	#print ("C_fSamplePoint", C_fSamplePoint)
 
-	C_jacInterval = multiplyRegularMatWithIntervalMat(C,jacInterval)
+	C_jacInterval = multiplyMats(C,jacInterval)
 
 	#print ("C_jacInterval", C_jacInterval)
 
-	I_minus_C_jacInterval = subtractIntervalMatFromRegularMat(I,C_jacInterval)
+	I_minus_C_jacInterval = subtractMats(I,C_jacInterval)
 
 	#print ("I_minus_C_jacInterval", I_minus_C_jacInterval)
 	
-	xi_minus_samplePoint = np.column_stack((startBounds[:,0] - samplePoint, startBounds[:,1] - samplePoint))
-	
-	xi_minus_samplePoint = np.array([interval_round(xi_minus_samplePoint[i]) for i in range(numV)])
+
+	xi_minus_samplePoint = np.zeros((numV, 2))
+	for i in range(numV):
+		xi_minus_samplePoint[i] = interval_sub(startBounds[i], samplePoint[i])
 
 	#print ("xi_minus_samplePoint", xi_minus_samplePoint)
 	lastTerm = multiplyMatWithVec(I_minus_C_jacInterval, xi_minus_samplePoint)
@@ -184,10 +215,9 @@ def krawczykHelp(startBounds, jacInterval, samplePoint, fSamplePoint, jacSampleP
 	#print ("lastTerm", lastTerm)
 	
 	kInterval = np.zeros((numV,2))
-	kInterval[:,0] = samplePoint - C_fSamplePoint + lastTerm[:,0]
-	kInterval[:,1] = samplePoint - C_fSamplePoint + lastTerm[:,1]
+
 	for i in range(numV):
-		kInterval[i,:] = interval_round(kInterval[i,:])
+		kInterval[i,:] = interval_add(interval_sub(samplePoint[i], C_fSamplePoint[i]), lastTerm[i])
 
 	#print ("startBounds")
 	#printHyper(startBounds)
@@ -262,7 +292,7 @@ Krawczyk update
 		hyperRectangle
 @return (False, None) if hyperrectangle contains no solution
 '''
-def checkExistenceOfSolution(model,hyperRectangle, alpha = 1.0):
+def checkExistenceOfSolution(model,hyperRectangle, alpha = 1.0, epsilonInflation=0.01):
 	epsilonBounds = 1e-12
 	numV = len(hyperRectangle[0])
 
@@ -293,14 +323,15 @@ def checkExistenceOfSolution(model,hyperRectangle, alpha = 1.0):
 		#print ("dist.shape", 0.1*dist+ epsilonBounds)
 		#print ("startBounds before")
 		#printHyper(startBounds)
-		startBounds[:,0] = startBounds[:,0] - (0.01*dist + epsilonBounds)
-		startBounds[:,1] = startBounds[:,1] + (0.01*dist + epsilonBounds)
+		startBounds[:,0] = startBounds[:,0] - (epsilonInflation*dist + epsilonBounds)
+		startBounds[:,1] = startBounds[:,1] + (epsilonInflation*dist + epsilonBounds)
 	
 		#print ("startBounds after")
 		#printHyper(startBounds)
-		samplePoint = (startBounds[:,0] + startBounds[:,1])/2.0
+		samplePointSing = (startBounds[:,0] + startBounds[:,1])/2.0
+		samplePoint = turnRegVecToIntervalVec(samplePointSing)
 		fSamplePoint = np.array(model.f(samplePoint))
-		jacSamplePoint = model.jacobian(samplePoint)
+		jacSamplePoint = model.jacobian(samplePointSing)
 		jacInterval = model.jacobian(startBounds)
 		
 		# Krawczyk update

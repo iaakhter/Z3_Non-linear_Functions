@@ -11,7 +11,7 @@
 %         bound by non-linear model
 
 
-function out = inverter(in, n, a)
+function out = inverterTanh(in, n, a)
   if(nargin < 3) a = 5; end
   if(nargin < 2) n = 1; end
   out = in;

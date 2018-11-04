@@ -171,8 +171,7 @@ Do a krawczyk update on hyperrectangle defined by startBounds
 '''
 def krawczykHelp(startBounds, jacInterval, samplePoint, fSamplePoint, jacSamplePoint):
 	numV = startBounds.shape[0]
-	ISing = np.identity(numV)
-	I = turnRegMatToIntervalMat(ISing)
+	I = np.identity(numV)
 	
 
 	'''print ("startBounds")
@@ -184,13 +183,11 @@ def krawczykHelp(startBounds, jacInterval, samplePoint, fSamplePoint, jacSampleP
 
 
 	try:
-		CSing = np.linalg.inv(jacSamplePoint)
+		C = np.linalg.inv(jacSamplePoint)
 	except:
 		# In case jacSamplePoint is singular
-		CSing = np.linalg.pinv(jacSamplePoint)
+		C = np.linalg.pinv(jacSamplePoint)
 
-	C = turnRegMatToIntervalMat(CSing)
-	
 	#print ("C", C)
 	#print ("fSamplePoint", fSamplePoint)
 	C_fSamplePoint = multiplyMatWithVec(C,fSamplePoint)
@@ -306,6 +303,7 @@ def checkExistenceOfSolution(model,hyperRectangle, alpha = 1.0, epsilonInflation
 	# does not contain zero then the hyperrectangle does not
 	# contain any solution
 	if hasattr(model, 'f'):
+		#print ("startBounds", startBounds)
 		funVal = model.f(startBounds)
 		if(any([np.nextafter(funVal[i,0], np.float("-inf"))*np.nextafter(funVal[i,1], np.float("inf")) > np.nextafter(0.0, np.float("inf")) 
 				for i in range(numV)])):

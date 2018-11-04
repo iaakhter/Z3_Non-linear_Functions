@@ -69,6 +69,8 @@ def rambusOscillatorLcMosfet(numStages, numSolutions = "all", g_cc = 0.5, Vtp = 
 	Sp = Sn *2.0
 	lenV = numStages*2
 
+	set_option(rational_to_decimal=True)
+
 	vs = RealVector('v', lenV)
 	ifwdNs = RealVector('ifwdN', lenV)
 	ifwdPs = RealVector('ifwdP', lenV)
@@ -101,8 +103,7 @@ def rambusOscillatorLcMosfet(numStages, numSolutions = "all", g_cc = 0.5, Vtp = 
 		for solution in allSolutions:
 			singleExcludingConstraints = []
 			for i in range(lenV):
-				singleExcludingConstraints.append(vs[i] < solution[i][0])
-				singleExcludingConstraints.append(vs[i] > solution[i][1])
+				singleExcludingConstraints.append(vs[i] != solution[i])
 			excludingConstraints.append(singleExcludingConstraints)
 		
 		#print ("allConstraints")
@@ -141,12 +142,22 @@ def rambusOscillatorLcMosfet(numStages, numSolutions = "all", g_cc = 0.5, Vtp = 
 					val = float(Fraction(str(m[d])))
 				sol[index] = val
 
+		m = s.model()
+		sol = [None]*lenV
+		for d in m.decls():
+			dName = str(d.name())
+			firstLetter = dName[0]
+			if (dName[0] == "v" and dName[1] == "_"):
+				index = int(dName[len(dName) - 1])
+				
+				sol[index] = m[d]
+
+
 		print ("sol", sol)
-		for i in range(lenV):
-			hyper[i,:] = np.array([sol[i] - epsilon, sol[i] + epsilon])
 		s.pop()
+
+		allSolutions.append(sol)
 		
-		allSolutions.append(hyper)
 		print ("num solutions found", len(allSolutions))
 
 	
@@ -166,6 +177,8 @@ def schmittTriggerLcMosfet(inputVoltage, Vtp = -0.4, Vtn = 0.4, Vdd = 1.8, Kn = 
 	start = time.time()
 	#print ("Vtp", Vtp, "Vtn", Vtn, "Vdd", Vdd, "Kn", Kn, "Kp", Kp, "Sn", Sn)
 	Sp = Sn *2.0
+
+	set_option(rational_to_decimal=True)
 
 	vs = RealVector('v', 3)
 	tIs = RealVector('tI', 6)
@@ -199,8 +212,7 @@ def schmittTriggerLcMosfet(inputVoltage, Vtp = -0.4, Vtn = 0.4, Vdd = 1.8, Kn = 
 		for solution in allSolutions:
 			singleExcludingConstraints = []
 			for i in range(lenV):
-				singleExcludingConstraints.append(vs[i] < solution[i][0])
-				singleExcludingConstraints.append(vs[i] > solution[i][1])
+				singleExcludingConstraints.append(vs[i] != solution[i])
 			excludingConstraints.append(singleExcludingConstraints)
 		
 		#print ("allConstraints")
@@ -224,25 +236,20 @@ def schmittTriggerLcMosfet(inputVoltage, Vtp = -0.4, Vtn = 0.4, Vdd = 1.8, Kn = 
 			break
 		
 		m = s.model()
-		hyper = np.zeros((lenV, 2))
-		sol = np.zeros((lenV))
+		sol = [None]*lenV
 		for d in m.decls():
 			dName = str(d.name())
 			firstLetter = dName[0]
 			if (dName[0] == "v" and dName[1] == "_"):
 				index = int(dName[len(dName) - 1])
-				if str(m[d])[-1] == "?":
-					val = float(str(m[d])[:-1])
-				else:
-					val = float(Fraction(str(m[d])))
-				sol[index] = val
+				
+				sol[index] = m[d]
+
 
 		print ("sol", sol)
-		for i in range(lenV):
-			hyper[i,:] = np.array([sol[i] - epsilon, sol[i] + epsilon])
 		s.pop()
-		
-		allSolutions.append(hyper)
+
+		allSolutions.append(sol)
 
 		print ("num solutions found", len(allSolutions))
 
@@ -260,10 +267,9 @@ def schmittTriggerLcMosfet(inputVoltage, Vtp = -0.4, Vtn = 0.4, Vdd = 1.8, Kn = 
 # Vtp, Vtn, Vdd, Kn, Kp, Sn are parameters for the long channel model
 # numSolutions indicates the number of solutions we want Z3 to find
 def inverterLcMosfet(inputVoltage, Vtp = -0.4, Vtn = 0.4, Vdd = 1.8, Kn = 270*1e-6, Kp = -90*1e-6, Sn = 3.0, numSolutions = "all"):
-	epsilon = 1e-14
 	start = time.time()
 	Sp = Sn*3.0
-
+	set_option(rational_to_decimal=True)
 	outputVolt = Real("outputVolt")
 	iP = Real("iP")
 	iN = Real("iN")
@@ -286,8 +292,7 @@ def inverterLcMosfet(inputVoltage, Vtp = -0.4, Vtn = 0.4, Vdd = 1.8, Kn = 270*1e
 		excludingConstraints = []
 		for solution in allSolutions:
 			singleExcludingConstraints = []
-			singleExcludingConstraints.append(outputVolt < solution[0][0])
-			singleExcludingConstraints.append(outputVolt > solution[0][1])
+			singleExcludingConstraints.append(outputVolt != solution)
 			excludingConstraints.append(singleExcludingConstraints)
 		
 		#print ("allConstraints")
@@ -311,18 +316,18 @@ def inverterLcMosfet(inputVoltage, Vtp = -0.4, Vtn = 0.4, Vdd = 1.8, Kn = 270*1e
 			break
 		
 		m = s.model()
-		hyper = np.zeros((1, 2))
+		#print ("m", m)
+
 		sol = None
 		for d in m.decls():
 			dName = str(d.name())
 			if dName == "outputVolt":
-				sol = float(Fraction(str(m[d])))
-
+				sol = m[d]
+		
 		print ("sol", sol)
-		hyper[0,:] = np.array([sol - epsilon, sol + epsilon])
 		s.pop()
 		
-		allSolutions.append(hyper)
+		allSolutions.append(sol)
 
 		print ("num solutions found", len(allSolutions))
 
@@ -337,11 +342,12 @@ def inverterLcMosfet(inputVoltage, Vtp = -0.4, Vtn = 0.4, Vdd = 1.8, Kn = 270*1e
 
 
 def inverterLoopLcMosfet(numInverters, numSolutions = "all", Vtp = -0.4, Vtn = 0.4, Vdd = 1.8, Kn = 270*1e-6, Kp = -90*1e-6, Sn = 3.0):
-	epsilon = 1e-14
 	start = time.time()
 	#print ("Vtp", Vtp, "Vtn", Vtn, "Vdd", Vdd, "Kn", Kn, "Kp", Kp, "Sn", Sn)
 	g_fwd = 1.0
 	Sp = Sn *2.0
+
+	set_option(rational_to_decimal=True)
 
 	vs = RealVector('v', numInverters)
 	iNs = RealVector('iN', numInverters)
@@ -370,8 +376,7 @@ def inverterLoopLcMosfet(numInverters, numSolutions = "all", Vtp = -0.4, Vtn = 0
 		for solution in allSolutions:
 			singleExcludingConstraints = []
 			for i in range(numInverters):
-				singleExcludingConstraints.append(vs[i] < solution[i][0])
-				singleExcludingConstraints.append(vs[i] > solution[i][1])
+				singleExcludingConstraints.append(vs[i] != solution[i])
 			excludingConstraints.append(singleExcludingConstraints)
 		
 		#print ("allConstraints")
@@ -397,25 +402,19 @@ def inverterLoopLcMosfet(numInverters, numSolutions = "all", Vtp = -0.4, Vtn = 0
 			break
 		
 		m = s.model()
-		hyper = np.zeros((numInverters, 2))
-		sol = np.zeros((numInverters))
+		sol = [None]*numInverters
 		for d in m.decls():
 			dName = str(d.name())
 			firstLetter = dName[0]
 			if (dName[0] == "v" and dName[1] == "_"):
-				index = int(dName[len(dName) - 1])
-				if str(m[d])[-1] == "?":
-					val = float(str(m[d])[:-1])
-				else:
-					val = float(Fraction(str(m[d])))
-				sol[index] = val
+				index = int(dName[len(dName) - 1])		
+				sol[index] = m[d]
+
 
 		print ("sol", sol)
-		for i in range(numInverters):
-			hyper[i,:] = np.array([sol[i] - epsilon, sol[i] + epsilon])
+
 		s.pop()
-		
-		allSolutions.append(hyper)
+		allSolutions.append(sol)
 
 		print ("num solutions found", len(allSolutions))
 
@@ -429,13 +428,10 @@ def inverterLoopLcMosfet(numInverters, numSolutions = "all", Vtp = -0.4, Vtn = 0
 	return allSolutions
 
 if __name__ == "__main__":
-	allSolutions = inverterLcMosfet(1.8)
-	#allSolutions = inverterLoopLcMosfet(2)
+	#allSolutions = inverterLcMosfet(0.0)
+	allSolutions = inverterLoopLcMosfet(3)
 	print ("allSolutions")
-	for solution in allSolutions:
-		print ("solution")
-		for i in range(solution.shape[0]):
-			print (solution[i,0], solution[i,1])
+	print (allSolutions)
 
 
 

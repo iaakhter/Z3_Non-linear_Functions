@@ -5,7 +5,7 @@
 # Each class has a jacobian method that gives a point and interval
 # jacobian of function depending on the type of function argument
 # (point or interval)
-# Each class also has a linearConstraints method that constructs
+# Some classes also have a linearConstraints method that constructs
 # linear bounds for the model, solves optimization problems to minimize
 # and maximize each variable to give a tighter hyperrectangle
 
@@ -19,7 +19,7 @@ from intervalBasics import *
 
 '''
 Rambus ring oscillator with tanh as the inverter model
-@param modelParam gain in tanh
+@param modelParam is constants in tanh where y = tanh(modelParam[0]*x + modelParam[1])
 @param g_cc strength of cross coupled inverters
 @param g_fwd strength of forward inverters
 @param numStages number of stages in the rambus oscillator
@@ -111,11 +111,6 @@ class RambusTanh:
 			" " + self.xs[i] + " + " + str(self.g_cc) + " "  + self.zs[i] + " <= 0.0\n"
 		
 
-		'''allConstraintList = allConstraints.splitlines()
-		allConstraints = ""
-		for i in range(len(allConstraintList)):
-			allConstraints += allConstraintList[i] + "\n"
-		print "numConstraints ", len(allConstraintList)'''
 		#print "allConstraints"
 		#print allConstraints
 		variableDict, A, B = lpUtils.constructCoeffMatrices(allConstraints)
@@ -152,6 +147,12 @@ class RambusTanh:
 		return [feasible, newHyperRectangle, numTotalLp, numSuccessLp, numUnsuccessLp]
 
 
+'''
+Inverter with tanh as the inverter model
+@param modelParam is constants in tanh where y = tanh(modelParam[0]*x + modelParam[1])
+@param inputVoltage specific inputVoltage for which we are looking for 
+				DC equilibrium points
+'''
 class InverterTanh:
 	def __init__(self, modelParam, inputVoltage):
 		self.modelParam = modelParam # y = tanh(modelParam[0]*x + modelParam[1])
@@ -174,6 +175,12 @@ class InverterTanh:
 			jac[0,0] = -1.0
 		return jac
 
+
+'''
+Inverter loops with tanh as the inverter model
+@param modelParam is constants in tanh where y = tanh(modelParam[0]*x + modelParam[1])
+@param numInverters number of inverters in the inverter loop
+'''
 class InverterLoopTanh:
 	def __init__(self, modelParam, numInverters):
 		self.modelParam = modelParam # y = tanh(modelParam[0]*x + modelParam[1])
@@ -342,9 +349,7 @@ class InverterMosfet:
 
 	def f(self,V):
 		myV = [x for x in V] + [self.inputVoltage, 0.0, self.Vdd]
-		#print 'InverterStMosfet.f: myV = ' + str(myV)
 		funcVal = self.c.f(myV)
-		#print 'InverterStMosfet.f: funcVal = ' + str(funcVal)
 		return funcVal[:-3]
 
 	def jacobian(self,V):
@@ -363,18 +368,16 @@ class InverterMosfet:
 		return [feasible, newHyperMat, numTotalLp, numSuccessLp, numUnsuccessLp]
 
 '''
-An inverter loop modeled by 2 CMOS transistors having long channel or 
-short channel Mosfet models
+An inverter loop where each inverter is modeled by 2 CMOS transistors 
+having long channel or short channel Mosfet models
 @param modelType "lcMosfet" if transistors are long channel and
 				"scMosfet" if transistors are short channel
 @param modelParam parameters of model depending on whether modelType
 				is long channel or short channel
-@param inputVoltage specific inputVoltage for which we are looking for 
-				DC equilibrium points
+@param numInverters number of inverters in the inverter loop
 '''
 class InverterLoopMosfet:
 	def __init__(self, modelType, modelParam, numInverters):
-		#self.inputVoltage = inputVoltage
 		s0 = 3.0
 		if modelType == "lcMosfet":
 			model = circuit.LcMosfet
@@ -410,9 +413,7 @@ class InverterLoopMosfet:
 
 	def f(self,V):
 		myV = [x for x in V] + [0.0, self.Vdd]
-		#print 'InverterStMosfet.f: myV = ' + str(myV)
 		funcVal = self.c.f(myV)
-		#print 'InverterStMosfet.f: funcVal = ' + str(funcVal)
 		return funcVal[:-2]
 
 	def jacobian(self,V):
@@ -494,7 +495,10 @@ class SchmittMosfet:
 
 	def f(self,V):
 		myV = [0.0, self.Vdd, self.inputVoltage] + [x for x in V]
+		#print ("myV", myV)
 		funcVal = self.c.f(myV)
+		#print ("myV", myV)
+		#print ("funcVal",funcVal)
 		return funcVal[3:]
 
 

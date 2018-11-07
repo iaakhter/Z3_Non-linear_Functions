@@ -16,6 +16,7 @@ import stChannel_py
 
 
 
+# @author Mark Greenstreet
 class MosfetModel:
 	def __init__(self, channelType, Vt = None, k = None, gds=0.0):
 		self.channelType = channelType   # 'pfet' or 'nfet'
@@ -29,6 +30,7 @@ class MosfetModel:
 		return "MosfetModel(" + str(self.channelType) + ", " + str(self.Vt) + ", " + str(self.k) + ", " + str(self.s) + ")"
 
 
+# @author Itrat Akhter
 # Short channel model
 class ScMosfet:
 	# s, g, d: Indices indicating source, gate and drain
@@ -206,6 +208,7 @@ class ScMosfet:
 		return(self.lp_ids_help(V[self.s], V[self.g], V[self.d], model))
 
 
+# @author Mark Greenstreet, Itrat Akhter
 # Long channel mosfet model
 # s, g, d: Indices indicating source, gate and drain
 # model: MosfetModel
@@ -218,14 +221,16 @@ class LcMosfet:
 		self.shape = shape
 		self.model = model
 
+	# @author Mark Greenstreet
 	# ids helper function. 
 	# Vs, Vg, Vd can be interval or point values
 	def ids_help(self, Vs, Vg, Vd, channelType, Vt, ks):
 		if(interval_p(Vs) or interval_p(Vg) or interval_p(Vd)):
 			# at least one of Vs, Vg, or Vd is an interval, we should return an interval
+			#print ("Vs", Vs, "Vg", Vg, "Vd", Vd)
 			return np.array([
-				self.ids_help(my_max(Vs), my_min(Vg), my_min(Vd), channelType, Vt, ks),
-				self.ids_help(my_min(Vs), my_max(Vg), my_max(Vd), channelType, Vt, ks)])
+				self.ids_help(np.amax(Vs), np.amin(Vg), np.amin(Vd), channelType, Vt, ks),
+				self.ids_help(np.amin(Vs), np.amax(Vg), np.amax(Vd), channelType, Vt, ks)])
 		elif(channelType == 'pfet'):
 			return -self.ids_help(-Vs, -Vg, -Vd, 'nfet', -Vt, -ks)
 		elif(Vd < Vs):
@@ -241,12 +246,14 @@ class LcMosfet:
 			i0 = ks*(Vgse - Vds/2.0)*Vds
 		return(i0 + i_leak)
 	
+	# @author Mark Greenstreet
 	# calculate ids from the given V
 	def ids(self, V):
 		model = self.model
 		return(self.ids_help(V[self.s], V[self.g], V[self.d], model.channelType, model.Vt, model.k*self.shape))
 
 
+	# @author Mark Greenstreet
 	# grad_ids: compute the partials of ids wrt. Vs, Vg, and Vd
 	#   This function is rather dense.  I would be happier if I could think of
 	#    a way to make it more obvious.
@@ -267,6 +274,7 @@ class LcMosfet:
 		# print "dg = " + str(dg) + ", dd = " + str(dd)
 		return np.array([interval_neg(interval_add(dg, dd)), dg, dd])
 
+	# @author Mark Greenstreet
 	def grad_ids_help(self, Vs, Vg, Vd, channelType, Vt, ks):
 		if(channelType == 'pfet'):
 			# self.grad_ids_help(-Vs, -Vg, -Vd, 'nfet', -Vt, -ks)
@@ -300,11 +308,13 @@ class LcMosfet:
 			dd = ks*(Vgse - Vds) + self.model.gds
 			return np.array([-(dg + dd), dg, dd])
 
+	# @author Mark Greenstreet
 	def grad_ids(self, V):
 		model = self.model
 		return(self.grad_ids_help(V[self.s], V[self.g], V[self.d], model.channelType, model.Vt, model.k*self.shape))
 			
 	
+	# @author Itrat Akhter
 	# This function constructs linear program
 	# in terms of src, gate, drain and Ids given the model
 	# representing the cutoff, linear or saturation region.
@@ -317,7 +327,6 @@ class LcMosfet:
 	# are Vg - Vs - Vt and Vd - Vs. For saturation, 
 	# the variables are Vd - Vs
 	def quad_lin_constraints(self, Amatrix, vertList, Vt):
-		#print ("ks", ks)
 		if Amatrix.shape[0] > 2:
 			raise Exception("quad_lin_constraints: can only accept functions of at most 2 variables")
 
@@ -327,17 +336,12 @@ class LcMosfet:
 		costs = []
 		ds = []
 		for vert in vertList:
-			#print ("vert", vert)
 			grad = 2*np.dot(Amatrix, vert)
-			#print ("grad", grad)
 			costs.append(list(-grad) + [1])
 			dVal = np.dot(np.transpose(vert), np.dot(Amatrix, vert)) - np.dot(grad, vert)
-			#print ("currentVal", np.dot(np.transpose(vert), np.dot(Amatrix, vert)))
-			#print ("dVal", dVal)
 			ds.append(dVal)
 		
 		lp2d = LP()
-		lp = LP()
 
 		# handle the case where A is neither 
 		# positive semidefinite or negative semidefinite
@@ -345,34 +349,24 @@ class LcMosfet:
 			# We need to sandwitch the model by the tangents
 			# on both sides so add negation of existing costs
 			allCosts = [[grad for grad in cost] for cost in costs]
-			#allCosts = []
 			for cost in costs:
 				allCosts.append([-grad for grad in cost])
 
 			for cost in allCosts:
-				#print ("cost", cost)
 				# Multiply A with coefficient for Ids from cost
-				# In all cases, the cost for Ids is 
-				#costs = [[0,0,1]]
+				# In all cases, the cost for Ids is costs = [[0,0,1]]
 				cA = cost[-1]*Amatrix
 
 				eigVals, eigVectors = np.linalg.eig(cA)
-				#print ("eigVals", eigVals)
-				#print ("eigVectors")
-				#print (eigVectors)
 
 				# sort the eigVals in descending order
 				# order eigVectors in the same way
 				sortedIndices = np.fliplr([np.argsort(eigVals)])[0]
 				sortedEigVals = eigVals[sortedIndices]
 				sortedEigVectors = eigVectors[:,sortedIndices]
-				#print ("sortedEigVals", sortedEigVals)
-				#print ("sortedEigVectors")
-				#print (sortedEigVectors)
 
 				v0 = sortedEigVectors[:,0]
-				#print ("v0")
-				#print (v0)
+		
 				# Find the intersection of eigen vector corresponding to positive
 				# eigen value with the hyperrectangle
 				intersectionPoints = self.intersection([v0[0], v0[1], 0.0], vertList)
@@ -386,20 +380,13 @@ class LcMosfet:
 				
 				for point in pointsToTest:
 					currentAtPoint = np.dot(np.transpose(point), np.dot(Amatrix, point))
-					#print ("3dpoint", np.array([point[0], point[1], currentAtPoint]))
-					funVal = np.dot(cost, np.array([point[0], point[1], currentAtPoint]))
-					#print ("funVal", funVal)
-					
+					funVal = np.dot(cost, np.array([point[0], point[1], currentAtPoint]))			
 					valToCompare = min(funVal, valToCompare)
 
-				#print ("valToCompare", valToCompare)
 				# transform expression in terms of vgse and vds, to Vs, Vg and Vd
 				dConst =  -(valToCompare + cost[0]*Vt)
 
 				lp2d.ineq_constraint([-cost[0], -cost[1], -cost[2]], -valToCompare)
-				lp.ineq_constraint([cost[0] + cost[1], -cost[0], -cost[1], -cost[2]], dConst)
-			#print ("lp in reg")
-			#print(lp)
 		
 		else:
 			# handle the case where A is positive semi definite or negative semidefinite
@@ -412,18 +399,12 @@ class LcMosfet:
 			for ci in range(len(costs)):
 				cost = costs[ci]
 				if len(cost) == 3:
-					gradgsdICons = [-cost[0] - cost[1], cost[0], cost[1], cost[2], ds[ci] + cost[0]*Vt]
 					gradgsdICons2d = [cost[0], cost[1], cost[2], ds[ci]]
 				elif len(cost) == 2:
-					gradgsdICons = [-cost[0], cost[0], 0.0, cost[1], ds[ci] + cost[0]*Vt]
 					gradgsdICons2d = [cost[0], 0.0, cost[1], ds[ci]]
-				#print ("gradgsdICons before", gradgsdICons)
 				if(cvx_flag):
-					gradgsdICons = [-grad for grad in gradgsdICons]
 					gradgsdICons2d = [-grad for grad in gradgsdICons2d]
 				
-				#print ("gradgsdICons", gradgsdICons)
-				lp.ineq_constraint(gradgsdICons[:-1], gradgsdICons[-1])
 				lp2d.ineq_constraint(gradgsdICons2d[:-1], gradgsdICons2d[-1])
 
 
@@ -432,33 +413,24 @@ class LcMosfet:
 			for cost in costs:
 				avgCost += np.array(cost)
 			avgCost = avgCost * (1.0/len(costs))
-			#print ("avgCost", avgCost)
 
 			# now find the additive constant for the cap constraint
 			d = None
 			for vert in vertList:
-				#print ("vert", vert)
 				IVal = np.dot(np.transpose(vert), np.dot(Amatrix, vert))
-				#print ("IVal", IVal)
-				#print ("np.dot(-avgCost[:-1], vert)", np.dot(-avgCost[:-1], vert))
 				bb = IVal - np.dot(-avgCost[:-1], vert)
-				#print ("bb", bb)
 				if(d is None): d = bb
 				elif(cvx_flag): d = max(d, bb)
 				else: d = min(d, bb)
 
 			if len(cost) == 3:
-				gradgsdICons = [-avgCost[0] - avgCost[1], avgCost[0], avgCost[1], avgCost[2], d + avgCost[0]*Vt]
 				gradgsdICons2d = [avgCost[0], avgCost[1], avgCost[2], d]
 			elif len(cost) == 2:
-				gradgsdICons = [-avgCost[0], avgCost[0], 0.0, avgCost[1], d + avgCost[0]*Vt]
 				gradgsdICons2d = [avgCost[0], 0.0, avgCost[1], d]
-			#print ("gradgsdICons before", gradgsdICons)
+
 			if not(cvx_flag):
-				gradgsdICons = [-grad for grad in gradgsdICons]
 				gradgsdICons2d = [-grad for grad in gradgsdICons2d]
 
-			lp.ineq_constraint(gradgsdICons[:-1], gradgsdICons[-1])
 			lp2d.ineq_constraint(gradgsdICons2d[:-1], gradgsdICons2d[-1])
 
 
@@ -468,34 +440,26 @@ class LcMosfet:
 			newAList = list(np.dot(np.array(lp2d.A), leakTermMat))
 			lp2d.A = newAList
 
+		# Convert LP expressing Ids into a 3 variable LP (Vs, Vg, Vd) from a 2 variable 
+		# LP (Vg - Vs - Vt, Vd - Vs)
 		lp3d = LP()
 		for i in range(len(lp2d.A)):
 			lp3d.ineq_constraint([-lp2d.A[i][0] - lp2d.A[i][1], lp2d.A[i][0], lp2d.A[i][1], lp2d.A[i][2]], 
 				lp2d.b[i] + lp2d.A[i][0]*Vt)
 			
-		'''print ("lp3d")
-		print (lp3d)
-
-		print ("lp")
-		print (lp)'''
-
-
-		#print ("lp in regConstraints")
-		#print (lp)
-		#return lp
+	
 		return lp3d
 
+	# @author Itrat Akhter
 	# Construct linear constraints for the mosfet model
 	# depending on whatever region they belong to - cutoff,
 	# saturation or linear - Assume nfet at the point when
 	# function is called
 	# Vgse = Vg - Vs - Vt
 	# Vds = Vd - Vs
+	# ks = constant relevant to mosfet
 	# hyperLp = hyperrectangle bounds
 	def lp_grind(self, Vgse, Vds, Vt, ks, hyperLp):
-		#print ("lp_grind: Vgse", Vgse, "Vds", Vds)
-		#print ("lp_grind: hyperLp")
-		#print (hyperLp)
 		Vgse = interval_fix(Vgse)
 		Vds = interval_fix(Vds)
 
@@ -518,9 +482,11 @@ class LcMosfet:
 						np.array([Vgse[0], Vds[1]])]
 			return self.quad_lin_constraints(linA, vertList, Vt).concat(hyperLp)
 
-		else:
+		else: # When regions overlap
+			# Taking the union of LPs slows down performance so we just return the hyper-rectangle
+			# constraints
 			return hyperLp
-			#print (hyperLp)
+
 			# take the union of the separate region constraints
 			# When taking the union, it is important to bound each variable
 			# because of the way the union code works involves solving
@@ -534,11 +500,7 @@ class LcMosfet:
 			if Vgse[0] < 0.0 and Vgse[1] > 0.0:
 				newVgse = np.array([Vgse[0], 0.0])
 				regionLp = self.lp_grind(newVgse, newVds, Vt, ks, hyperLp)
-				#print ("regionLp")
-				#print (regionLp)
 				lp = lp.union(regionLp, (regionLp.num_constraints() - hyperLp.num_constraints(), regionLp.num_constraints()))
-				#print ("lp after regionLp")
-				#print (lp)
 				newVgse = np.array([0.0, Vgse[1]])
 
 			# Find intersection between Vgse = Vds line and hyperrectangle
@@ -549,16 +511,11 @@ class LcMosfet:
 						np.array([newVgse[1], newVds[1]]), \
 						np.array([newVgse[0], newVds[1]])]
 			intersectionPoints = self.intersection([-1, 1, 0.0], vertList)
-			#print ("intersectionPoints")
-			#print (intersectionPoints)
+
 			if len(intersectionPoints) == 0:
 				# Deal with just saturation
 				regionLp = self.lp_grind(newVgse, newVds, Vt, ks, hyperLp)
-				#print ("regionLp")
-				#print (regionLp)
 				lp = lp.union(regionLp, (regionLp.num_constraints() - hyperLp.num_constraints(), regionLp.num_constraints()))
-				#print ("lp after regionLp")
-				#print (lp)
 			else:
 				# deal with  ("saturation + linear")
 				# find the two polygons caused by the line Vgse = Vds line
@@ -594,11 +551,10 @@ class LcMosfet:
 
 			return lp
 
+	# @author Mark Greenstreet, Itrat Akhter
 	# Return an lp formed around ids for intervals given by
 	# Vs, Vg and Vd
 	def lp_ids_help(self, Vs, Vg, Vd, channelType, Vt, ks):
-		#print ("Vs", Vs, "Vg", Vg, "Vd", Vd, "channelType", channelType)
-		#print ("interval_r(Vs)", interval_r(Vs), "interval_r(Vd)", interval_r(Vd))
 		Vgs = interval_sub(Vg, Vs)
 		Vgse = Vgs - Vt
 		Vds = interval_sub(Vd, Vs)
@@ -636,10 +592,9 @@ class LcMosfet:
 		# If hyperrectangles are tiny do not try to construct 
 		# linear convex regions and just return the lp representing
 		# the bounds
-		if interval_r(Vs) < 1e-14 and interval_r(Vd) < 1e-14:
+		if interval_r(Vs) < 1e-9 or interval_r(Vd) < 1e-9:
 			return hyperLp
 		
-		#print ("Vgse", Vgse, "Vds", Vds)
 		if(not(interval_p(Vs) or interval_p(Vg) or interval_p(Vd))):
 			# Vs, Vg, and Vd are non-intervals -- they define a point
 			# Add an inequality that our Ids is the value for this point
@@ -651,18 +606,6 @@ class LcMosfet:
 			# If the Vs interval overlaps the Vd interval, then Vds can change sign.
 			# That means we've got a saddle.  We won't try to generated LP constraints
 			# for the saddle.  So, we just return a hyperLp.
-			#return hyperLp
-			#print ("Vs", Vs, "Vd", Vd)
-			'''intersect = interval_intersect(Vs, Vd)
-			intersectMidPoint = interval_mid(intersect)
-			Vs1stHalf = np.array(Vs[0], intersectMidPoint)
-			Vs2ndHalf = np.array(intersectMidPoint, Vs[1])
-			Vd1stHalf = np.array(Vd[0], intersectMidPoint)
-			Vd2ndHalf = np.array([intersectMidPoint, Vd[1]])
-			lp1 = self.lp_ids_help(Vs1stHalf, Vg, Vd2ndHalf, channelType, Vt, ks)
-			lp2 = self.lp_ids_help(Vs2ndHalf, Vg, Vd1stHalf, channelType, Vt, ks)
-			return lp1.union(lp2, (lp2.num_constraints() - hyperLp.num_constraints(), lp2.num_constraints()))'''
-
 			return hyperLp
 		elif(interval_lo(Vs) >= interval_hi(Vd)):
 			LPswap = self.lp_ids_help(Vd, Vg, Vs, channelType, Vt, ks)
@@ -679,6 +622,7 @@ class LcMosfet:
 		else:
 			return self.lp_grind(Vgse, Vds, Vt, ks, hyperLp)
 
+	# @author Itrat Akhter
 	# Find the intersection points between the line
 	# represented by [a, b, c] where a, b, and c represent
 	# the line ax + by = c and polygon represented by vertList
@@ -698,7 +642,6 @@ class LcMosfet:
 			else:
 				m = (vert2[1] - vert1[1])/(vert2[0] - vert1[0])
 				c = vert1[1] - m*vert1[0]
-				#print ("m", m, "c", c)
 				x0 = (line[2] - line[1]*c)/(line[0] + line[1]*m)
 				x1 = m*x0 + c
 				if x0 >= minVert[0] and x0 <= maxVert[0] and x1 >= minVert[1] and x1 <= maxVert[1]:
@@ -706,21 +649,21 @@ class LcMosfet:
 
 		return intersectionPoints
 
+	# @ author Mark Greenstreet
 	# Return an lp
 	def lp_ids(self, V, numDivisions = None, mainDict = None):
 		model = self.model
 		idsLp = self.lp_ids_help(V[self.s], V[self.g], V[self.d], model.channelType, model.Vt, model.k*self.shape)
-	
-		#print ("idsLp")
-		#print (idsLp)
 		return idsLp
 
 
+# @author Mark Greenstreet, Itrat Akhter
 # Circuit combining different transistor models
 class Circuit:
 	def __init__(self, tr):
 		self.tr = tr # list of transistor objects (long channel - Mosfet or short channel - StMosfet)
 
+	# @author Mark Greenstreet
 	# Return node currents given the voltages at nodes
 	def f(self, V):
 		intervalVal = any([interval_p(x) for x in V])
@@ -736,6 +679,7 @@ class Circuit:
 			I_node[tr.d] = interval_sub(I_node[tr.d], Ids)
 		return I_node
 
+	# @author Mark Greenstreet
 	# Return jacobian of node currents with respect to node voltages
 	def jacobian(self, V):
 		#print ("Calculating jacobian for V")
@@ -758,6 +702,7 @@ class Circuit:
 
 	
 
+	# @author Mark Greenstreet, Itrat Akhter
 	# The lp we return has one variable for each node and one variable for each transistor.
 	# For 0 <= i < #nodes, variable[i] is the voltage on node i.
 	# For 0 <= j < #transistors, variable[#nodes+j] is Ids for transistor j
@@ -765,6 +710,7 @@ class Circuit:
 	# transistors and set the node currents to 0
 	# grndPower Index is the list of indices indicating
 	# ground and power in V. We need this when we are setting sum of node currents to 0
+	# because during the summation we want to avoid the ground and power nodes
 	def lp(self, V, grndPowerIndex):
 		lp = LP()
 		n_nodes = len(V)
@@ -793,13 +739,10 @@ class Circuit:
 			# to avoid duplicate constraints so that we do not slow down
 			# the linear program solver. We will add the hyper constraints
 			# for each variable exactly once in a bit. 
+			# TODO: Construct a better way to do this
 			modLptr = LP()
 			for ai in range(6,len(lptr.A)):
 				modLptr.ineq_constraint(lptr.A[ai], lptr.b[ai])
-			#print ("lptr")
-			#print (lptr)
-			#print ("modLptr")
-			#print (modLptr)
 			
 			lp.concat(modLptr.varmap(nvars, [tr.s, tr.g, tr.d, n_nodes+i]))
 			
@@ -808,7 +751,6 @@ class Circuit:
 			# each variable exactly once
 			for ind in [tr.s, tr.g, tr.d]:
 				if not(hyperAdded[ind]):
-					#print ("ind", ind)
 					hyperAdded[ind] = True
 					greatConstr = np.zeros((nvars))
 					greatConstr[ind] = -1.0
@@ -825,9 +767,6 @@ class Circuit:
 			eqCoeffs[tr.d, n_nodes + i] += -1.0
 
 
-		#print ("eqCoeffs")
-		#print (eqCoeffs)
-
 		# need to add equality constraints that the sum of the currents into each node is zero
 		for i in range(n_nodes):
 			if all([i != gpi for gpi in grndPowerIndex]):
@@ -838,6 +777,7 @@ class Circuit:
 
 
 
+	# @author Itrat Akhter
 	# This function solves the linear program 
 	# returns a tighter hyperrectangle if feasible
 	# grndPower Index is the list of indices indicating
@@ -854,10 +794,7 @@ class Circuit:
 		numSuccessLp, numUnsuccessLp, numTotalLp = 0, 0, 0
 		for i in range(n_nodes):
 			if interval_p(tighterHyper[i]):
-				#print ("nvars", nvars)
-				#print ("numConstraints", lp.num_constraints())
 				numTotalLp += 2
-				#print ("i", i)
 				cost = np.zeros((nvars))
 
 				#minimize variable i
@@ -871,17 +808,8 @@ class Circuit:
 				maxSol = lp.solve()
 
 				if minSol is None or maxSol is None:
-					#print ("nvars", nvars)
-					#print ("numConstraints", lp.num_constraints())
-					#print ("hyperrectangle", V)
-					#print ("minSol is None?", minSol, "maxSol is None?", maxSol)
-					#print (lp)
 					numUnsuccessLp += 2
 					continue
-
-				#print ("minSol status", minSol["status"])
-				#print ("maxSol status", maxSol["status"])
-
 
 				if minSol["status"] == "primal infeasible" and maxSol["status"] == "primal infeasible":
 					numSuccessLp += 2
@@ -889,14 +817,10 @@ class Circuit:
 					break
 
 				if minSol["status"] == "optimal":
-					#print ("min lp optimal", minSol["status"])
-					#print (lp)
 					tighterHyper[i][0] = minSol['x'][i]
 					numSuccessLp += 1
 				else:
 					numUnsuccessLp += 1
-					#print ("min lp not optimal", minSol["status"])
-					#print (lp)
 				if maxSol["status"] == "optimal":
 					tighterHyper[i][1] = maxSol['x'][i]
 					numSuccessLp += 1

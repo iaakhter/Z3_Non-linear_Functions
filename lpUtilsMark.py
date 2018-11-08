@@ -1,4 +1,5 @@
-#@author: Mark Greenstreet
+# @author: Mark Greenstreet, Itrat Akhter
+# Class to help construct, manipulate and solve linear programs
 
 import numpy as np
 from cvxopt import matrix,solvers
@@ -47,6 +48,7 @@ class LP:
 				"eqA\n" + str(np.array(self.Aeq)) + "\n" + "eqB\n" + str(np.array(self.beq)) + "\n" + \
 				"cost\n" + str(np.array(self.c)) + "\n"
 
+	# @author: Mark Greenstreet
 	# concat: add the constraints from LP2 to our constraints.
 	# We keep our cost vector and ignore LP2.c.  We should probably
 	# check to makes sure that LP2 has the same number of variables as
@@ -59,6 +61,7 @@ class LP:
 		self.beq = self.beq + LP2.beq
 		return(self)
 
+	# @author: Mark Greenstreet
 	# sometimes, we want to replace a variable with its negation (i.e.
 	#   when using nfet code to model pfet currents).  That means we need
 	#   to negate the elements of A and Aeq.
@@ -67,25 +70,22 @@ class LP:
 		nAeq = [[-e for e in row] for row in self.Aeq]
 		return LP(self.c, nA, self.b, nAeq, self.beq)
 
+	# @author:Mark Greenstreet
 	# add an equality constraint
 	# eq_constraint modifies self.
 	def eq_constraint(self, aeq, beq):
 		self.Aeq.append(aeq)
 		self.beq.append(beq)
 
+	# @author:Mark Greenstreet
 	# add an inequality constraint
 	# ineq_constraint modifies self.
 	def ineq_constraint(self, a, b):
 		self.A.append(a)
 		self.b.append(b)
 
-	# remove inequality constraint at index, index
-	def remove_ineq_constraint(self, index):
-		aRemoved = self.A.pop(index)
-		bRemoved = self.b.pop(index)
-		return (aRemoved, bRemoved)
 
-	
+	# @author: Itrat Akhter
 	# Use inequality constraints of 
 	# one LP (self) as costs (both min and max) of other LP
 	# to construct constraints that satisfy both LP
@@ -93,11 +93,6 @@ class LP:
 	# otherLpExcludingInds indicates the indices of the inequality
 	# constraints in self that are not considered as cost for consideration
 	def constraint_as_cost(self, otherLp, otherLpExcludingInds):
-		#print ("start constraint_as_cost")
-		'''print ("selfLp")
-		print (self)
-		print ("otherLp")
-		print (otherLp)'''
 		newLp = LP()
 		# Use the normals of inequalities of
 		# self's as cost (minimize and maximize) 
@@ -107,9 +102,6 @@ class LP:
 		validConstraints = []
 		for i in range(len(self.A)):
 			if otherLpExcludingInds is None or not(i>= otherLpExcludingInds[0] and i < otherLpExcludingInds[1]):
-				#print ("constraint being considered")
-				#print (self.A[i])
-				#print (self.b[i])
 				minCost = [ val*1.0 for val in self.A[i]]
 				maxCost = [-val*1.0 for val in self.A[i]]
 				possibleValidConstraints = []
@@ -126,41 +118,27 @@ class LP:
 				otherLp.add_cost(maxCost)
 				maxSol = otherLp.solve()
 				if maxSol is not None and maxSol["status"] == "optimal":
-					#print ("maxSol['status']", maxSol["status"])
-					#print ("maxCost", maxCost)
-					#print ("maxSol['x']", np.array(maxSol['x']))
 					maxB = np.dot(np.array(maxCost), np.array(maxSol['x']))[0]
-					#print ("maxB", maxB)
 					possibleValidConstraints.append([minCost, -maxB])
 					possibleBs.append(-maxB)
-					#print ("constraint being added", possibleValidConstraints[-1])
-
-
+				
 
 				# Add the constraint with the highest constant to the newLp
 				maxB = max(possibleBs)
 				maxBindex = possibleBs.index(maxB)
 				if maxSol is not None and maxSol["status"] == "optimal":
-					#print ("possibleValidConstraints", possibleValidConstraints)
-					#print ("maxBindex", maxBindex)
 					newLp.ineq_constraint(possibleValidConstraints[maxBindex][0], possibleValidConstraints[maxBindex][1])
 
 		
-		#print ("newLp")
-		#print (newLp)
 		return newLp
 
 
 	
+	# @author: Itrat Akhter
 	# Create a union of self and another LP
 	# The union of LPs should satisfy both
 	# the LPs
 	def union(self, otherLp, otherLpExcludingInds):
-		#print ("selfLp before", self.num_constraints())
-		#print (self)
-		#print ("otherLp before", otherLp.num_constraints())
-		#print (otherLp)
-		#print ("otherLpExcludingInds", otherLpExcludingInds)
 		newLp = LP()
 
 		# Use inequality constraints of self as 
@@ -180,15 +158,15 @@ class LP:
 			newLp.eq_constraint([x for x in otherLp.Aeq[i]], otherLp.beq[i])
 
 		
-		#print ("newLp")
-		#print (newLp)
 		return newLp
 
+	# @author: Itrat Akhter
 	# This will replace the current cost
 	# function. 
 	def add_cost(self, c):
 		self.c = c
 
+	# @author: Itrat Akhter
 	# return cvxopt solution after solving lp
 	def solve(self):
 		if self.num_constraints() == 0:
@@ -209,22 +187,13 @@ class LP:
 		cMatrix = matrix(self.c)
 		solvers.options["show_progress"] = False
 
-		'''print ("self lp")
-		print (self)
-
-		print ("AMatrix")
-		print (AMatrix)
-		print ("bMatrix")
-		print (bMatrix)
-		print ("cMatrix")
-		print (cMatrix)'''
-
 		try:
 			sol = solvers.lp(cMatrix, AMatrix, bMatrix)
 			return sol
 		except ValueError:
 			return None
 
+	# @author: Itrat Akhter
 	# Calculate the slack for each inequality constraint
 	def slack(self):
 		sol = self.solve()
@@ -239,6 +208,7 @@ class LP:
 		return slack
 
 
+	# @author: Mark Greenstreet
 	# Map thre current LP to a new LP where
 	# the new Lp has nvar number of variables
 	# vmap indicates to which index in the new LP

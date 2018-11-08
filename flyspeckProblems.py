@@ -1,5 +1,5 @@
-#@author: Itrat Akhter
-#@author: Flyspeck example
+# @author: Itrat Akhter
+# Flyspeck example from dReal: An SMT Solver for Nonlinear Theories over the Reals* paper.
 
 import numpy as np
 import lpUtils

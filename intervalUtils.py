@@ -1,3 +1,5 @@
+# Functions implementing interval verification algorithm - the Krawczyk
+# operator and its helper functions
 # @author Itrat Ahmed Akhter
 
 import numpy as np
@@ -49,10 +51,8 @@ def subtractMats(mat1, mat2):
 
 '''
 Multiply interval or regular matrix with interval or regular vector
-@param mat regular or interval matrix
-@param vec regular or interval vector
-@return regular or interval vector depending on whether mat and vec 
-		are interval or regular
+and regular or interval vector depending on whether mat and vec 
+are interval or regular
 '''
 def multiplyMatWithVec(mat,vec):
 	isInterval = interval_p(mat[0,0]) or interval_p(vec[0])
@@ -104,8 +104,6 @@ def turnRegVecToIntervalVec(vec):
 
 '''
 Return the volume of the hyperrectangle
-@param hyperRectangle hyperrectangle
-@return the volume of the hyperRectangle
 '''
 def volume(hyperRectangle):
 	if hyperRectangle is None:
@@ -247,6 +245,18 @@ def printHyper(hyper):
 	for i in range(hyper.shape[0]):
 		print (hyper[i,0], hyper[i,1])
 
+
+'''
+Find a Newton's solution in hyper. If there exists a solution
+inflate current hyper so that solution is in centre and
+check the inflated hyper with Krawczyk
+@param model defines the problem
+@param hyper hyperRectangle
+@param epsilonBounds defines how far away from the hyperrectangle hyper
+we can allow the newton solution to be to start the hyperrectangle 
+inflation process
+@return Krawczyk result of inflated hyper
+'''
 def checkInflatedHyper(model, hyper, epsilonBounds):
 	startBounds = np.copy(hyper)
 	prevIntersect, intersect = newtonInflation(model, startBounds, epsilonBounds)
@@ -280,6 +290,9 @@ Krawczyk update
 @param alpha indicates how many times the Krawczyk operator is 
 		used to refine hyperRectangle before the function returns
 		If the reduction in volume is below alpha, then we are done
+@param epsilonInflation the amount by which either side of the hyper-rectangle
+		is inflated before applying the Krawczyk method. This allows for quicker
+		convergence to a unique solution if one exists
 @return (True, refinedHyper) if hyperrectangle contains a unique solution.
 		refinedHyper also contains the solution and might be smaller
 		than hyperRectangle
@@ -318,9 +331,6 @@ def checkExistenceOfSolution(model,hyperRectangle, alpha = 1.0, epsilonInflation
 		#print ("startBounds before")
 		#printHyper(startBounds)
 		dist = startBounds[:,1] - startBounds[:,0]
-		#print ("dist.shape", 0.1*dist+ epsilonBounds)
-		#print ("startBounds before")
-		#printHyper(startBounds)
 		startBounds[:,0] = startBounds[:,0] - (epsilonInflation*dist + epsilonBounds)
 		startBounds[:,1] = startBounds[:,1] + (epsilonInflation*dist + epsilonBounds)
 	

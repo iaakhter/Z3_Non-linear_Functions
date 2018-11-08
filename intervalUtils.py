@@ -252,9 +252,8 @@ inflate current hyper so that solution is in centre and
 check the inflated hyper with Krawczyk
 @param model defines the problem
 @param hyper hyperRectangle
-@param epsilonBounds defines how far away from the hyperrectangle hyper
-we can allow the newton solution to be to start the hyperrectangle 
-inflation process
+@param epsilonInflation indicates the proportion of hyper-rectangle distance by which the 
+ 	hyper-rectangle needs to be inflated before the Krawczyk operator is applied
 @return Krawczyk result of inflated hyper
 '''
 def checkInflatedHyper(model, hyper, epsilonBounds):
@@ -318,6 +317,7 @@ def checkExistenceOfSolution(model,hyperRectangle, alpha = 1.0, epsilonInflation
 	if hasattr(model, 'f'):
 		#print ("startBounds", startBounds)
 		funVal = model.f(startBounds)
+		#print ("funVal", funVal)
 		if(any([np.nextafter(funVal[i,0], np.float("-inf"))*np.nextafter(funVal[i,1], np.float("inf")) > np.nextafter(0.0, np.float("inf")) 
 				for i in range(numV)])):
 			return [False, None]

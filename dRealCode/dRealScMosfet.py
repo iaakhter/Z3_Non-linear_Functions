@@ -350,7 +350,7 @@ def inverterLoopScMosfet(numInverters, numSolutions = "all"):
 		for i in range(numInverters):
 			hyper[i,:] = [result[vs[i]].lb() - 2*epsilon, result[vs[i]].ub() + 2*epsilon]
 
-		#print ("hyper", hyper)
+		print ("hyper", hyper)
 		allSolutions.append(hyper)
 
 		print ("num solutions found", len(allSolutions))
@@ -431,7 +431,7 @@ def rambusOscillatorScMosfet(numStages, g_cc = 0.5, numSolutions = "all"):
 		for i in range(lenV):
 			hyper[i,:] = [result[vs[i]].lb() - 2*epsilon, result[vs[i]].ub() + 2*epsilon]
 
-		#print ("hyper", hyper)
+		print ("hyper", hyper)
 		allSolutions.append(hyper)
 
 		print ("num solutions found", len(allSolutions))

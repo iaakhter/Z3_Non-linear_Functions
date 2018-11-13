@@ -220,37 +220,93 @@ class LcMosfet:
 		self.d = d
 		self.shape = shape
 		self.model = model
+		self.funDict = {}
+		self.gradDict = {}
 
-	# @author Mark Greenstreet
+	# @author Itrat Akhter
 	# ids helper function. 
 	# Vs, Vg, Vd can be interval or point values
 	def ids_help(self, Vs, Vg, Vd, channelType, Vt, ks):
-		if(interval_p(Vs) or interval_p(Vg) or interval_p(Vd)):
-			# at least one of Vs, Vg, or Vd is an interval, we should return an interval
-			#print ("Vs", Vs, "Vg", Vg, "Vd", Vd)
-			return np.array([
-				self.ids_help(np.amax(Vs), np.amin(Vg), np.amin(Vd), channelType, Vt, ks),
-				self.ids_help(np.amin(Vs), np.amax(Vg), np.amax(Vd), channelType, Vt, ks)])
-		elif(channelType == 'pfet'):
-			return -self.ids_help(-Vs, -Vg, -Vd, 'nfet', -Vt, -ks)
-		elif(Vd < Vs):
-			return -self.ids_help(Vd, Vg, Vs, channelType, Vt, ks)
-		Vgse = (Vg - Vs) - Vt
-		Vds = Vd - Vs
-		i_leak = Vds*self.model.gds
-		if(Vgse < 0):  # cut-off
-			i0 = 0
-		elif(Vgse < Vds): # saturation
-			i0 = (ks/2.0)*Vgse*Vgse
-		else: # linear
-			i0 = ks*(Vgse - Vds/2.0)*Vds
-		return(i0 + i_leak)
+		#print ("Vs", Vs, "Vg", Vg, "Vd", Vd)
+		if interval_p(Vs) or interval_p(Vg) or interval_p(Vd):
+			Vge = interval_sub(Vg, Vt)
+			Vds = interval_sub(Vd, Vs)
+			VgseTerm = interval_max(interval_sub(Vge, Vs), 0)
+			VgdeTerm = interval_max(interval_sub(Vge, Vd), 0)
+			i0 = interval_mult(ks/2.0, interval_sub(interval_mult(VgseTerm, VgseTerm),
+												interval_mult(VgdeTerm, VgdeTerm)))
+			if self.model.gds != 0.0:
+				i_leak = interval_mult(Vds, self.model.gds)
+				return interval_add(i0, i_leak)
+			else:
+				return i0
+		else:
+			Vge = Vg - Vt
+			Vds = Vd - Vs
+			VgseTerm = max(Vge - Vs, 0)
+			VgdeTerm = max(Vge - Vd, 0)
+			i0 = 0.5*ks*(VgseTerm*VgseTerm - VgdeTerm*VgdeTerm)
+			i_leak = self.model.gds*Vds
+			return i0 + i_leak
+
+	# @author Itrat Akhter
+	# ids helper function that takes advantage of monotonicity properties. 
+	# Vs, Vg, Vd can be interval or point values
+	def ids_help_mon(self, Vs, Vg, Vd, channelType, Vt, ks):
+		if(channelType == 'pfet'):
+			return interval_neg(self.ids_help(interval_neg(Vs), interval_neg(Vg), interval_neg(Vd), 'nfet', -Vt, -ks))
+
+		elif interval_p(Vs) or interval_p(Vg) or interval_p(Vd):
+			VsDict, VgDict, VdDict = None, None, None
+			if interval_p(Vd):
+				VdDict = tuple(list(Vd))
+			else:
+				VdDict = Vd
+
+			if interval_p(Vg):
+				VgDict = tuple(list(Vg))
+			else:
+				VgDict = Vg
+
+			if interval_p(Vs):
+				VsDict = tuple(list(Vs))
+			else:
+				VsDict = Vs
+
+			if (VsDict, VgDict, VdDict, channelType) in self.funDict:
+				return self.funDict[(VsDict, VgDict, VdDict, channelType)]
+
+			Vs = interval_fix(Vs)
+			Vg = interval_fix(Vg)
+			Vd = interval_fix(Vd)
+			if Vs[1] <= Vd[0]:
+				currentVal = np.array([
+				self.ids_help(interval_applyRia(np.amax(Vs)), interval_applyRia(np.amin(Vg)), interval_applyRia(np.amin(Vd)), channelType, Vt, ks)[0],
+				self.ids_help(interval_applyRia(np.amin(Vs)), interval_applyRia(np.amax(Vg)), interval_applyRia(np.amax(Vd)), channelType, Vt, ks)[1]])
+			elif Vd[1] < Vs[0]:
+				currentVal = np.array([
+				self.ids_help(interval_applyRia(np.amax(Vs)), interval_applyRia(np.amax(Vg)), interval_applyRia(np.amin(Vd)), channelType, Vt, ks)[0],
+				self.ids_help(interval_applyRia(np.amin(Vs)), interval_applyRia(np.amin(Vg)), interval_applyRia(np.amax(Vd)), channelType, Vt, ks)[1]])
+			else:
+				currentVal = np.array([
+				self.ids_help(interval_applyRia(np.amax(Vs)), interval_applyRia(np.amax(Vg)), interval_applyRia(np.amin(Vd)), channelType, Vt, ks)[0],
+				self.ids_help(interval_applyRia(np.amin(Vs)), interval_applyRia(np.amax(Vg)), interval_applyRia(np.amax(Vd)), channelType, Vt, ks)[1]])
+
+			self.funDict[(VsDict, VgDict, VdDict, channelType)] = currentVal
+			# Clean up funDict
+			if len(self.funDict) >= 10000:
+				self.funDict = {}
+
+		else: currentVal = self.ids_help(Vs, Vg, Vd, channelType, Vt, ks)
+		return currentVal
 	
 	# @author Mark Greenstreet
 	# calculate ids from the given V
 	def ids(self, V):
 		model = self.model
-		return(self.ids_help(V[self.s], V[self.g], V[self.d], model.channelType, model.Vt, model.k*self.shape))
+		#print ("V", V)
+		#print ("self.s", self.s, "self.g", self.g, "self.d", self.d)
+		return(self.ids_help_mon(V[self.s], V[self.g], V[self.d], model.channelType, model.Vt, model.k*self.shape))
 
 
 	# @author Mark Greenstreet
@@ -283,17 +339,40 @@ class LcMosfet:
 			# we can just return that gradient.
 			return self.grad_ids_help(interval_neg(Vs), interval_neg(Vg), interval_neg(Vd), 'nfet', -Vt, -ks)
 		elif(interval_p(Vs) or interval_p(Vg) or interval_p(Vd)):
-			Vs = interval_fix(Vs)
-			Vg = interval_fix(Vg)
-			Vd = interval_fix(Vd)
-			Vt = interval_fix(Vt)
+			VsDict, VgDict, VdDict = None, None, None
+			if interval_p(Vd):
+				VdDict = tuple(list(Vd))
+			else:
+				VdDict = Vd
+
+			if interval_p(Vg):
+				VgDict = tuple(list(Vg))
+			else:
+				VgDict = Vg
+
+			if interval_p(Vs):
+				VsDict = tuple(list(Vs))
+			else:
+				VsDict = Vs
+
+			if (VsDict, VgDict, VdDict, channelType) in self.gradDict:
+				return self.gradDict[(VsDict, VgDict, VdDict, channelType)]
+			Vs = interval_applyRia(Vs)
+			Vg = interval_applyRia(Vg)
+			Vd = interval_applyRia(Vd)
+			Vt = interval_applyRia(Vt)
 			g0 = self.dg_fun(Vs, Vg, Vd, Vt, ks)
 			g1x = self.dg_fun(Vd, Vg, Vs, Vt, ks)
 			if(g1x is None): g1 = None
 			else: g1 = np.array([interval_neg(g1x[2]), interval_neg(g1x[1]), interval_neg(g1x[0])])
-			if g0 is None: return g1
-			elif g1 is None: return g0
-			else: return np.array([interval_union(g0[i], g1[i]) for i in range(len(g0))])
+			if g0 is None: grad = g1
+			elif g1 is None: grad = g0
+			else: grad = np.array([interval_union(g0[i], g1[i]) for i in range(len(g0))])
+			self.gradDict[(VsDict, VgDict, VdDict, channelType)] = grad
+			# Clean up funDict
+			if len(self.gradDict) >= 10000:
+				self.gradDict = {}
+			return grad
 		elif(Vd < Vs):
 			gx = self.grad_ids_help(Vd, Vg, Vs, channelType, Vt, ks)
 			return np.array([-gx[2], -gx[1], -gx[0]])
@@ -559,7 +638,9 @@ class LcMosfet:
 		Vgse = Vgs - Vt
 		Vds = interval_sub(Vd, Vs)
 
-		Ids = self.ids_help(Vs, Vg, Vd, channelType, Vt, ks)
+		#print ("Vs", Vs, "Vg", Vg, "Vd", Vd)
+		Ids = self.ids_help_mon(Vs, Vg, Vd, channelType, Vt, ks)
+		#print ("Ids", Ids)
 		# form the LP where the constraints for the Vg and Vd and Vs
 		# bounds are added. This is important to make sure we don't get
 		# unboundedness from our linear program
@@ -589,6 +670,8 @@ class LcMosfet:
 			hyperLp.ineq_constraint([0.0, 0.0, 0.0, -1.0], -(Ids))
 			hyperLp.ineq_constraint([0.0, 0.0, 0.0, 1.0], (Ids))
 
+		#return hyperLp
+
 		# If hyperrectangles are tiny do not try to construct 
 		# linear convex regions and just return the lp representing
 		# the bounds
@@ -598,7 +681,7 @@ class LcMosfet:
 		if(not(interval_p(Vs) or interval_p(Vg) or interval_p(Vd))):
 			# Vs, Vg, and Vd are non-intervals -- they define a point
 			# Add an inequality that our Ids is the value for this point
-			return(LP(None, None, None, [[0,0,0,1.0]], self.ids_help(Vs, Vg, Vd, channelType, Vt, ks)))
+			return(LP(None, None, None, [[0,0,0,1.0]], self.ids_help_mon(Vs, Vg, Vd, channelType, Vt, ks)))
 		elif(channelType == 'pfet'):
 			LPnfet = self.lp_ids_help(interval_neg(Vs), interval_neg(Vg), interval_neg(Vd), 'nfet', -Vt, -ks)
 			return LPnfet.neg_A()
@@ -773,6 +856,8 @@ class Circuit:
 				lp.ineq_constraint(list(-eqCoeffs[i]), 0.0)
 				lp.ineq_constraint(list(eqCoeffs[i]), 0.0)
 
+		#print ("lp")
+		#print (lp)
 		return lp
 
 

@@ -347,8 +347,8 @@ def ifFeasibleHyper(hyperRectangle, statVars, volRedThreshold, model, kAlpha,eps
 		else:
 			vol = None
 		statVars['stringHyperList'].append(("l", vol))
-		'''print ("newHyperRectangle", newHyperRectangle)
-		intervalUtils.printHyper(newHyperRectangle'''
+		#print ("newHyperRectangle", newHyperRectangle)
+		#intervalUtils.printHyper(newHyperRectangle)
 		if feasible == False:
 			return (False, None)
 
@@ -412,12 +412,16 @@ def addToSolutions(model, allHypers, solHyper, kAlpha,epsilonInflation):
 	for hi in range(len(allHypers)):
 		oldHyper = allHypers[hi]
 
+		'''for i in range(lenV):
+			if interval_intersect(solHyper[i], oldHyper[i]) is None:
+				print ("not intersecting", solHyper[i], oldHyper[i])'''
 		#Check if solHyper overlaps with oldHyper
 		if all(interval_intersect(solHyper[i], oldHyper[i]) is not None for i in range(lenV)):
 			intersectHyper = np.zeros((lenV,2))
 			for ui in range(lenV):
 				intersectHyper[ui,:] = interval_intersect(solHyper[ui], oldHyper[ui])
 
+			#print ("intersectHyper", intersectHyper)
 			if np.all(soln[1] >= intersectHyper[:,0]) and np.all(soln[1] <= intersectHyper[:,1]):
 				hyperAroundNewton = np.zeros((lenV, 2))
 				for si in range(lenV):
@@ -682,15 +686,60 @@ def rambusOscillator(modelType, numStages, g_cc, statVars, kAlpha=1.0, epsilonIn
 	
 	allHypers = []
 
+	'''hyper1 = np.array([[1.35, 1.8],
+						[0.9, 1.8],
+						[0.0, 0.9],
+						[0.0, 0.9]])'''
+	hyper1 = None
+	#feasibility = ifFeasibleHyper(hyperRectangle=hyper1, statVars=statVars, volRedThreshold=1.0, model=model, kAlpha=kAlpha,epsilonInflation=epsilonInflation)
+	#print ("feasibility", feasibility)
+	'''hyper1 = np.array([[1.7999998100803811, 1.8],
+						[0.0, 4.4122565118110095e-12],
+						[0.5204758706791751, 0.5539991578829824],
+						[1.795431201546126, 1.8],
+						[0.0, 8.105592737403754e-08],
+						[1.7999999999986622, 1.8],
+						[1.0453925769488364, 1.0685168999355248],
+						[0.00396157418470353, 0.009124314562001691]])
+	fVal = model.f(hyper1)
+	print ("fVal")
+	intervalUtils.printHyper(fVal)
+	feas = intervalUtils.checkExistenceOfSolution(model,hyper1.transpose(), alpha = kAlpha, epsilonInflation=epsilonInflation)
+	print ("feasibility")
+	print (feas)'''
+
+
+	'''hyper1 = np.array([[1.6278178919881217, 1.6278178942899837],
+						[1.55407062766072, 1.5540706309561325],
+						[6.523159433547119e-17, 1.2288759830968326e-17],
+						[0.16870818405562973, 0.16870818565396228],
+						[0.1076139571020803, 0.10761395883468822],
+						[0.12766813879925398, 0.12766814077766875],
+						[1.7999999999999992, 1.800000000000001],
+						[1.452495225275838, 1.4524952267582616]])
+
+	hyper2 = np.array([[1.6278178920290314, 1.6278178942563253],
+						[1.5540706276747582, 1.5540706309385526],
+						[5.106161194109459e-17, 1.456900429145809e-17],
+						[0.16870818412176625, 0.16870818560404693],
+						[0.10761395711218251, 0.10761395882091715],
+						[0.1276681388034702, 0.1276681407746626],
+						[1.7999999999999992, 1.800000000000001],
+						[1.4524952253462955, 1.452495226650087]])
+	allHypers = [hyper1]
+	addToSolutions(model, allHypers, hyper2, kAlpha,epsilonInflation)
+	print ("allHypers")
+	print (allHypers)'''
+
 	if bisectType == "bisectMax":
 		bisectFun = bisectMax
 	if bisectType == "bisectNewton":
 		bisectFun = bisectNewton
 	if useLp:
 		volRedThreshold = 1.0
-		solverLoop(uniqueHypers=allHypers, model=model, statVars=statVars, volRedThreshold=volRedThreshold, bisectFun=bisectFun, numSolutions=numSolutions, kAlpha=kAlpha, epsilonInflation=epsilonInflation)
+		solverLoop(uniqueHypers=allHypers, model=model, statVars=statVars, volRedThreshold=volRedThreshold, bisectFun=bisectFun, numSolutions=numSolutions, kAlpha=kAlpha, epsilonInflation=epsilonInflation, hyperRectangle=hyper1)
 	else:
-		solverLoopNoLp(uniqueHypers=allHypers, model=model, statVars=statVars, bisectFun=bisectFun, numSolutions=numSolutions, kAlpha=kAlpha, epsilonInflation=epsilonInflation)
+		solverLoopNoLp(uniqueHypers=allHypers, model=model, statVars=statVars, bisectFun=bisectFun, numSolutions=numSolutions, kAlpha=kAlpha, epsilonInflation=epsilonInflation, hyperRectangle = hyper1)
 	
 	#print ("allHypers")
 	#print (allHypers)
@@ -716,14 +765,14 @@ def rambusOscillator(modelType, numStages, g_cc, statVars, kAlpha=1.0, epsilonIn
 if __name__ == "__main__":
 	statVars = {}
 	start = time.time()
-	#allHypers = schmittTrigger(modelType="lcMosfet", inputVoltage = 0.0, statVars=statVars, numSolutions = "all", useLp = False)
+	#allHypers = schmittTrigger(modelType="lcMosfet", inputVoltage = 1.8, statVars=statVars, numSolutions = "all", useLp = False)
 	#allHypers = inverter(modelType="lcMosfet", inputVoltage=0.9, statVars=statVars, numSolutions="all")
 	#allHypers = inverterLoop(modelType="tanh", numInverters=4, statVars=statVars, numSolutions="all", useLp = False)
-	allHypers = rambusOscillator(modelType="tanh", numStages=4, g_cc=4.0, statVars=statVars, kAlpha = 1.0, epsilonInflation=0.001, numSolutions="all", bisectType="bisectMax", useLp = True)
+	allHypers = rambusOscillator(modelType="scMosfet", numStages=4, g_cc=4.0, statVars=statVars, kAlpha = 1.0, epsilonInflation=0.001, numSolutions="all", bisectType="bisectMax", useLp = False)
 	end = time.time()
-	print ("allHypers")
-	for hyper in allHypers:
-		print ("hyper")
-		intervalUtils.printHyper(hyper)
+	#print ("allHypers")
+	#for hyper in allHypers:
+	#	print ("hyper")
+	#	intervalUtils.printHyper(hyper)
 	print ("numSolutions", len(allHypers))
 	print ("time taken", end - start)

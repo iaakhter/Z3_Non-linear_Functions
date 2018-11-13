@@ -72,6 +72,12 @@ def interval_round(x):
 		x[1] = np.nextafter(x[1], np.float("inf"))
 	return x
 
+# Turn a floating point into an interval
+def interval_applyRia(x):
+	if interval_p(x):
+		return x
+	return np.array([np.nextafter(x, np.float("-inf")), np.nextafter(x, np.float("inf"))])
+
 def interval_add(x, y):
 	if((x is None) or (y is None)): return None
 	if(interval_p(x) and interval_p(y)):
@@ -87,6 +93,13 @@ def interval_neg(x):
 	if(interval_p(x)):
 		return(np.array([-x[1], -x[0]]))
 	else: return(-x)
+
+def interval_max(x,y):
+	if not(interval_p(x) or interval_p(y)): return max(x,y)
+	if interval_p(x) and interval_p(y): return np.array([max(x[0], y[0]), max(x[1], y[1])])
+	if interval_p(x): return np.array([max(x[0], y), max(x[1], y)])
+	if interval_p(y): return np.array([max(x, y[0]), max(x, y[1])])
+
 
 def interval_sub(x, y):
 	if((x is None) or (y is None)): return None

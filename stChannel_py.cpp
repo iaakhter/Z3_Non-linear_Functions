@@ -504,6 +504,15 @@ MyList mvs_idnMonPy(const MyList& Vd,
         return ids;
 
     }
+    else{
+        MyList ids;
+        F<I> ids1 = mvs_ids(VdfLow, VgfHigh, VsfHigh, Vbf, fetType);
+        F<I> ids2 = mvs_ids(VdfHigh, VgfHigh, VsfLow, Vbf, fetType);
+        ids.push_back(ids1.v.l());
+        ids.push_back(ids2.v.u());
+        return ids;
+    }
+
 
     return mvs_idnPy(Vd, Vg, Vs, Vb);
 
@@ -562,7 +571,14 @@ MyList mvs_idpMonPy(const MyList& Vd,
         ids.push_back(ids1.v.l());
         ids.push_back(ids2.v.u());
         return ids;
-
+    }
+    else{
+        MyList ids;
+        F<I> ids1 = mvs_ids(VdfLow, VgfLow, VsfHigh, Vbf, fetType);
+        F<I> ids2 = mvs_ids(VdfHigh, VgfLow, VsfLow, Vbf, fetType);
+        ids.push_back(ids1.v.l());
+        ids.push_back(ids2.v.u());
+        return ids;
     }
 
     return mvs_idpPy(Vd, Vg, Vs, Vb);

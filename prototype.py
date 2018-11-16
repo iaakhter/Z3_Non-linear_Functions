@@ -48,11 +48,18 @@ def bisectNewton(hyper, model):
 # Bisect the hyper-rectangle at the dimension indicated by
 # bisectIndex and at the curoffVal
 def bisectAtIndex(hyper, options):
-	bisectIndex, cutoffVal = options
+	bisectIndex = options[0]
 	lHyper = np.copy(hyper)
 	rHyper = np.copy(hyper)
-	lHyper[bisectIndex][1] = cutoffVal
-	rHyper[bisectIndex][0] = cutoffVal
+	if len(options) == 2:
+		cutoffVal = options[1]
+		lHyper[bisectIndex][1] = cutoffVal
+		rHyper[bisectIndex][0] = cutoffVal
+	else:
+		cutoffVal = (hyper[bisectIndex][0] + hyper[bisectIndex][1])/2.0
+		lHyper[bisectIndex][1] = cutoffVal
+		rHyper[bisectIndex][0] = cutoffVal
+
 	return [lHyper, rHyper]
 
 # Figure out the dimension to bisect over and the value at which
@@ -80,7 +87,10 @@ def findBisectingIndexProportion(model, hyper):
 				bisectIndex = maxDistIndexFromHi		
 				cutoffVal = finalSoln[1][bisectIndex] + 0.3*(hyper[bisectIndex][1] - finalSoln[1][bisectIndex])
 
-	return bisectIndex, cutoffVal			
+	return bisectIndex, cutoffVal
+
+
+
 
 # solver's main loop that uses LP
 # @param uniqueHypers is a list of hyperrectangle containing unique solutions
@@ -120,7 +130,7 @@ def solverLoop(uniqueHypers, model, statVars=None, volRedThreshold=1.0, bisectFu
 	statVars['stringHyperList'].append(("i", intervalUtils.volume(hyperRectangle)))
 	
 	start = time.time()
-	feas = intervalUtils.checkExistenceOfSolution(model,hyperRectangle.transpose(),kAlpha,epsilonInflation)
+	feas = intervalUtils.checkExistenceOfSolution(model,hyperRectangle,kAlpha,epsilonInflation)
 	end = time.time()
 	statVars['totalKTime'] += end - start
 	statVars['numK'] += 1
@@ -173,13 +183,13 @@ def solverLoop(uniqueHypers, model, statVars=None, volRedThreshold=1.0, bisectFu
 			while hypForBisection is not None:
 				#print ("hypForBisection")
 				#intervalUtils.printHyper(hypForBisection)
-				lHyp, rHyp = bisectFun(hypForBisection, model)
+				lHyp, rHyp = bisectFun(hypForBisection)
 				statVars['numBisection'] += 1
 				statVars['stringHyperList'].append(("b", [intervalUtils.volume(lHyp), intervalUtils.volume(rHyp)]))
 				#print ("lHyp")
 				#intervalUtils.printHyper(lHyp)
 				start = time.time()
-				lFeas = intervalUtils.checkExistenceOfSolution(model, lHyp.transpose(), kAlpha, epsilonInflation=epsilonInflation)
+				lFeas = intervalUtils.checkExistenceOfSolution(model, lHyp, kAlpha, epsilonInflation=epsilonInflation)
 				end = time.time()
 				#print ("lFeas", lFeas)
 				statVars['totalKTime'] += end - start
@@ -188,7 +198,7 @@ def solverLoop(uniqueHypers, model, statVars=None, volRedThreshold=1.0, bisectFu
 				#print ("rHyp")
 				#intervalUtils.printHyper(rHyp)
 				start = time.time()
-				rFeas = intervalUtils.checkExistenceOfSolution(model, rHyp.transpose(), kAlpha, epsilonInflation=epsilonInflation)
+				rFeas = intervalUtils.checkExistenceOfSolution(model, rHyp, kAlpha, epsilonInflation=epsilonInflation)
 				end = time.time()
 				#print ("rFeas", rFeas)
 				statVars['totalKTime'] += end - start
@@ -224,22 +234,7 @@ def solverLoop(uniqueHypers, model, statVars=None, volRedThreshold=1.0, bisectFu
 					hypForBisection = None
 
 
-# solver's main loop that doesn't use LP
-# @param uniqueHypers is a list of hyperrectangle containing unique solutions
-#	found by solverLoop
-# @param model indicates the problem we are trying to solve rambus/schmitt/metitarski
-# @param statVars holds statistical information about the operations performed by the solver.
-#	For example, number of bisections, number of Lp's performed
-# @param bisectFun is a function that takes in a hyperrectangle and employes some mechanism
-#	to bisect it	
-# @param numSolutions indicates the number of solutions wanted by the user
-# @param kAlpha is the threshold which indicates the stopping criterion for the Krawczyk loop
-# @param epsilonInflation indicates the proportion of hyper-rectangle distance by which the 
-# 	hyper-rectangle needs to be inflated before the Krawczyk operator is applied
-# @param hyperRectangle the initial hyperrectangle over which the search for solutions
-#	is done by solverLoop. If this argument is None then the hyperrectangle defined
-#	by the bounds of the model is used
-def solverLoopNoLp(uniqueHypers, model, statVars=None, bisectFun=bisectMax, numSolutions="all", kAlpha=1.0, epsilonInflation=0.001, hyperRectangle = None):
+def solverLoopNoLpSlab(uniqueHypers, model, statVars=None, bisectFun=bisectMax, numSolutions="all", kAlpha=1.0, epsilonInflation=0.001, hyperRectangle = None):
 	if statVars is None:
 		statVars = {}
 		statVars.update({'numBisection':0, 'numLp':0, 'numK':0, 'numSingleKill':0, 'numDoubleKill':0,
@@ -255,7 +250,7 @@ def solverLoopNoLp(uniqueHypers, model, statVars=None, bisectFun=bisectMax, numS
 			hyperRectangle[i,1] = model.bounds[i][1]
 
 	
-	statVars['stringHyperList'].append(("i", intervalUtils.volume(hyperRectangle)))
+	statVars['stringHyperList'].append(("i", hyperRectangle))
 	
 	#stack containing hyperrectangles about which any decision
 	#has not been made - about whether they contain unique solution
@@ -281,11 +276,301 @@ def solverLoopNoLp(uniqueHypers, model, statVars=None, bisectFun=bisectMax, numS
 			continue
 
 		start = time.time()
-		feasibility = intervalUtils.checkExistenceOfSolution(model, hyperPopped.transpose(), kAlpha, epsilonInflation=epsilonInflation)
+		intervalCheck = intervalUtils.intervalEval(model, hyperPopped)
+		end = time.time()
+		statVars['stringHyperList'].append(('ia', intervalCheck))
+		statVars['totalIaTime'] += end - start
+		statVars['numIa'] += 1
+		if not(intervalCheck):
+			continue
+
+		start = time.time()
+		feasibility = intervalUtils.checkExistenceOfSolutionWithNewton(model, hyperPopped, kAlpha, epsilonInflation=epsilonInflation)
 		end = time.time()
 		statVars['totalKTime'] += end - start
 		statVars['numK'] += 1
-		statVars['stringHyperList'].append(("g", intervalUtils.volume(feasibility[1])))
+		statVars['stringHyperList'].append(("g", feasibility))
+		
+		#print ("feasibility", feasibility)
+		#print ("type(feasibility[0])", type(feasibility[0]))
+		if type(feasibility[0]) == bool:
+			if feasibility[0]:
+				#If the Krawczyk loop indicate uniqueness, then add the hyperrectangle
+				#to our list
+				if numSolutions == "all" or len(uniqueHypers) < numSolutions:
+					#print ("solution found")
+					#print ("hyper")
+					#intervalUtils.printHyper(hyperPopped)
+					#print ("feas")
+					#intervalUtils.printHyper(feasibility[1])
+					addToSolutions(model, uniqueHypers, feasibility[1], kAlpha, epsilonInflation)
+
+			elif feasibility[0] == False and feasibility[1] is not None:
+				#If the Krawczyk loop cannot make a decision about
+				#the hyperrectangle, bisect and add the two halves to
+				#the stackList to be processed again.
+				hypForBisection = feasibility[1]
+				lHyp, rHyp = bisectFun(hypForBisection, model)
+				statVars['numBisection'] += 1
+				statVars['stringHyperList'].append(("b", [lHyp, rHyp]))
+				stackList.append(lHyp)
+				stackList.append(rHyp)
+		else:
+			if numSolutions == "all" or len(uniqueHypers) < numSolutions:
+				#print ("solution found")
+				#print ("hyper")
+				#intervalUtils.printHyper(hyperPopped)
+				#print ("feas")
+				#intervalUtils.printHyper(feasibility[1])
+				addToSolutions(model, uniqueHypers, feasibility[0], kAlpha, epsilonInflation)
+				statVars['numBisection'] += len(feasibility[1])
+				statVars['stringHyperList'].append(("b", len(feasibility[1])))
+				for hyp in feasibility[1]:
+					stackList.append(hyp)
+
+# solver's main loop that doesn't use LP
+# @param uniqueHypers is a list of hyperrectangle containing unique solutions
+#	found by solverLoop
+# @param model indicates the problem we are trying to solve rambus/schmitt/metitarski
+# @param statVars holds statistical information about the operations performed by the solver.
+#	For example, number of bisections, number of Lp's performed
+# @param bisectFun is a function that takes in a hyperrectangle and employes some mechanism
+#	to bisect it	
+# @param numSolutions indicates the number of solutions wanted by the user
+# @param kAlpha is the threshold which indicates the stopping criterion for the Krawczyk loop
+# @param epsilonInflation indicates the proportion of hyper-rectangle distance by which the 
+# 	hyper-rectangle needs to be inflated before the Krawczyk operator is applied
+# @param hyperRectangle the initial hyperrectangle over which the search for solutions
+#	is done by solverLoop. If this argument is None then the hyperrectangle defined
+#	by the bounds of the model is used
+def solverLoopNoLpBisectAndKill(uniqueHypers, model, statVars=None, bisectFun=bisectMax, numSolutions="all", kAlpha=1.0, epsilonInflation=0.001, hyperRectangle = None):
+	if statVars is None:
+		statVars = {}
+		statVars.update({'numBisection':0, 'numLp':0, 'numK':0, 'numIa':0 ,'numSingleKill':0, 'numDoubleKill':0,
+					'totalKTime':0, 'totalLPTime':0, 'totalIaTime':0,'avgKTime':0, 'avgLPTime':0, 'avgIaTime':0,'stringHyperList':[],
+					'numLpCalls':0, 'numSuccessLpCalls':0, 'numUnsuccessLpCalls':0})
+	lenV = len(model.bounds)
+	
+	if hyperRectangle is None:
+		hyperRectangle = np.zeros((lenV,2))
+
+		for i in range(lenV):
+			hyperRectangle[i,0] = model.bounds[i][0]
+			hyperRectangle[i,1] = model.bounds[i][1]
+	totalHyperDistance = np.amax(hyperRectangle[:,1] - hyperRectangle[:,0])
+
+	
+	statVars['stringHyperList'].append(("i", hyperRectangle))
+	
+	#stack containing hyperrectangles about which any decision
+	#has not been made - about whether they contain unique solution
+	#or no solution
+	stackList = [hyperRectangle]
+
+	while len(stackList) > 0:
+		#pop the hyperrectangle
+		#print ("len(stackList)", len(stackList))
+		hyperPopped = stackList.pop(-1)
+		#print ("solver loop hyperPopped")
+		#intervalUtils.printHyper(hyperPopped)
+
+		'''hyperPoppedMaxDist = np.amax(hyperPopped[:,1] - hyperPopped[:,0])
+
+		countLarge = np.where((hyperPopped[:,1] - hyperPopped[:,0]) >= 0.5*totalHyperDistance)
+		#print ("countLarge", countLarge)
+		if len(countLarge) > (lenV/3):
+			lHyp, rHyp = bisectFun(hyperPopped, model)
+			statVars['numBisection'] += 1
+			statVars['stringHyperList'].append(("b", [lHyp, rHyp]))
+			stackList.append(lHyp)
+			stackList.append(rHyp)
+			continue'''
+		
+		#if the popped hyperrectangle is contained in a hyperrectangle
+		#that is already known to contain a unique solution, then do not
+		#consider this hyperrectangle for the next steps
+		hyperAlreadyConsidered = False
+		for hyper in uniqueHypers:
+			if np.greater_equal(hyperPopped[:,0], hyper[:,0]).all() and np.less_equal(hyperPopped[:,1], hyper[:,1]).all():
+				hyperAlreadyConsidered = True
+				break
+		if hyperAlreadyConsidered:
+			continue
+
+		start = time.time()
+		feasibility = intervalUtils.checkExistenceOfSolutionWithNewton(model, hyperPopped, kAlpha, epsilonInflation=epsilonInflation)
+		end = time.time()
+		statVars['totalKTime'] += end - start
+		statVars['numK'] += 1
+		statVars['stringHyperList'].append(("g", feasibility))
+		
+		if type(feasibility[0]) == bool:
+			if feasibility[0]:
+				#If the Krawczyk loop indicate uniqueness, then add the hyperrectangle
+				#to our list
+				if numSolutions == "all" or len(uniqueHypers) < numSolutions:
+					#print ("solution found")
+					#print ("hyper")
+					#intervalUtils.printHyper(hyperPopped)
+					#print ("feas")
+					#intervalUtils.printHyper(feasibility[1])
+					addToSolutions(model, uniqueHypers, feasibility[1], kAlpha, epsilonInflation)
+
+			elif feasibility[0] == False and feasibility[1] is not None:
+				hypForBisection = feasibility[1]
+				countKills = 0
+				killLimit = lenV
+				while hypForBisection is not None:
+					countKills += 1
+					#print ("hypForBisection")
+					#intervalUtils.printHyper(hypForBisection)
+					lHyp, rHyp = bisectFun(hypForBisection, model)
+					statVars['numBisection'] += 1
+					statVars['stringHyperList'].append(("b", [lHyp, rHyp]))
+					#print ("lHyp")
+					#intervalUtils.printHyper(lHyp)
+					start = time.time()
+					lFeas = intervalUtils.intervalEval(model, lHyp)
+					end = time.time()
+					statVars['stringHyperList'].append(("ia", lFeas))
+					#print ("lFeas", lFeas)
+					statVars['totalIaTime'] += end - start
+					statVars['numIa'] += 1
+					#statVars['stringHyperList'].append(("g", intervalUtils.volume(lFeas[1])))
+					#print ("rHyp")
+					#intervalUtils.printHyper(rHyp)
+					start = time.time()
+					rFeas = intervalUtils.intervalEval(model, rHyp)
+					end = time.time()
+					statVars['stringHyperList'].append(("ia", rFeas))
+					#print ("rFeas", rFeas)
+					statVars['totalIaTime'] += end - start
+					statVars['numIa'] += 1
+					#statVars['stringHyperList'].append(("g", intervalUtils.volume(rFeas[1])))
+					if not(lFeas) or not(rFeas):
+						if not(lFeas) and not(rFeas):
+							statVars['numDoubleKill'] += 1
+							hypForBisection = None
+						else:
+							statVars['numSingleKill'] += 1
+							if not(lFeas):
+								if countKills < killLimit:
+									hypForBisection = rHyp
+								else:
+									stackList.append(rHyp)
+									hypForBisection = None
+							else:
+								if countKills < killLimit:
+									hypForBisection = lHyp
+								else:
+									stackList.append(lHyp)
+									hypForBisection = None
+					else:
+						stackList.append(lHyp)
+						stackList.append(rHyp)
+						hypForBisection = None
+
+		else:
+			if numSolutions == "all" or len(uniqueHypers) < numSolutions:
+				#print ("solution found")
+				#print ("hyper")
+				#intervalUtils.printHyper(hyperPopped)
+				#print ("feas")
+				#intervalUtils.printHyper(feasibility[1])
+				addToSolutions(model, uniqueHypers, feasibility[0], kAlpha, epsilonInflation)
+				statVars['numBisection'] += len(feasibility[1])
+				#statVars['stringHyperList'].append(("b", len(feasibility[1])))
+				for hyp in feasibility[1]:
+					start = time.time()
+					intervalCheck = intervalUtils.intervalEval(model, hyp)
+					end = time.time()
+					statVars['totalIaTime'] += end - start
+					statVars['numIa'] += 1
+					statVars['stringHyperList'].append(("ia", intervalCheck))
+					if intervalCheck:
+						stackList.append(hyp)
+
+
+
+# solver's main loop that doesn't use LP
+# @param uniqueHypers is a list of hyperrectangle containing unique solutions
+#	found by solverLoop
+# @param model indicates the problem we are trying to solve rambus/schmitt/metitarski
+# @param statVars holds statistical information about the operations performed by the solver.
+#	For example, number of bisections, number of Lp's performed
+# @param bisectFun is a function that takes in a hyperrectangle and employes some mechanism
+#	to bisect it	
+# @param numSolutions indicates the number of solutions wanted by the user
+# @param kAlpha is the threshold which indicates the stopping criterion for the Krawczyk loop
+# @param epsilonInflation indicates the proportion of hyper-rectangle distance by which the 
+# 	hyper-rectangle needs to be inflated before the Krawczyk operator is applied
+# @param hyperRectangle the initial hyperrectangle over which the search for solutions
+#	is done by solverLoop. If this argument is None then the hyperrectangle defined
+#	by the bounds of the model is used
+def solverLoopNoLp(uniqueHypers, model, statVars=None, bisectFun=bisectMax, numSolutions="all", kAlpha=1.0, epsilonInflation=0.001, hyperRectangle = None):
+	if statVars is None:
+		statVars = {}
+		statVars.update({'numBisection':0, 'numLp':0, 'numK':0, 'numIa':0 ,'numSingleKill':0, 'numDoubleKill':0,
+					'totalKTime':0, 'totalLPTime':0, 'totalIaTime':0,'avgKTime':0, 'avgLPTime':0, 'avgIaTime':0,'stringHyperList':[],
+					'numLpCalls':0, 'numSuccessLpCalls':0, 'numUnsuccessLpCalls':0})
+	lenV = len(model.bounds)
+	
+	if hyperRectangle is None:
+		hyperRectangle = np.zeros((lenV,2))
+
+		for i in range(lenV):
+			hyperRectangle[i,0] = model.bounds[i][0]
+			hyperRectangle[i,1] = model.bounds[i][1]
+
+	#totalHyperDistance = np.amax(hyperRectangle[:,1] - hyperRectangle[:,0])
+	statVars['stringHyperList'].append(("i", hyperRectangle))
+	
+	#stack containing hyperrectangles about which any decision
+	#has not been made - about whether they contain unique solution
+	#or no solution
+	stackList = [hyperRectangle]
+
+	while len(stackList) > 0:
+		#pop the hyperrectangle
+		#print ("len(stackList)", len(stackList))
+		hyperPopped = stackList.pop(-1)
+		#print ("solver loop hyperPopped")
+		#intervalUtils.printHyper(hyperPopped)
+
+		'''hyperPoppedMaxDist = np.amax(hyperPopped[:,1] - hyperPopped[:,0])
+
+		#countLarge = np.where((hyperPopped[:,1] - hyperPopped[:,0]) >= 0.5*totalHyperDistance)
+		if hyperPoppedMaxDist > 0.25*totalHyperDistance:
+			lHyp, rHyp = bisectFun(hyperPopped, model)
+			stackList.append(lHyp)
+			stackList.append(rHyp)
+			continue'''
+		
+		#if the popped hyperrectangle is contained in a hyperrectangle
+		#that is already known to contain a unique solution, then do not
+		#consider this hyperrectangle for the next steps
+		hyperAlreadyConsidered = False
+		for hyper in uniqueHypers:
+			if np.greater_equal(hyperPopped[:,0], hyper[:,0]).all() and np.less_equal(hyperPopped[:,1], hyper[:,1]).all():
+				hyperAlreadyConsidered = True
+				break
+		if hyperAlreadyConsidered:
+			continue
+
+		start = time.time()
+		intervalCheck = intervalUtils.intervalEval(model, hyperPopped)
+		end = time.time()
+		statVars['stringHyperList'].append(('ia', intervalCheck))
+		statVars['totalIaTime'] += end - start
+		statVars['numIa'] += 1
+		if not(intervalCheck):
+			continue
+		start = time.time()
+		feasibility = intervalUtils.checkExistenceOfSolution(model, hyperPopped, kAlpha, epsilonInflation=epsilonInflation)
+		end = time.time()
+		statVars['totalKTime'] += end - start
+		statVars['numK'] += 1
+		statVars['stringHyperList'].append(("g", feasibility))
 		
 		#print ("feasibility", feasibility)
 		if feasibility[0]:
@@ -306,7 +591,7 @@ def solverLoopNoLp(uniqueHypers, model, statVars=None, bisectFun=bisectMax, numS
 			hypForBisection = feasibility[1]
 			lHyp, rHyp = bisectFun(hypForBisection, model)
 			statVars['numBisection'] += 1
-			statVars['stringHyperList'].append(("b", [intervalUtils.volume(lHyp), intervalUtils.volume(rHyp)]))
+			statVars['stringHyperList'].append(("b", [lHyp, rHyp]))
 			stackList.append(lHyp)
 			stackList.append(rHyp)
 
@@ -362,7 +647,7 @@ def ifFeasibleHyper(hyperRectangle, statVars, volRedThreshold, model, kAlpha,eps
 		start = time.time()
 		
 		#Apply Krawczyk
-		kResult = intervalUtils.checkExistenceOfSolution(model, newHyperRectangle.transpose(), kAlpha, epsilonInflation=epsilonInflation)
+		kResult = intervalUtils.checkExistenceOfSolution(model, newHyperRectangle, kAlpha, epsilonInflation=epsilonInflation)
 		end = time.time()
 		statVars['totalKTime'] += (end - start)
 		statVars['numK'] += 1
@@ -407,14 +692,11 @@ def addToSolutions(model, allHypers, solHyper, kAlpha,epsilonInflation):
 	soln = intervalUtils.newton(model,exampleVolt)
 	
 	if not(soln[0]):
-		raise Exception("prototype.py addToSolutions: Something went wrong. Should contain a unique solution")
+		raise Exception("prototype.py addToSolutions: Something went wrong. Should contain a unique solution" + str(solHyper))
 	
 	for hi in range(len(allHypers)):
 		oldHyper = allHypers[hi]
 
-		'''for i in range(lenV):
-			if interval_intersect(solHyper[i], oldHyper[i]) is None:
-				print ("not intersecting", solHyper[i], oldHyper[i])'''
 		#Check if solHyper overlaps with oldHyper
 		if all(interval_intersect(solHyper[i], oldHyper[i]) is not None for i in range(lenV)):
 			intersectHyper = np.zeros((lenV,2))
@@ -428,7 +710,7 @@ def addToSolutions(model, allHypers, solHyper, kAlpha,epsilonInflation):
 					minDiff = min(abs(intersectHyper[si,1] - soln[1][si]), abs(soln[1][si] - intersectHyper[si,0]))
 					hyperAroundNewton[si,0] = soln[1][si] - minDiff
 					hyperAroundNewton[si,1] = soln[1][si] + minDiff
-				feasibility = intervalUtils.checkExistenceOfSolution(model, hyperAroundNewton.transpose(), alpha = kAlpha, epsilonInflation=epsilonInflation)
+				feasibility = intervalUtils.checkExistenceOfSolution(model, hyperAroundNewton, alpha = kAlpha, epsilonInflation=epsilonInflation)
 				if feasibility[0]:
 					foundOverlap = True
 					break
@@ -461,8 +743,8 @@ def addToSolutions(model, allHypers, solHyper, kAlpha,epsilonInflation):
 # @param useLp flag to decide whether to use linear programming in our method or not
 # @return a list of hyperrectangles containing unique dc equilibrium points
 def schmittTrigger(modelType, inputVoltage, statVars, kAlpha = 1.0, epsilonInflation=0.001, bisectType="bisectMax", numSolutions = "all", useLp = False):
-	statVars.update({'numBisection':0, 'numLp':0, 'numK':0, 'numSingleKill':0, 'numDoubleKill':0,
-					'totalKTime':0, 'totalLPTime':0, 'avgKTime':0, 'avgLPTime':0, 'stringHyperList':[],
+	statVars.update({'numBisection':0, 'numLp':0, 'numK':0, 'numIa':0 ,'numSingleKill':0, 'numDoubleKill':0,
+					'totalKTime':0, 'totalLPTime':0, 'totalIaTime':0,'avgKTime':0, 'avgLPTime':0, 'avgIaTime':0,'stringHyperList':[],
 					'numLpCalls':0, 'numSuccessLpCalls':0, 'numUnsuccessLpCalls':0})
 
 	#load the schmitt trigger model
@@ -528,8 +810,8 @@ def schmittTrigger(modelType, inputVoltage, statVars, kAlpha = 1.0, epsilonInfla
 # @param useLp flag to decide whether to use linear programming in our method or not
 # @return a list of hyperrectangles containing unique dc equilibrium points
 def inverter(modelType, inputVoltage, statVars, kAlpha=1.0, epsilonInflation=0.001, bisectType="bisectMax", numSolutions="all" , useLp=False):
-	statVars.update({'numBisection':0, 'numLp':0, 'numK':0, 'numSingleKill':0, 'numDoubleKill':0,
-					'totalKTime':0, 'totalLPTime':0, 'avgKTime':0, 'avgLPTime':0, 'stringHyperList':[],
+	statVars.update({'numBisection':0, 'numLp':0, 'numK':0, 'numIa':0 ,'numSingleKill':0, 'numDoubleKill':0,
+					'totalKTime':0, 'totalLPTime':0, 'totalIaTime':0,'avgKTime':0, 'avgLPTime':0, 'avgIaTime':0,'stringHyperList':[],
 					'numLpCalls':0, 'numSuccessLpCalls':0, 'numUnsuccessLpCalls':0})
 	
 
@@ -595,8 +877,8 @@ def inverter(modelType, inputVoltage, statVars, kAlpha=1.0, epsilonInflation=0.0
 # @param useLp flag to decide whether to use linear programming in our method or not
 # @return a list of hyperrectangles containing unique dc equilibrium points
 def inverterLoop(modelType, numInverters, statVars, kAlpha=1.0, epsilonInflation=0.001, bisectType="bisectMax", numSolutions="all" , useLp=False):
-	statVars.update({'numBisection':0, 'numLp':0, 'numK':0, 'numSingleKill':0, 'numDoubleKill':0,
-					'totalKTime':0, 'totalLPTime':0, 'avgKTime':0, 'avgLPTime':0, 'stringHyperList':[],
+	statVars.update({'numBisection':0, 'numLp':0, 'numK':0, 'numIa':0 ,'numSingleKill':0, 'numDoubleKill':0,
+					'totalKTime':0, 'totalLPTime':0, 'totalIaTime':0,'avgKTime':0, 'avgLPTime':0, 'avgIaTime':0,'stringHyperList':[],
 					'numLpCalls':0, 'numSuccessLpCalls':0, 'numUnsuccessLpCalls':0})
 	
 
@@ -665,8 +947,8 @@ def inverterLoop(modelType, numInverters, statVars, kAlpha=1.0, epsilonInflation
 # @param useLp flag to decide whether to use linear programming in our method or not
 # @return a list of hyperrectangles containing unique dc equilibrium points
 def rambusOscillator(modelType, numStages, g_cc, statVars, kAlpha=1.0, epsilonInflation=0.01, bisectType="bisectMax", numSolutions="all", useLp=False):
-	statVars.update({'numBisection':0, 'numLp':0, 'numK':0, 'numSingleKill':0, 'numDoubleKill':0,
-					'totalKTime':0, 'totalLPTime':0, 'avgKTime':0, 'avgLPTime':0, 'stringHyperList':[],
+	statVars.update({'numBisection':0, 'numLp':0, 'numK':0, 'numIa':0 ,'numSingleKill':0, 'numDoubleKill':0,
+					'totalKTime':0, 'totalLPTime':0, 'totalIaTime':0,'avgKTime':0, 'avgLPTime':0, 'avgIaTime':0,'stringHyperList':[],
 					'numLpCalls':0, 'numSuccessLpCalls':0, 'numUnsuccessLpCalls':0})
 	
 	if modelType == "tanh":
@@ -693,18 +975,18 @@ def rambusOscillator(modelType, numStages, g_cc, statVars, kAlpha=1.0, epsilonIn
 	hyper1 = None
 	#feasibility = ifFeasibleHyper(hyperRectangle=hyper1, statVars=statVars, volRedThreshold=1.0, model=model, kAlpha=kAlpha,epsilonInflation=epsilonInflation)
 	#print ("feasibility", feasibility)
-	'''hyper1 = np.array([[1.7999998100803811, 1.8],
-						[0.0, 4.4122565118110095e-12],
-						[0.5204758706791751, 0.5539991578829824],
-						[1.795431201546126, 1.8],
-						[0.0, 8.105592737403754e-08],
-						[1.7999999999986622, 1.8],
-						[1.0453925769488364, 1.0685168999355248],
-						[0.00396157418470353, 0.009124314562001691]])
+	'''hyper1 = np.array([[0.71968695, 0.97929253],
+       [0.71968695, 0.97929253],
+       [0.71968695, 0.97929253],
+       [0.71968695, 0.97929253],
+       [0.71968695, 0.97929253],
+       [0.71968695, 0.97929253],
+       [0.35984348, 0.71968695],
+       [0.9       , 1.1667208 ]])
 	fVal = model.f(hyper1)
 	print ("fVal")
-	intervalUtils.printHyper(fVal)
-	feas = intervalUtils.checkExistenceOfSolution(model,hyper1.transpose(), alpha = kAlpha, epsilonInflation=epsilonInflation)
+	intervalUtils.printHyper(fVal)'''
+	'''feas = intervalUtils.checkExistenceOfSolution(model,hyper1, alpha = kAlpha, epsilonInflation=epsilonInflation)
 	print ("feasibility")
 	print (feas)'''
 
@@ -739,7 +1021,7 @@ def rambusOscillator(modelType, numStages, g_cc, statVars, kAlpha=1.0, epsilonIn
 		volRedThreshold = 1.0
 		solverLoop(uniqueHypers=allHypers, model=model, statVars=statVars, volRedThreshold=volRedThreshold, bisectFun=bisectFun, numSolutions=numSolutions, kAlpha=kAlpha, epsilonInflation=epsilonInflation, hyperRectangle=hyper1)
 	else:
-		solverLoopNoLp(uniqueHypers=allHypers, model=model, statVars=statVars, bisectFun=bisectFun, numSolutions=numSolutions, kAlpha=kAlpha, epsilonInflation=epsilonInflation, hyperRectangle = hyper1)
+		solverLoopNoLpBisectAndKill(uniqueHypers=allHypers, model=model, statVars=statVars, bisectFun=bisectFun, numSolutions=numSolutions, kAlpha=kAlpha, epsilonInflation=epsilonInflation, hyperRectangle = hyper1)
 	
 	#print ("allHypers")
 	#print (allHypers)
@@ -753,22 +1035,31 @@ def rambusOscillator(modelType, numStages, g_cc, statVars, kAlpha=1.0, epsilonIn
 		statVars['avgLPTime'] = (statVars['totalLPTime']*1.0)/statVars['numLp']
 	if statVars['numK'] != 0:
 		statVars['avgKTime'] = (statVars['totalKTime']*1.0)/statVars['numK']
+	if statVars['numIa'] != 0:
+		statVars['avgIaTime'] = (statVars['totalIaTime']*1.0)/statVars['numIa']
 	
-	#print ("numBisection", statVars['numBisection'], "numLp", statVars['numLp'], "numK", statVars['numK'],
-	#	"numSingleKill", statVars['numSingleKill'], "numDoubleKill", statVars['numDoubleKill'])
-	#print ("totalKTime", statVars['totalKTime'], "totalLPTime", statVars['totalLPTime'], "avgKTime", 
-	#	statVars['avgKTime'], "avgLPTime", statVars['avgLPTime'])
+	'''print ("stringHyperList")
+	for entry in statVars["stringHyperList"]:
+		print entry'''
+
+	print ("numBisection", statVars['numBisection'], "numLp", statVars['numLp'], "numK", statVars['numK'],
+		"numIa", statVars['numIa'], "numSingleKill", statVars['numSingleKill'], "numDoubleKill", statVars['numDoubleKill'])
+	print ("totalKTime", statVars['totalKTime'], "totalLPTime", statVars['totalLPTime'], "totalIaTime", statVars['totalIaTime'],
+		"avgKTime", statVars['avgKTime'], "avgLPTime", statVars['avgLPTime'], "avgIaTime", statVars["avgIaTime"])
 	#print ("numLpCalls", statVars['numLpCalls'], "numSuccessLpCalls", statVars['numSuccessLpCalls'], "numUnsuccessLpCalls", statVars['numUnsuccessLpCalls'])
+	#print ("allSolutions")
+	#dcUtils.printSol(allHypers, model)
+
 	return allHypers
 
 
 if __name__ == "__main__":
 	statVars = {}
 	start = time.time()
-	#allHypers = schmittTrigger(modelType="lcMosfet", inputVoltage = 1.8, statVars=statVars, numSolutions = "all", useLp = False)
+	#allHypers = schmittTrigger(modelType="lcMosfet", inputVoltage = 0.9, statVars=statVars, numSolutions = "all", useLp = False)
 	#allHypers = inverter(modelType="lcMosfet", inputVoltage=0.9, statVars=statVars, numSolutions="all")
 	#allHypers = inverterLoop(modelType="tanh", numInverters=4, statVars=statVars, numSolutions="all", useLp = False)
-	allHypers = rambusOscillator(modelType="scMosfet", numStages=4, g_cc=4.0, statVars=statVars, kAlpha = 1.0, epsilonInflation=0.001, numSolutions="all", bisectType="bisectMax", useLp = False)
+	allHypers = rambusOscillator(modelType="tanh", numStages=6, g_cc=4.0, statVars=statVars, kAlpha = 1.0, epsilonInflation=0.001, numSolutions="all", bisectType="bisectMax", useLp = False)
 	end = time.time()
 	#print ("allHypers")
 	#for hyper in allHypers:

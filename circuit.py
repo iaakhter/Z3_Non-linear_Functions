@@ -253,29 +253,28 @@ class LcMosfet:
 	# ids helper function that takes advantage of monotonicity properties. 
 	# Vs, Vg, Vd can be interval or point values
 	def ids_help_mon(self, Vs, Vg, Vd, channelType, Vt, ks):
+		VsDict, VgDict, VdDict = None, None, None
+		if interval_p(Vd):
+			VdDict = tuple(list(Vd))
+		else:
+			VdDict = Vd
+
+		if interval_p(Vg):
+			VgDict = tuple(list(Vg))
+		else:
+			VgDict = Vg
+
+		if interval_p(Vs):
+			VsDict = tuple(list(Vs))
+		else:
+			VsDict = Vs
+
+		if (VsDict, VgDict, VdDict, channelType) in self.funDict:
+			return self.funDict[(VsDict, VgDict, VdDict, channelType)]
 		if(channelType == 'pfet'):
-			return interval_neg(self.ids_help(interval_neg(Vs), interval_neg(Vg), interval_neg(Vd), 'nfet', -Vt, -ks))
+			currentVal = interval_neg(self.ids_help(interval_neg(Vs), interval_neg(Vg), interval_neg(Vd), 'nfet', -Vt, -ks))
 
 		elif interval_p(Vs) or interval_p(Vg) or interval_p(Vd):
-			VsDict, VgDict, VdDict = None, None, None
-			if interval_p(Vd):
-				VdDict = tuple(list(Vd))
-			else:
-				VdDict = Vd
-
-			if interval_p(Vg):
-				VgDict = tuple(list(Vg))
-			else:
-				VgDict = Vg
-
-			if interval_p(Vs):
-				VsDict = tuple(list(Vs))
-			else:
-				VsDict = Vs
-
-			if (VsDict, VgDict, VdDict, channelType) in self.funDict:
-				return self.funDict[(VsDict, VgDict, VdDict, channelType)]
-
 			Vs = interval_fix(Vs)
 			Vg = interval_fix(Vg)
 			Vd = interval_fix(Vd)
@@ -292,12 +291,12 @@ class LcMosfet:
 				self.ids_help(interval_applyRia(np.amax(Vs)), interval_applyRia(np.amax(Vg)), interval_applyRia(np.amin(Vd)), channelType, Vt, ks)[0],
 				self.ids_help(interval_applyRia(np.amin(Vs)), interval_applyRia(np.amax(Vg)), interval_applyRia(np.amax(Vd)), channelType, Vt, ks)[1]])
 
-			self.funDict[(VsDict, VgDict, VdDict, channelType)] = currentVal
-			# Clean up funDict
-			if len(self.funDict) >= 10000:
-				self.funDict = {}
 
 		else: currentVal = self.ids_help(Vs, Vg, Vd, channelType, Vt, ks)
+		self.funDict[(VsDict, VgDict, VdDict, channelType)] = currentVal
+		# Clean up funDict
+		if len(self.funDict) >= 10000:
+			self.funDict = {}
 		return currentVal
 	
 	# @author Mark Greenstreet
@@ -332,31 +331,31 @@ class LcMosfet:
 
 	# @author Mark Greenstreet
 	def grad_ids_help(self, Vs, Vg, Vd, channelType, Vt, ks):
+		VsDict, VgDict, VdDict = None, None, None
+		if interval_p(Vd):
+			VdDict = tuple(list(Vd))
+		else:
+			VdDict = Vd
+
+		if interval_p(Vg):
+			VgDict = tuple(list(Vg))
+		else:
+			VgDict = Vg
+
+		if interval_p(Vs):
+			VsDict = tuple(list(Vs))
+		else:
+			VsDict = Vs
+
+		if (VsDict, VgDict, VdDict, channelType) in self.gradDict:
+			return self.gradDict[(VsDict, VgDict, VdDict, channelType)]
 		if(channelType == 'pfet'):
 			# self.grad_ids_help(-Vs, -Vg, -Vd, 'nfet', -Vt, -ks)
 			# returns the partials of -Ids wrt. -Vs, -Vg, and -Vd,
 			# e.g. (d -Ids)/(d -Vs).  The negations cancel out; so
 			# we can just return that gradient.
-			return self.grad_ids_help(interval_neg(Vs), interval_neg(Vg), interval_neg(Vd), 'nfet', -Vt, -ks)
+			grad = self.grad_ids_help(interval_neg(Vs), interval_neg(Vg), interval_neg(Vd), 'nfet', -Vt, -ks)
 		elif(interval_p(Vs) or interval_p(Vg) or interval_p(Vd)):
-			VsDict, VgDict, VdDict = None, None, None
-			if interval_p(Vd):
-				VdDict = tuple(list(Vd))
-			else:
-				VdDict = Vd
-
-			if interval_p(Vg):
-				VgDict = tuple(list(Vg))
-			else:
-				VgDict = Vg
-
-			if interval_p(Vs):
-				VsDict = tuple(list(Vs))
-			else:
-				VsDict = Vs
-
-			if (VsDict, VgDict, VdDict, channelType) in self.gradDict:
-				return self.gradDict[(VsDict, VgDict, VdDict, channelType)]
 			Vs = interval_applyRia(Vs)
 			Vg = interval_applyRia(Vg)
 			Vd = interval_applyRia(Vd)
@@ -368,24 +367,27 @@ class LcMosfet:
 			if g0 is None: grad = g1
 			elif g1 is None: grad = g0
 			else: grad = np.array([interval_union(g0[i], g1[i]) for i in range(len(g0))])
-			self.gradDict[(VsDict, VgDict, VdDict, channelType)] = grad
-			# Clean up funDict
-			if len(self.gradDict) >= 10000:
-				self.gradDict = {}
-			return grad
+			
 		elif(Vd < Vs):
 			gx = self.grad_ids_help(Vd, Vg, Vs, channelType, Vt, ks)
-			return np.array([-gx[2], -gx[1], -gx[0]])
-		Vgse = (Vg - Vs) - Vt
-		Vds = Vd - Vs
-		if(Vgse < 0):  # cut-off: Ids = 0
-			return np.array([-self.model.gds, 0.0, self.model.gds])
-		elif(Vgse < Vds): # saturation: Ids = (ks/2.0)*Vgse*Vgse
-			return np.array([-ks*Vgse - self.model.gds, ks*Vgse, self.model.gds])
-		else: # linear: ks*(Vgse - Vds/2.0)*Vds
-			dg = ks*Vds
-			dd = ks*(Vgse - Vds) + self.model.gds
-			return np.array([-(dg + dd), dg, dd])
+			grad =  np.array([-gx[2], -gx[1], -gx[0]])
+		else:
+			Vgse = (Vg - Vs) - Vt
+			Vds = Vd - Vs
+			if(Vgse < 0):  # cut-off: Ids = 0
+				grad = np.array([-self.model.gds, 0.0, self.model.gds])
+			elif(Vgse < Vds): # saturation: Ids = (ks/2.0)*Vgse*Vgse
+				grad = np.array([-ks*Vgse - self.model.gds, ks*Vgse, self.model.gds])
+			else: # linear: ks*(Vgse - Vds/2.0)*Vds
+				dg = ks*Vds
+				dd = ks*(Vgse - Vds) + self.model.gds
+				grad = np.array([-(dg + dd), dg, dd])
+
+		self.gradDict[(VsDict, VgDict, VdDict, channelType)] = grad
+		# Clean up gradDict
+		if len(self.gradDict) >= 10000:
+			self.gradDict = {}
+		return grad
 
 	# @author Mark Greenstreet
 	def grad_ids(self, V):
@@ -745,10 +747,21 @@ class LcMosfet:
 class Circuit:
 	def __init__(self, tr):
 		self.tr = tr # list of transistor objects (long channel - Mosfet or short channel - StMosfet)
+		self.funDict = {}
+		self.gradDict = {}
 
 	# @author Mark Greenstreet
 	# Return node currents given the voltages at nodes
 	def f(self, V):
+		vTuple = ()
+		for x in V:
+			if interval_p(x):
+				vTuple += (tuple(list(x)),)
+			else:
+				vTuple += ((x),)
+		if vTuple in self.funDict:
+			#print ("funCollide")
+			return self.funDict[vTuple]
 		intervalVal = any([interval_p(x) for x in V])
 		if intervalVal:
 			I_node = np.zeros((len(V),2))
@@ -760,6 +773,9 @@ class Circuit:
 			#print "Circuit.f: i = " + str(i) + ", tr.s = " + str(tr.s) + "(" + str(V[tr.s]) + "), tr.g = " + str(tr.g) + "(" + str(V[tr.g]) + "), tr.d = " + str(tr.d) + "(" + str(V[tr.d]) + "), ids = " + str(Ids)
 			I_node[tr.s] = interval_add(I_node[tr.s], Ids)
 			I_node[tr.d] = interval_sub(I_node[tr.d], Ids)
+		self.funDict[vTuple] = I_node
+		if len(self.funDict) > 10000:
+			self.funDict = {}
 		return I_node
 
 	# @author Mark Greenstreet
@@ -767,6 +783,15 @@ class Circuit:
 	def jacobian(self, V):
 		#print ("Calculating jacobian for V")
 		#print (V)
+		vTuple = ()
+		for x in V:
+			if interval_p(x):
+				vTuple += (tuple(list(x)),)
+			else:
+				vTuple += ((x),)
+		if vTuple in self.gradDict:
+			#print ("grad collide")
+			return self.gradDict[vTuple]
 		intervalVal = any([interval_p(x) for x in V])	
 		
 		if intervalVal:
@@ -781,6 +806,9 @@ class Circuit:
 			for i in range(len(sgd)):
 				J[tr.s, sgd[i]] = interval_add(J[tr.s, sgd[i]], g[i])
 				J[tr.d, sgd[i]] = interval_sub(J[tr.d, sgd[i]], g[i])
+		self.gradDict[vTuple] = J
+		if len(self.gradDict) > 10000:
+			self.gradDict = {}
 		return J
 
 	

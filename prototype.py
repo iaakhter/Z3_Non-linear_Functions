@@ -358,7 +358,7 @@ def solverLoopNoLpBisectAndKill(uniqueHypers, model, statVars=None, bisectFun=bi
 			hyperRectangle[i,0] = model.bounds[i][0]
 			hyperRectangle[i,1] = model.bounds[i][1]
 	totalHyperDistance = np.amax(hyperRectangle[:,1] - hyperRectangle[:,0])
-
+	#print ("start algo")
 	
 	statVars['stringHyperList'].append(("i", hyperRectangle))
 	
@@ -700,16 +700,15 @@ def addToSolutions(model, allHypers, solHyper, kAlpha,epsilonInflation):
 		#Check if solHyper overlaps with oldHyper
 		if all(interval_intersect(solHyper[i], oldHyper[i]) is not None for i in range(lenV)):
 			intersectHyper = np.zeros((lenV,2))
-			for ui in range(lenV):
-				intersectHyper[ui,:] = interval_intersect(solHyper[ui], oldHyper[ui])
+			intersectHyper[:,0] = np.maximum(solHyper[:,0], oldHyper[:,0])
+			intersectHyper[:,1] = np.minimum(solHyper[:,1], oldHyper[:,1])
 
 			#print ("intersectHyper", intersectHyper)
 			if np.all(soln[1] >= intersectHyper[:,0]) and np.all(soln[1] <= intersectHyper[:,1]):
 				hyperAroundNewton = np.zeros((lenV, 2))
-				for si in range(lenV):
-					minDiff = min(abs(intersectHyper[si,1] - soln[1][si]), abs(soln[1][si] - intersectHyper[si,0]))
-					hyperAroundNewton[si,0] = soln[1][si] - minDiff
-					hyperAroundNewton[si,1] = soln[1][si] + minDiff
+				minDiff = np.minimum(np.absolute(intersectHyper[:,1] - soln[1]), np.absolute(soln[1] - intersectHyper[:,0]))
+				hyperAroundNewton[:,0] = soln[1] - minDiff
+				hyperAroundNewton[:,1] = soln[1] + minDiff
 				feasibility = intervalUtils.checkExistenceOfSolution(model, hyperAroundNewton, alpha = kAlpha, epsilonInflation=epsilonInflation)
 				if feasibility[0]:
 					foundOverlap = True
@@ -838,11 +837,13 @@ def inverter(modelType, inputVoltage, statVars, kAlpha=1.0, epsilonInflation=0.0
 		volRedThreshold = 1.0
 		solverLoop(uniqueHypers=allHypers, model=model, statVars=statVars, volRedThreshold=volRedThreshold, bisectFun=bisectFun, numSolutions=numSolutions, kAlpha=kAlpha, epsilonInflation=epsilonInflation)
 	else:
-		solverLoopNoLp(uniqueHypers=allHypers, model=model, statVars=statVars, bisectFun=bisectFun, numSolutions=numSolutions, kAlpha=kAlpha, epsilonInflation=epsilonInflation)
+		solverLoopNoLpBisectAndKill(uniqueHypers=allHypers, model=model, statVars=statVars, bisectFun=bisectFun, numSolutions=numSolutions, kAlpha=kAlpha, epsilonInflation=epsilonInflation)
 	
-	#print ("allHypers")
-	#print (allHypers)
-	#print ("numSolutions", len(allHypers))
+	'''print ("allHypers")
+	print (allHypers)
+	print ("model.f", model.f(np.array([[0.0, 0.9]])))
+	print ("model.f", model.f(allHypers[0]))
+	#print ("numSolutions", len(allHypers))'''
 	
 	endExp = time.time()
 	#print ("TOTAL TIME ", endExp - startExp)
@@ -905,7 +906,7 @@ def inverterLoop(modelType, numInverters, statVars, kAlpha=1.0, epsilonInflation
 		volRedThreshold = 1.0
 		solverLoop(uniqueHypers=allHypers, model=model, statVars=statVars, volRedThreshold=volRedThreshold, bisectFun=bisectFun, numSolutions=numSolutions, kAlpha=kAlpha, epsilonInflation=epsilonInflation)
 	else:
-		solverLoopNoLp(uniqueHypers=allHypers, model=model, statVars=statVars, bisectFun=bisectFun, numSolutions=numSolutions, kAlpha=kAlpha, epsilonInflation=epsilonInflation)
+		solverLoopNoLpBisectAndKill(uniqueHypers=allHypers, model=model, statVars=statVars, bisectFun=bisectFun, numSolutions=numSolutions, kAlpha=kAlpha, epsilonInflation=epsilonInflation)
 	
 	#print ("allHypers")
 	#print (allHypers)
@@ -1021,7 +1022,7 @@ def rambusOscillator(modelType, numStages, g_cc, statVars, kAlpha=1.0, epsilonIn
 		volRedThreshold = 1.0
 		solverLoop(uniqueHypers=allHypers, model=model, statVars=statVars, volRedThreshold=volRedThreshold, bisectFun=bisectFun, numSolutions=numSolutions, kAlpha=kAlpha, epsilonInflation=epsilonInflation, hyperRectangle=hyper1)
 	else:
-		solverLoopNoLpBisectAndKill(uniqueHypers=allHypers, model=model, statVars=statVars, bisectFun=bisectFun, numSolutions=numSolutions, kAlpha=kAlpha, epsilonInflation=epsilonInflation, hyperRectangle = hyper1)
+		solverLoopNoLp(uniqueHypers=allHypers, model=model, statVars=statVars, bisectFun=bisectFun, numSolutions=numSolutions, kAlpha=kAlpha, epsilonInflation=epsilonInflation, hyperRectangle = hyper1)
 	
 	#print ("allHypers")
 	#print (allHypers)
@@ -1042,10 +1043,10 @@ def rambusOscillator(modelType, numStages, g_cc, statVars, kAlpha=1.0, epsilonIn
 	for entry in statVars["stringHyperList"]:
 		print entry'''
 
-	print ("numBisection", statVars['numBisection'], "numLp", statVars['numLp'], "numK", statVars['numK'],
+	'''print ("numBisection", statVars['numBisection'], "numLp", statVars['numLp'], "numK", statVars['numK'],
 		"numIa", statVars['numIa'], "numSingleKill", statVars['numSingleKill'], "numDoubleKill", statVars['numDoubleKill'])
 	print ("totalKTime", statVars['totalKTime'], "totalLPTime", statVars['totalLPTime'], "totalIaTime", statVars['totalIaTime'],
-		"avgKTime", statVars['avgKTime'], "avgLPTime", statVars['avgLPTime'], "avgIaTime", statVars["avgIaTime"])
+		"avgKTime", statVars['avgKTime'], "avgLPTime", statVars['avgLPTime'], "avgIaTime", statVars["avgIaTime"])'''
 	#print ("numLpCalls", statVars['numLpCalls'], "numSuccessLpCalls", statVars['numSuccessLpCalls'], "numUnsuccessLpCalls", statVars['numUnsuccessLpCalls'])
 	#print ("allSolutions")
 	#dcUtils.printSol(allHypers, model)
@@ -1056,14 +1057,14 @@ def rambusOscillator(modelType, numStages, g_cc, statVars, kAlpha=1.0, epsilonIn
 if __name__ == "__main__":
 	statVars = {}
 	start = time.time()
-	#allHypers = schmittTrigger(modelType="lcMosfet", inputVoltage = 0.9, statVars=statVars, numSolutions = "all", useLp = False)
-	#allHypers = inverter(modelType="lcMosfet", inputVoltage=0.9, statVars=statVars, numSolutions="all")
-	#allHypers = inverterLoop(modelType="tanh", numInverters=4, statVars=statVars, numSolutions="all", useLp = False)
-	allHypers = rambusOscillator(modelType="tanh", numStages=6, g_cc=4.0, statVars=statVars, kAlpha = 1.0, epsilonInflation=0.001, numSolutions="all", bisectType="bisectMax", useLp = False)
+	#allHypers = schmittTrigger(modelType="scMosfet", inputVoltage = 0.9, statVars=statVars, numSolutions = "all", useLp = False)
+	#allHypers = inverter(modelType="scMosfet", inputVoltage=0.5, statVars=statVars, numSolutions="all")
+	#allHypers = inverterLoop(modelType="scMosfet", numInverters=4, statVars=statVars, numSolutions="all", useLp = False)
+	#allHypers = rambusOscillator(modelType="lcMosfet", numStages=4, g_cc=4.0, statVars=statVars, kAlpha = 1.0, epsilonInflation=0.001, numSolutions="all", bisectType="bisectMax", useLp = False)
 	end = time.time()
-	#print ("allHypers")
-	#for hyper in allHypers:
-	#	print ("hyper")
-	#	intervalUtils.printHyper(hyper)
+	'''print ("allHypers")
+	for hyper in allHypers:
+		print ("hyper")
+		intervalUtils.printHyper(hyper)'''
 	print ("numSolutions", len(allHypers))
 	print ("time taken", end - start)

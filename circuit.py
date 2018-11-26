@@ -100,7 +100,7 @@ class ScMosfet:
 		self.funDict[(VsDict, VgDict, VdDict, channelType)] = funVal
 		
 		# Clean up funDict
-		if len(self.funDict) >= 10000:
+		if len(self.funDict) >= 30000:
 			self.funDict = {}
 
 		return funVal
@@ -162,7 +162,7 @@ class ScMosfet:
 
 		# Clean up gradDict
 		self.gradDict[(VsDict, VgDict, VdDict, channelType)] = grad
-		if len(self.gradDict) >= 10000:
+		if len(self.gradDict) >= 30000:
 			self.gradDict = {}
 		return grad
 
@@ -295,7 +295,7 @@ class LcMosfet:
 		else: currentVal = self.ids_help(Vs, Vg, Vd, channelType, Vt, ks)
 		self.funDict[(VsDict, VgDict, VdDict, channelType)] = currentVal
 		# Clean up funDict
-		if len(self.funDict) >= 10000:
+		if len(self.funDict) >= 30000:
 			self.funDict = {}
 		return currentVal
 	
@@ -385,7 +385,7 @@ class LcMosfet:
 
 		self.gradDict[(VsDict, VgDict, VdDict, channelType)] = grad
 		# Clean up gradDict
-		if len(self.gradDict) >= 10000:
+		if len(self.gradDict) >= 30000:
 			self.gradDict = {}
 		return grad
 
@@ -774,7 +774,7 @@ class Circuit:
 			I_node[tr.s] = interval_add(I_node[tr.s], Ids)
 			I_node[tr.d] = interval_sub(I_node[tr.d], Ids)
 		self.funDict[vTuple] = I_node
-		if len(self.funDict) > 10000:
+		if len(self.funDict) > 30000:
 			self.funDict = {}
 		return I_node
 
@@ -807,7 +807,7 @@ class Circuit:
 				J[tr.s, sgd[i]] = interval_add(J[tr.s, sgd[i]], g[i])
 				J[tr.d, sgd[i]] = interval_sub(J[tr.d, sgd[i]], g[i])
 		self.gradDict[vTuple] = J
-		if len(self.gradDict) > 10000:
+		if len(self.gradDict) > 30000:
 			self.gradDict = {}
 		return J
 

@@ -38,9 +38,9 @@ class RambusTanh:
 			self.ys.append("y" + str(i))
 			self.zs.append("z" + str(i))
 
-		self.bounds = []
+		self.bounds = np.zeros((numStages*2, 2))
 		for i in range(numStages*2):
-			self.bounds.append([-1.0,1.0])
+			self.bounds[i] = [-1.0, 1.0]
 
 	def f(self, V):
 		intervalVal = any([interval_p(x) for x in V])
@@ -156,8 +156,7 @@ Inverter with tanh as the inverter model
 class InverterTanh:
 	def __init__(self, modelParam, inputVoltage):
 		self.modelParam = modelParam # y = tanh(modelParam[0]*x + modelParam[1])
-		self.bounds = []
-		self.bounds.append([-1.0,1.0])
+		self.bounds = np.array([[-1.0, 1.0]])
 		self.inputVoltage = inputVoltage
 
 	def f(self, V):
@@ -185,9 +184,9 @@ class InverterLoopTanh:
 	def __init__(self, modelParam, numInverters):
 		self.modelParam = modelParam # y = tanh(modelParam[0]*x + modelParam[1])
 		self.numInverters = numInverters
-		self.bounds = []
+		self.bounds = np.zeros((numInverters, 2))
 		for i in range(numInverters):
-			self.bounds.append([-1.0, 1.0])
+			self.bounds[i] = [-1.0, 1.0]
 
 	def f(self, V):
 		intervalVal = any([interval_p(x) for x in V])
@@ -274,9 +273,9 @@ class RambusMosfet:
 
 		self.c = circuit.Circuit(transistorList)
 
-		self.bounds = []
+		self.bounds = np.zeros((numStages*2, 2))
 		for i in range(numStages*2):
-			self.bounds.append([0.0, self.Vdd])
+			self.bounds[i] = [0.0, self.Vdd]
 
 
 	def f(self,V):
@@ -341,11 +340,9 @@ class InverterMosfet:
 
 		self.c = circuit.Circuit(transistorList)
 
-		self.bounds = []
 		# output voltage
-		self.bounds.append([0.0, self.Vdd])
-
-
+		self.bounds = np.array([[0.0, self.Vdd]])
+	
 
 	def f(self,V):
 		myV = [x for x in V] + [self.inputVoltage, 0.0, self.Vdd]
@@ -405,9 +402,9 @@ class InverterLoopMosfet:
 
 		self.c = circuit.Circuit(transistorList)
 
-		self.bounds = []
+		self.bounds = np.zeros((numInverters, 2))
 		for i in range(numInverters):
-			self.bounds.append([0.0, self.Vdd])
+			self.bounds[i] = [0.0, self.Vdd]
 
 
 
@@ -488,9 +485,9 @@ class SchmittMosfet:
 
 		self.c = circuit.Circuit([m0, m1, m2, m3, m4, m5])
 
-		self.bounds = []
+		self.bounds = np.zeros((3, 2))
 		for i in range(3):
-			self.bounds.append([0.0,self.Vdd])
+			self.bounds[i] = [0.0, self.Vdd]
 
 
 	def f(self,V):

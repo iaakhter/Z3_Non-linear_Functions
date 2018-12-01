@@ -49,12 +49,12 @@ if __name__ == '__main__':
 	timeout = 36000 # in seconds (10 hours)
 
 	# Run rambus experiments
-	'''modelTypesL = ["tanh", "lcMosfet", "scMosfet"]
-	#modelTypesL = ["scMosfet"]
-	numStagesL = [2, 4, 6]
-	#numStagesL = [2]
-	gccL = [0.5, 4.0]
-	#gccL = [4.0]
+	#modelTypesL = ["tanh", "lcMosfet", "scMosfet"]
+	modelTypesL = ["lcMosfet"]
+	#numStagesL = [2, 4, 6]
+	numStagesL = [6]
+	#gccL = [0.5, 4.0]
+	gccL = [0.5]
 	for modelType in modelTypesL:
 		for numStages in numStagesL:
 			for gcc in gccL:	
@@ -75,7 +75,7 @@ if __name__ == '__main__':
 					p.join()
 
 	# Run schmitt trigger experiments
-	modelTypesL = ["lcMosfet", "scMosfet"]
+	'''modelTypesL = ["lcMosfet", "scMosfet"]
 	inputVoltages = []
 	for modelType in modelTypesL:
 		if modelType == "lcMosfet":
@@ -126,7 +126,7 @@ if __name__ == '__main__':
 
 
 	# Run inverter loop experiments
-	modelTypesL = ["tanh", "lcMosfet", "scMosfet"]
+	'''modelTypesL = ["tanh","lcMosfet"]
 	numInvertersL = [1, 2, 3, 4]
 	for modelType in modelTypesL:
 		for numInverters in numInvertersL:
@@ -144,5 +144,5 @@ if __name__ == '__main__':
 
 				# Terminate process
 				p.terminate()
-				p.join()
+				p.join()'''
 

@@ -8,6 +8,7 @@ from z3LcMosfet import *
 from z3Tanh import *
 
 def runRambusExperiment(modelType, numStages, g_cc):
+	#allHypers = inverterLoopTanh(numInverters = 1)
 	print ("rambus modelType", modelType, "numStages", numStages, "g_cc", g_cc)
 	if modelType == "tanh":
 		allHypers = rambusOscillatorTanh(numStages = numStages, g_cc = g_cc)
@@ -16,11 +17,13 @@ def runRambusExperiment(modelType, numStages, g_cc):
 
 
 def runSchmittExperiment(modelType, inputVoltage):
+	#allHypers = inverterLoopTanh(numInverters = 1)
 	print ("schmitt modelType", modelType, "inputVoltage", inputVoltage)
 	if modelType == "lcMosfet":
 		allHypers = schmittTriggerLcMosfet(inputVoltage = inputVoltage)
 
 def runInverterExperiment(modelType, inputVoltage):
+	#allHypers = inverterLoopTanh(numInverters = 1)
 	print ("inverter modelType", modelType, "inputVoltage", inputVoltage)
 	if modelType == "tanh":
 		allHypers = inverterTanh(inputVoltage = inputVoltage)
@@ -28,6 +31,7 @@ def runInverterExperiment(modelType, inputVoltage):
 		allHypers = inverterLcMosfet(inputVoltage = inputVoltage)
 
 def runInverterLoopExperiment(modelType, numInverters):
+	#allHypers = inverterLoopTanh(numInverters = 1)
 	print ("inverter modelType", modelType, "numInverters", numInverters)
 	if modelType == "tanh":
 		allHypers = inverterLoopTanh(numInverters = numInverters)
@@ -39,7 +43,7 @@ if __name__ == '__main__':
 	timeout = 36000 # in seconds (10 hours)
 
 	# Run rambus experiments
-	'''modelTypesL = ["tanh"]
+	'''modelTypesL = ["lcMosfet"]
 	#modelTypesL = ["tanh"]
 	numStagesL = [2]
 	#numStagesL = [2]
@@ -64,7 +68,7 @@ if __name__ == '__main__':
 					p.join()'''
 
 	# Run schmitt trigger experiments
-	'''modelTypesL = ["lcMosfet"]
+	modelTypesL = ["lcMosfet"]
 	inputVoltages = []
 	for modelType in modelTypesL:
 		if modelType == "lcMosfet":
@@ -85,10 +89,10 @@ if __name__ == '__main__':
 
 				# Terminate process
 				p.terminate()
-				p.join()'''
+				p.join()
 
 	# Run inverter experiments
-	'''modelTypesL = ["tanh", "lcMosfet"]
+	'''modelTypesL = ["tanh","lcMosfet"]
 	inputVoltages = []
 	for modelType in modelTypesL:
 		if modelType == "tanh":
@@ -114,8 +118,8 @@ if __name__ == '__main__':
 				p.join()'''
 
 	# Run inverter loop experiments
-	modelTypesL = ["lcMosfet"]
-	numInvertersL = [1, 2, 3, 4]
+	'''modelTypesL = ["lcMosfet"]
+	numInvertersL = [1,2,3,4]
 	for modelType in modelTypesL:
 		for numInverters in numInvertersL:
 			p = multiprocessing.Process(target=runInverterLoopExperiment, name="RunInverterLoopExperiment", args=(modelType, numInverters))
@@ -132,4 +136,4 @@ if __name__ == '__main__':
 
 				# Terminate process
 				p.terminate()
-				p.join()
+				p.join()'''

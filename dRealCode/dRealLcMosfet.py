@@ -327,7 +327,7 @@ def inverterLcMosfet(inputVoltage, Vtp = -0.4, Vtn = 0.4, Vdd = 1.8, Kn = 270*1e
 		hyper = np.zeros((1,2))
 		hyper[0,:] = [result[outputVolt].lb() - 1000*epsilon, result[outputVolt].ub() + 1000*epsilon]
 
-		#print ("hyper", hyper)
+		print ("hyper", hyper)
 		allSolutions.append(hyper)
 
 		print ("num solutions found", len(allSolutions))
@@ -406,7 +406,7 @@ def inverterLoopLcMosfet(numInverters, numSolutions = "all", Vtp = -0.4, Vtn = 0
 	return allSolutions
 
 if __name__ == "__main__":
-	allSolutions = inverterLoopLcMosfet(1)
+	allSolutions = inverterLcMosfet(0.9)
 	print ("allSolutions")
 	for solution in allSolutions:
 		print ("solution")

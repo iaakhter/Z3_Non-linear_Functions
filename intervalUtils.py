@@ -477,7 +477,7 @@ def krawczykHelp(startBounds, jacInterval, samplePoint, fSamplePoint, jacSampleP
 	#printHyper(kInterval)
 	# if kInterval is in the interior of startBounds, found a unique solution
 	if np.all(kInterval[:,0] > startBounds[:,0]) and np.all(kInterval[:,1] < startBounds[:,1]):
-		return [True, startBounds]
+		return [True, kInterval]
 	'''if(all([ (interval_lo(kInterval[i]) > interval_lo(startBounds[i])) and (interval_hi(kInterval[i]) < interval_hi(startBounds[i]))
 		 for i in range(numV) ])):
 		return (True, startBounds)'''
@@ -615,8 +615,8 @@ def checkExistenceOfSolution(model,hyperRectangle, alpha = 1.0, epsilonInflation
 		#print ("total", end - start)
 		
 		if kHelpResult[0] or kHelpResult[1] is None:
-			if kHelpResult[0]:
-				return [True, startBounds]
+			'''if kHelpResult[0]:
+				return [True, startBounds]'''
 			return kHelpResult
 		
 		intersect = kHelpResult[1]

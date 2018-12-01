@@ -40,7 +40,7 @@ LINK_LIBRARIES(${Boost_LIBRARIES} ${PYTHON_LIBRARIES}) # Deprecated but so conve
 PYTHON_ADD_MODULE(stChannel_py stChannel_py.cpp)
 FILE(COPY stChannel_py.py DESTINATION .)
 
-#ADD_EXECUTABLE(stChannel_py stChannel_py.cpp)
-#TARGET_LINK_LIBRARIES(stChannel_py ${Boost_LIBRARIES} ${PYTHON_LIBRARIES})
-#FILE(COPY stChannel_py.py DESTINATION .)
-#SET( ENV{PYTHONPATH} . )
+PYTHON_ADD_MODULE(interval_py interval_py.cpp)
+FILE(COPY mcInterval.py DESTINATION .)
+
+

@@ -87,9 +87,10 @@ def rambusOscillatorTanh(numStages, g_cc = 0.5, numSolutions = "all", a = -5.0):
 		sol = [None]*lenV
 		for d in m.decls():
 			dName = str(d.name())
+			#print ("dName", dName)
 			firstLetter = dName[0]
 			if (dName[0] == "v" and dName[1] == "_"):
-				index = int(dName[len(dName) - 1])
+				index = int(dName[3:])
 				
 				sol[index] = m[d]
 
@@ -255,6 +256,7 @@ def inverterLoopTanh(numInverters, numSolutions = "all", a= -5.0):
 
 
 		print ("sol", sol)
+		#print ("allSOlutions", allSolutions)
 
 		s.pop()
 		allSolutions.append(sol)
@@ -268,8 +270,8 @@ def inverterLoopTanh(numInverters, numSolutions = "all", a= -5.0):
 
 
 if __name__ == "__main__":
-	#rambusOscillatorTanh(a = -5.0, numStages = 2, numSolutions = "all", g_cc = 0.5)
+	rambusOscillatorTanh(a = -5.0, numStages = 6, numSolutions = "all", g_cc = 4.0)
 	#allSolutions = inverterTanh(-1.0, -5.0)
-	allSolutions = inverterLoopTanh(1)
-	print ("allSolutions")
-	print (allSolutions)
+	#allSolutions = inverterLoopTanh(1)
+	#print ("allSolutions")
+	#print (allSolutions)

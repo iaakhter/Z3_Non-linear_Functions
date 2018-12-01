@@ -114,8 +114,8 @@ def solverLoop(uniqueHypers, model, statVars=None, volRedThreshold=1.0, bisectFu
 		raise Exception("model has no instance of linearConstraints. Define a method called linearConstraints in the model class to use linear programming feature. Or use the solver without the linear programming feature\n")
 	if statVars is None:
 		statVars = {}
-		statVars.update({'numBisection':0, 'numLp':0, 'numK':0, 'numSingleKill':0, 'numDoubleKill':0,
-					'totalKTime':0, 'totalLPTime':0, 'avgKTime':0, 'avgLPTime':0, 'stringHyperList':[],
+		statVars.update({'numBisection':0, 'numLp':0, 'numK':0, 'numIa':0 ,'numSingleKill':0, 'numDoubleKill':0,
+					'totalKTime':0, 'totalLPTime':0, 'totalIaTime':0,'avgKTime':0, 'avgLPTime':0, 'avgIaTime':0,'stringHyperList':[],
 					'numLpCalls':0, 'numSuccessLpCalls':0, 'numUnsuccessLpCalls':0})
 	lenV = len(model.bounds)
 	
@@ -130,13 +130,20 @@ def solverLoop(uniqueHypers, model, statVars=None, volRedThreshold=1.0, bisectFu
 	statVars['stringHyperList'].append(("i", intervalUtils.volume(hyperRectangle)))
 	
 	start = time.time()
-	feas = intervalUtils.checkExistenceOfSolution(model,hyperRectangle,kAlpha,epsilonInflation)
+	intervalCheck = intervalUtils.intervalEval(model, hyperRectangle)
+	end = time.time()
+	statVars['stringHyperList'].append(('ia', intervalCheck))
+	statVars['totalIaTime'] += end - start
+	statVars['numIa'] += 1
+	if not(intervalCheck):
+		return
+	start = time.time()
+	feas = intervalUtils.checkExistenceOfSolution(model, hyperRectangle, kAlpha, epsilonInflation=epsilonInflation)
 	end = time.time()
 	statVars['totalKTime'] += end - start
 	statVars['numK'] += 1
+	statVars['stringHyperList'].append(("g", feas))
 	
-	statVars['stringHyperList'].append(("g", intervalUtils.volume(feas[1])))
-
 
 	#stack containing hyperrectangles about which any decision
 	#has not been made - about whether they contain unique solution
@@ -189,19 +196,37 @@ def solverLoop(uniqueHypers, model, statVars=None, volRedThreshold=1.0, bisectFu
 				#print ("lHyp")
 				#intervalUtils.printHyper(lHyp)
 				start = time.time()
-				lFeas = intervalUtils.checkExistenceOfSolution(model, lHyp, kAlpha, epsilonInflation=epsilonInflation)
+				intervalCheck = intervalUtils.intervalEval(model, lHyp)
 				end = time.time()
-				#print ("lFeas", lFeas)
-				statVars['totalKTime'] += end - start
-				statVars['numK'] += 1
-				statVars['stringHyperList'].append(("g", intervalUtils.volume(lFeas[1])))
+				statVars['stringHyperList'].append(('ia', intervalCheck))
+				statVars['totalIaTime'] += end - start
+				statVars['numIa'] += 1
+				if not(intervalCheck):
+					lFeas = [False, None]
+				else:
+					start = time.time()
+					lFeas = intervalUtils.checkExistenceOfSolution(model, lHyp, kAlpha, epsilonInflation=epsilonInflation)
+					end = time.time()
+					statVars['totalKTime'] += end - start
+					statVars['numK'] += 1
+					statVars['stringHyperList'].append(("g", lFeas))
 				#print ("rHyp")
 				#intervalUtils.printHyper(rHyp)
 				start = time.time()
-				rFeas = intervalUtils.checkExistenceOfSolution(model, rHyp, kAlpha, epsilonInflation=epsilonInflation)
+				intervalCheck = intervalUtils.intervalEval(model, rHyp)
 				end = time.time()
-				#print ("rFeas", rFeas)
-				statVars['totalKTime'] += end - start
+				statVars['stringHyperList'].append(('ia', intervalCheck))
+				statVars['totalIaTime'] += end - start
+				statVars['numIa'] += 1
+				if not(intervalCheck):
+					rFeas = [False, None]
+				else:
+					start = time.time()
+					rFeas = intervalUtils.checkExistenceOfSolution(model, rHyp, kAlpha, epsilonInflation=epsilonInflation)
+					end = time.time()
+					statVars['totalKTime'] += end - start
+					statVars['numK'] += 1
+					statVars['stringHyperList'].append(("g", lFeas))
 
 				statVars['numK'] += 1
 				statVars['stringHyperList'].append(("g", intervalUtils.volume(rFeas[1])))
@@ -645,13 +670,19 @@ def ifFeasibleHyper(hyperRectangle, statVars, volRedThreshold, model, kAlpha,eps
 
 
 		start = time.time()
-		
-		#Apply Krawczyk
+		intervalCheck = intervalUtils.intervalEval(model, newHyperRectangle)
+		end = time.time()
+		statVars['stringHyperList'].append(('ia', intervalCheck))
+		statVars['totalIaTime'] += end - start
+		statVars['numIa'] += 1
+		if not(intervalCheck):
+			return (False, None)
+		start = time.time()
 		kResult = intervalUtils.checkExistenceOfSolution(model, newHyperRectangle, kAlpha, epsilonInflation=epsilonInflation)
 		end = time.time()
-		statVars['totalKTime'] += (end - start)
+		statVars['totalKTime'] += end - start
 		statVars['numK'] += 1
-		statVars['stringHyperList'].append(("g", intervalUtils.volume(kResult[1])))
+		statVars['stringHyperList'].append(("g", kResult))
 		
 		#Unique solution or no solution
 		if kResult[0] or kResult[1] is None:

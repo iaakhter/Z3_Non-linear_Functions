@@ -237,11 +237,11 @@ Rambus ring oscillator with 2 CMOS transistors having
 '''
 class RambusMosfet:
 	def __init__(self, modelType, modelParam, g_cc, g_fwd, numStages):
-		s0 = 3.0
 		self.g_cc = g_cc
 		self.g_fwd = g_fwd
 		self.numStages = numStages
 		lenV = numStages*2
+		s0 = 3.0
 
 		if modelType == "lcMosfet":
 			model = circuit.LcMosfet

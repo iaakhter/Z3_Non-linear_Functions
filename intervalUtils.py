@@ -7,26 +7,6 @@ import numpy as np
 import random
 import math
 from intervalBasics import *
-#import mcInterval
-
-
-'''
-Multiply 2 matrices and return the resulting matrix. 
-Any matrix can be an interval matrix
-'''
-def multiplyMats(mat1, mat2):
-	isInterval = len(mat1.shape) == 3 or len(mat2.shape) == 3
-	if isInterval:
-		result = np.zeros((mat1.shape[0],mat2.shape[1],2))
-	else:
-		result = np.zeros((mat1.shape[0],mat2.shape[1]))
-	
-	for i in range(mat1.shape[0]):
-		for j in range(mat2.shape[1]):
-			for k in range(mat2.shape[1]):
-				result[i,j] = interval_add(result[i,j], interval_mult(mat1[i,k],mat2[k,j]))
-
-	return result
 
 
 def multiplyRegMatWithInMat(regMat, inMat):
@@ -40,13 +20,6 @@ def multiplyRegMatWithInMat(regMat, inMat):
 	upperLimitMidWithUlp = np.nextafter(upperLimitMid, np.float("inf"))
 	upperLimitRadWithUlp = np.nextafter(newMatRad, np.float("inf"))
 	upperLimit = upperLimitMidWithUlp - upperLimitMid + upperLimitRadWithUlp - newMatRad
-
-	'''
-	upperLimitMid = np.dot(regMatAbs, inMatMidAbs)
-	for i in range(upperLimit.shape[0]):
-		for j in range(upperLimit.shape[1]):
-			upperLimit[i,j] = (np.nextafter(upperLimit[i,j], np.float("inf")) - upperLimit[i,j] + 
-				np.nextafter(newMatRad[i,j], np.float("inf")) - newMatRad[i,j])'''
 	upperLimit = ((regMat.shape[1] + 1)/2.0)*upperLimit
 	newMatRad += upperLimit
 	resultMat = np.zeros((regMat.shape[0], regMat.shape[1], 2))
@@ -65,10 +38,6 @@ def multiplyRegMatWithInVec(regMat, inVec):
 	upperLimitMidWithUlp = np.nextafter(upperLimitMid, np.float("inf"))
 	upperLimitRadWithUlp = np.nextafter(newVecRad, np.float("inf"))
 	upperLimit = upperLimitMidWithUlp - upperLimitMid + upperLimitRadWithUlp - newVecRad
-	'''upperLimit = np.dot(regMatAbs, inVecMidAbs)
-	for i in range(upperLimit.shape[0]):
-		upperLimit[i] = (np.nextafter(upperLimit[i], np.float("inf")) - upperLimit[i] + 
-				np.nextafter(newVecRad[i], np.float("inf")) - newVecRad[i])'''
 	upperLimit = ((regMat.shape[1] + 1)/2.0)*upperLimit
 	newVecRad += upperLimit
 	resultVec = np.zeros((regMat.shape[0], 2))
@@ -92,11 +61,6 @@ def multiplyInMatWithInVec(inMat, inVec):
 	upperLimitMidWithUlp = np.nextafter(upperLimitMid, np.float("inf"))
 	upperLimitRadWithUlp = np.nextafter(newVecRad, np.float("inf"))
 	upperLimit = upperLimitMidWithUlp - upperLimitMid + upperLimitRadWithUlp - newVecRad
-
-	'''upperLimit = np.dot(inMatMidAbs, inVecMidAbs)
-	for i in range(upperLimit.shape[0]):
-		upperLimit[i] = (np.nextafter(upperLimit[i], np.float("inf")) - upperLimit[i] + 
-				np.nextafter(newVecRad[i], np.float("inf")) - newVecRad[i])'''
 	upperLimit = ((inMat.shape[1] + 1)/2.0)*upperLimit
 	newVecRad += upperLimit
 	resultVec = np.zeros((inMat.shape[0], 2))
@@ -117,10 +81,6 @@ def multiplyInMatWithInVecZeroMid(inMat, inVec):
 
 	upperLimitRadWithUlp = np.nextafter(newVecRad, np.float("inf"))
 	upperLimit = upperLimitRadWithUlp - newVecRad
-	'''#upperLimit = np.dot(inMatMidAbs, inVecMidAbs)
-	upperLimit = np.zeros((newVecMid.shape[0]))
-	for i in range(upperLimit.shape[0]):
-		upperLimit[i] = (np.nextafter(newVecRad[i], np.float("inf")) - newVecRad[i])'''
 	upperLimit = ((inMat.shape[1] + 1)/2.0)*upperLimit
 	newVecRad += upperLimit
 	resultVec = np.zeros((inMat.shape[0], 2))
@@ -135,24 +95,6 @@ def subtractInMatFromRegMat(regMat, inMat):
 	resultMat[:,:,0] = regMat - inMat[:,:,1]
 	resultMat[:,:,0] = np.nextafter(resultMat[:,:,0], np.float("-inf"))
 	resultMat[:,:,1] = np.nextafter(resultMat[:,:,1], np.float("inf"))
-	"""inMatMid = (inMat[:,:,0] + inMat[:,:,1])/2.0
-	inMatRad = (inMat[:,:,1] - inMat[:,:,0])/2.0
-	newMatMid = regMat - inMatMid
-	newMatRad = inMatRad
-	upperLimitMid = np.absolute(newMatMid)
-	upperLimitMidWithUlp = np.nextafter(upperLimitMid, np.float("inf"))
-	upperLimit = upperLimitMidWithUlp - upperLimitMid
-	'''for i in range(upperLimit.shape[0]):
-		for j in range(upperLimit.shape[1]):
-			upperLimit[i,j] = (np.nextafter(upperLimit[i,j], np.float("inf")) - upperLimit[i,j])'''
-	upperLimit = (0.5)*upperLimit
-	newMatRad += upperLimit
-	#upperLimit = np.amax(np.absolute(newMatMid))
-	#upperLimit = np.nextafter(upperLimit, np.float("inf")) - upperLimit
-	#newMatRad[:,:] += upperLimit
-	resultMat = np.zeros((regMat.shape[0], regMat.shape[1], 2))
-	resultMat[:,:,0] = newMatMid - newMatRad
-	resultMat[:,:,1] = newMatMid + newMatRad"""
 	return resultMat
 
 def subtractInVecFromInVec(vec1, vec2):
@@ -161,21 +103,6 @@ def subtractInVecFromInVec(vec1, vec2):
 	resultVec[:,1] = vec1[:,1] - vec2[:,0]
 	resultVec[:,0] = np.nextafter(resultVec[:,0], np.float("-inf"))
 	resultVec[:,1] = np.nextafter(resultVec[:,1], np.float("inf"))
-	'''vec1Mid = (vec1[:,0] + vec1[:,1])/2.0
-	vec1Rad = (vec1[:,1] - vec1[:,0])/2.0
-	vec2Mid = (vec2[:,0] + vec2[:,1])/2.0
-	vec2Rad = (vec2[:,1] - vec2[:,0])/2.0
-	newVecMid = vec1Mid - vec2Mid
-	newVecRad = vec1Rad + vec2Rad
-	upperLimit = np.absolute(newVecMid)
-	for i in range(upperLimit.shape[0]):
-		upperLimit[i] = (np.nextafter(upperLimit[i], np.float("inf")) - upperLimit[i] + 
-			np.nextafter(newVecRad[i], np.float("inf")) - newVecRad[i])
-	upperLimit = (0.5)*upperLimit
-	newVecRad += upperLimit
-	resultVec = np.zeros((vec1.shape[0], 2))
-	resultVec[:,0] = newVecMid - newVecRad
-	resultVec[:,1] = newVecMid + newVecRad'''
 	return resultVec
 
 def addInVecToInVec(vec1, vec2):
@@ -184,56 +111,7 @@ def addInVecToInVec(vec1, vec2):
 	resultVec[:,1] = vec1[:,1] + vec2[:,1]
 	resultVec[:,0] = np.nextafter(resultVec[:,0], np.float("-inf"))
 	resultVec[:,1] = np.nextafter(resultVec[:,1], np.float("inf"))
-	"""vec1Mid = (vec1[:,0] + vec1[:,1])/2.0
-	vec1Rad = (vec1[:,1] - vec1[:,0])/2.0
-	vec2Mid = (vec2[:,0] + vec2[:,1])/2.0
-	vec2Rad = (vec2[:,1] - vec2[:,0])/2.0
-	newVecMid = vec1Mid + vec2Mid
-	newVecRad = vec1Rad + vec2Rad
-	upperLimit = np.absolute(newVecMid)
-	for i in range(upperLimit.shape[0]):
-		upperLimit[i] = (np.nextafter(upperLimit[i], np.float("inf")) - upperLimit[i] + 
-			np.nextafter(newVecRad[i], np.float("inf")) - newVecRad[i])
-	upperLimit = (0.5)*upperLimit
-	newVecRad += upperLimit
-	resultVec = np.zeros((vec1.shape[0], 2))
-	resultVec[:,0] = newVecMid - newVecRad
-	resultVec[:,1] = newVecMid + newVecRad"""
 	return resultVec
-
-
-'''
-Subtract 2 matrices. Either of the matrix can be an interval matrix
-and return the resulting matrix
-'''
-def subtractMats(mat1, mat2):
-	isInterval = len(mat1.shape) == 3 or len(mat2.shape) == 3
-	if isInterval:
-		result = np.zeros((mat1.shape[0],mat2.shape[1],2))
-	else:
-		result = np.zeros((mat1.shape[0],mat2.shape[1]))
-
-	for i in range(result.shape[0]):
-		for j in range(result.shape[1]):
-			result[i,j] = interval_sub(mat1[i,j], mat2[i,j])
-	return result
-
-'''
-Multiply interval or regular matrix with interval or regular vector
-and regular or interval vector depending on whether mat and vec 
-are interval or regular
-'''
-def multiplyMatWithVec(mat,vec):
-	isInterval = interval_p(mat[0,0]) or interval_p(vec[0])
-
-	if isInterval:
-		result = np.zeros((mat.shape[0],2))
-	else:
-		result = np.zeros((mat.shape[0],1))
-	for i in range(mat.shape[0]):
-		for j in range(mat.shape[1]):
-			result[i] = interval_add(result[i], interval_mult(mat[i,j],vec[j]))
-	return result
 
 
 '''
@@ -310,17 +188,6 @@ def newton(model, soln, overallHyper=None, normThresh=1e-8, maxIter=100):
 		return(False, soln)
 	return (True,soln)
 
-def newtonSingleStep(soln, fSoln, jac, overallHyper):
-	res = fSoln
-	res = -np.array(res)
-	
-	h = np.linalg.lstsq(jac, res, rcond=None)[0]
-	return soln + h
-	'''if np.less(soln, overallHyper[:,0] - 0.001).any() or np.greater(soln, overallHyper[:,1] + 0.001).any():
-		return (False, soln)
-	return (True,soln)'''
-
-
 
 
 '''
@@ -342,9 +209,6 @@ Do a krawczyk update on hyperrectangle defined by startBounds
 def krawczykHelp(startBounds, jacInterval, samplePoint, fSamplePoint, jacSamplePoint):
 	numV = startBounds.shape[0]
 	I = np.identity(numV)
-	'''xi_minus_samplePoint = np.zeros((numV, 2))
-	for i in range(numV):
-		xi_minus_samplePoint[i] = interval_sub(startBounds[i], samplePoint[i])'''
 	xi_minus_samplePoint = subtractInVecFromInVec(startBounds, samplePoint)
 	
 
@@ -356,120 +220,33 @@ def krawczykHelp(startBounds, jacInterval, samplePoint, fSamplePoint, jacSampleP
 	print ("jacSamplePoint", jacSamplePoint)'''
 
 
-	#start = time.time()
 	try:
 		C = np.linalg.inv(jacSamplePoint)
 	except:
 		# In case jacSamplePoint is singular
 		C = np.linalg.pinv(jacSamplePoint)
-	#end = time.time()
-	#print ("step1", end - start)
-	'''print ("startBounds", startBounds)
-	#print ("xi_minus_samplePoint", xi_minus_samplePoint)
-	#print ("C")
-	#print (C)
-	midSample = (samplePoint[:,0] + samplePoint[:,1])/2.0
-	midFunval = (funStartBounds[:,0] + funStartBounds[:,1])/2.0
-	CmidFunVal = np.dot(C, midFunval)
-	xNewton = midSample - CmidFunVal
-	radFunVal = np.zeros((numV, 2))
-	radFunVal[:,0] = funStartBounds[:,0] - midFunval
-	radFunVal[:,1] = funStartBounds[:,1] - midFunval
-	radNewton = multiplyMatWithVec(np.absolute(C), radFunVal)
-	newHyper = np.zeros((numV, 2))
-	#print ("xNewton", xNewton)
-	for i in range(numV):
-		#print ("xNewton[i]", xNewton[i])
-		#print ("radNewton[i]", radNewton[i])
-		newHyper[i,:] = interval_add(xNewton[i], radNewton[i])
-
-	print ("newHyper", newHyper)
-	if(all([ (interval_lo(newHyper[i]) > interval_lo(startBounds[i])) and (interval_hi(newHyper[i]) < interval_hi(startBounds[i]))
-		 for i in range(numV) ])):
-		pass
-
-	else:
-		intersect = np.zeros((numV,2))
-		for i in range(numV):
-			#print ("i", i)
-			#print ("startBounds", startBounds[i][0], startBounds[i][1])
-			#print ("kInterval", kInterval[i][0], kInterval[i][1])
-			intersectVar = interval_intersect(newHyper[i], startBounds[i])
-			if intersectVar is not None:
-				intersect[i] = intersectVar
-			else:
-				intersect = None
-				break
-
-		if intersect is not None:
-			#print ("startBounds", startBounds)
-			#print ("newtonIntersect", newHyper)
-			return [False, startBounds]'''
-
-	#print ("C", C)
-	#print ("fSamplePoint", fSamplePoint)
-	#start = time.time()
-	#C_fSamplePoint = multiplyMatWithVec(C,fSamplePoint)
-	#print ("C_fSamplePoint before")
-	#print (C_fSamplePoint)
+	
 	C_fSamplePoint = multiplyRegMatWithInVec(C, fSamplePoint)
 	#print ("C_fSamplePoint after")
 	#print (C_fSamplePoint)
-	#end = time.time()
-	#print ("step2", end - start)
-	#print ("C_fSamplePoint", C_fSamplePoint)
 
-	#start = time.time()
-	#C_jacInterval = multiplyMats(C,jacInterval)
-	#print ("C_jacInterval before")
-	#print (C_jacInterval)
+	
 	C_jacInterval = multiplyRegMatWithInMat(C, jacInterval)
 	#print ("C_jacInterval after")
 	#print (C_jacInterval)
-	#end = time.time()
-	#print ("step3", end - start)
 
-	#print ("C_jacInterval", C_jacInterval)
-
-	#start = time.time()
-	#I_minus_C_jacInterval = subtractMats(I,C_jacInterval)
-	#print ("I_minus_C_jacInterval before")
-	#print (I_minus_C_jacInterval)
+	
 	I_minus_C_jacInterval = subtractInMatFromRegMat(I, C_jacInterval)
 	#print ("I_minus_C_jacInterval after")
 	#print (I_minus_C_jacInterval)
-	#end = time.time()
-	#print ("step4", end - start)
-
-	#print ("I_minus_C_jacInterval", I_minus_C_jacInterval)
 	
-
-	#print ("xi_minus_samplePoint", xi_minus_samplePoint)
-	#start = time.time()
-	#lastTerm = multiplyMatWithVec(I_minus_C_jacInterval, xi_minus_samplePoint)
-	#print ("lastTerm before")
-	#print (lastTerm)
-	#lastTerm = multiplyInMatWithInVec(I_minus_C_jacInterval, xi_minus_samplePoint)
 	lastTerm = multiplyInMatWithInVecZeroMid(I_minus_C_jacInterval, xi_minus_samplePoint)
 	#print ("lastTerm after")
 	#print (lastTerm)
-	#end = time.time()
-	#print ("step5", end - start)
-
-	#print ("lastTerm", lastTerm)
 	
-	#start = time.time()
-	'''kInterval = np.zeros((numV,2))
-	for i in range(numV):
-		kInterval[i,:] = interval_add(interval_sub(samplePoint[i], C_fSamplePoint[i]), lastTerm[i])'''
 	kInterval = addInVecToInVec(subtractInVecFromInVec(samplePoint, C_fSamplePoint), lastTerm)
-	#print ("kInterval before")
-	#print (kInterval)
-	#kInterval = addInVecToInVec(subtractInVecFromInVec(samplePoint, C_fSamplePoint), lastTerm)
 	#print ("kInterval after")
 	#print (kInterval)
-	#end = time.time()
-	#print ("step6", end - start)
 	
 	#print ("startBounds")
 	#printHyper(startBounds)
@@ -478,20 +255,7 @@ def krawczykHelp(startBounds, jacInterval, samplePoint, fSamplePoint, jacSampleP
 	# if kInterval is in the interior of startBounds, found a unique solution
 	if np.all(kInterval[:,0] > startBounds[:,0]) and np.all(kInterval[:,1] < startBounds[:,1]):
 		return [True, kInterval]
-	'''if(all([ (interval_lo(kInterval[i]) > interval_lo(startBounds[i])) and (interval_hi(kInterval[i]) < interval_hi(startBounds[i]))
-		 for i in range(numV) ])):
-		return (True, startBounds)'''
-
 	
-	'''intersect = np.zeros((numV, 2))
-	low = np.maximum(startBounds[:,0], kInterval[:,0])
-	high = np.minimum(startBounds[:,1], kInterval[:,1])
-	if np.all(low <= high):
-		intersect[:,0] = low
-		intersect[:,1] = high
-		return [False, intersect]
-	else:
-		return [False, None]'''
 	intersect = np.zeros((numV,2))
 	for i in range(numV):
 		#print ("i", i)
@@ -514,36 +278,6 @@ def printHyper(hyper):
 		print (hyper[i,0], hyper[i,1])
 
 
-'''
-Find a Newton's solution in hyper. If there exists a solution
-inflate current hyper so that solution is in centre and
-check the inflated hyper with Krawczyk
-@param model defines the problem
-@param hyper hyperRectangle
-@param epsilonInflation indicates the proportion of hyper-rectangle distance by which the 
- 	hyper-rectangle needs to be inflated before the Krawczyk operator is applied
-@return Krawczyk result of inflated hyper
-'''
-def checkInflatedHyper(model, hyper, epsilonBounds):
-	startBounds = np.copy(hyper)
-	prevIntersect, intersect = newtonInflation(model, startBounds, epsilonBounds)
-
-	if prevIntersect is None:
-		return [False, hyper]
-
-	startBounds = np.copy(intersect)
-	samplePoint = (startBounds[:,0] + startBounds[:,1])/2.0
-	fSamplePoint = np.array(model.f(samplePoint))
-	jacSamplePoint = model.jacobian(samplePoint)
-	jacInterval = model.jacobian(startBounds)
-	
-	# Krawczyk update
-	kHelpResult = krawczykHelp(startBounds, jacInterval, samplePoint, fSamplePoint, jacSamplePoint)
-
-	if kHelpResult[0]:
-		return [True, kHelpResult[1]]
-	else:
-		return [False, hyper]
 
 
 '''
@@ -569,24 +303,12 @@ Krawczyk update
 		hyperRectangle
 @return (False, None) if hyperrectangle contains no solution
 '''
-def checkExistenceOfSolution(model,hyperRectangle, alpha = 1.0, epsilonInflation=0.001, samplePointSing=None, samplePoint=None, fSamplePoint=None, jacSamplePoint=None):
+def checkExistenceOfSolution(model,hyperRectangle, alpha = 1.0, epsilonInflation=0.001):
 	epsilonBounds = 1e-12
 	numV = len(hyperRectangle[0])
 
 	startBounds = np.copy(hyperRectangle)
 
-	# First do an interval arithmetic test
-	# Calculate the interval evaluation of the function
-	# for hyperrectangle. If any component of the result
-	# does not contain zero then the hyperrectangle does not
-	# contain any solution
-	'''if hasattr(model, 'f'):
-		#print ("startBounds", startBounds)
-		funVal = model.f(startBounds)
-		#print ("funVal", funVal)
-		if(any([np.nextafter(funVal[i,0], np.float("-inf"))*np.nextafter(funVal[i,1], np.float("inf")) > np.nextafter(0.0, np.float("inf")) 
-				for i in range(numV)])):
-			return [False, None]'''
 
 	# Start the Krawczyk update
 	iteration = 0
@@ -600,23 +322,15 @@ def checkExistenceOfSolution(model,hyperRectangle, alpha = 1.0, epsilonInflation
 	
 		#print ("startBounds after")
 		#printHyper(startBounds)
-		if iteration > 0 or samplePointSing is None:
-			samplePointSing = (startBounds[:,0] + startBounds[:,1])/2.0
-			samplePoint = turnRegVecToIntervalVec(samplePointSing)
-			fSamplePoint = np.array(model.f(samplePoint))
-			jacSamplePoint = model.jacobian(samplePointSing)
-		#funStartBounds = model.f(startBounds)
+		samplePointSing = (startBounds[:,0] + startBounds[:,1])/2.0
+		samplePoint = turnRegVecToIntervalVec(samplePointSing)
+		fSamplePoint = np.array(model.f(samplePoint))
+		jacSamplePoint = model.jacobian(samplePointSing)
 		jacInterval = model.jacobian(startBounds)
-		
-		# Krawczyk update
-		#start = time.time()
+	
 		kHelpResult = krawczykHelp(startBounds, jacInterval, samplePoint, fSamplePoint, jacSamplePoint)
-		#end = time.time()
-		#print ("total", end - start)
 		
 		if kHelpResult[0] or kHelpResult[1] is None:
-			'''if kHelpResult[0]:
-				return [True, startBounds]'''
 			return kHelpResult
 		
 		intersect = kHelpResult[1]
@@ -638,73 +352,16 @@ def checkExistenceOfSolution(model,hyperRectangle, alpha = 1.0, epsilonInflation
 
 		iteration += 1
 
-def findSlabs(bigHyper, smallHyper):
-	slabs = []
-	lenV = bigHyper.shape[0]
-	origHyper = np.copy(bigHyper)
-	for i in range(lenV):
-		newHyper1 = np.copy(origHyper)
-		newHyper2 = np.copy(origHyper)
-		if newHyper1[i,0] < smallHyper[i,0]:
-			newHyper1[i,1] = smallHyper[i,0]
-			slabs.append(newHyper1)
-		if smallHyper[i,1] < newHyper2[i,1]:
-			newHyper2[i,0] = smallHyper[i,1]
-			slabs.append(newHyper2)
-		origHyper[i,:] = smallHyper[i,:]
-	return slabs
-
-def findMaximalHyperFromNewton(model, soln, fSoln, jac, hyper):
-	#print ("soln", soln)
-	#print ("maximal step1")
-	newSoln = newtonSingleStep(soln, fSoln, jac, hyper)
-	fNewSoln = model.f(newSoln)
-	if np.linalg.norm(fNewSoln) > np.linalg.norm(fSoln):
-		return [False, None]
-	#print ("maximal step2", fNewSoln)
-	soln = newton(model, newSoln, overallHyper=hyper, normThresh=1e-5)
-	numV = hyper.shape[0]
-	solnInHyper = True
-	if soln[0]:
-		# the new hyper must contain the solution in the middle and enclose old hyper
-		#print ("soln ", soln[1][0], soln[1][1], soln[1][2])
-		if np.any(soln[1] < hyper[:,0]) or np.any(soln[1] > hyper[:,1]):
-			solnInHyper = False
-	else:
-		return [False, None]
-	#print ("maximal step3")
-	if not(solnInHyper):
-		return [False, None]
-	#print ("maximal step4", fNewSoln)
-	#print ("hyper", hyper)
-	#print ("soln", soln[1])
-	smallHyper = np.zeros((numV, 2))
-	#print ("soln", soln)
-	numIter = 0
-	startingRad = (hyper[:,1] - hyper[:,0])/4.0
-	while True:
-		if numIter > 10:
-			return [False, None]
-		smallHyper[:,0] = soln[1] - startingRad
-		smallHyper[:,1] = soln[1] + startingRad
-		feasHyper = checkExistenceOfSolution(model, smallHyper)
-		if feasHyper[0]:
-			#print ("maximal step5")
-			return feasHyper
-		else:
-			startingRad = startingRad*0.6
-		numIter += 1
 
 
 
-
+# First do an interval arithmetic test
+# Calculate the interval evaluation of the function
+# for hyperrectangle. If any component of the result
+# does not contain zero then the hyperrectangle does not
+# contain any solution and return False in that case
 def intervalEval(model, startBounds):
 	numV = startBounds.shape[0]
-	# First do an interval arithmetic test
-	# Calculate the interval evaluation of the function
-	# for hyperrectangle. If any component of the result
-	# does not contain zero then the hyperrectangle does not
-	# contain any solution
 	if hasattr(model, 'f'):
 		#print ("startBounds", startBounds)
 		funVal = model.f(startBounds)
@@ -712,90 +369,5 @@ def intervalEval(model, startBounds):
 		funValMult = np.multiply(funVal[:,0], funVal[:,1])
 		if np.any(funValMult > 0.0):
 			return False
-		#if(any([np.nextafter(funVal[i,0], np.float("-inf"))*np.nextafter(funVal[i,1], np.float("inf")) > np.nextafter(0.0, np.float("inf")) 
-		#		for i in range(numV)])):
-		#	return False
 	return True
-
-
-
-def checkExistenceOfSolutionWithNewton(model,hyperRectangle, alpha = 1.0, epsilonInflation=0.001):
-	epsilonBounds = 1e-12
-	numV = len(hyperRectangle[0])
-
-	#startBounds = np.copy(hyperRectangle)
-
-	# First do an interval arithmetic test
-	# Calculate the interval evaluation of the function
-	# for hyperrectangle. If any component of the result
-	# does not contain zero then the hyperrectangle does not
-	# contain any solution
-	'''if hasattr(model, 'f'):
-		#print ("startBounds", startBounds)
-		funVal = model.f(startBounds)
-		#print ("funVal", funVal)
-		if(any([np.nextafter(funVal[i,0], np.float("-inf"))*np.nextafter(funVal[i,1], np.float("inf")) > np.nextafter(0.0, np.float("inf")) 
-				for i in range(numV)])):
-			return [False, None]'''
-
-	samplePointSing = (hyperRectangle[:,0] + hyperRectangle[:,1])/2.0
-	samplePoint = turnRegVecToIntervalVec(samplePointSing)
-	fSamplePoint = np.array(model.f(samplePoint))
-	fSamplePointSing = (fSamplePoint[:,0] + fSamplePoint[:,1])/2.0
-	jacSamplePoint = model.jacobian(samplePointSing)
-	#start = time.time()
-	maximalHyperWithNewton = findMaximalHyperFromNewton(model, samplePointSing, fSamplePointSing, jacSamplePoint, hyperRectangle)
-	#end = time.time()
-	#print ("time taken to find maximum hyper rectangle", end - start)
-	#print ("maximalHyperWithNewton", maximalHyperWithNewton)
-	if not(maximalHyperWithNewton[0]):
-		#return [False, startBounds]
-		return checkExistenceOfSolution(model, hyperRectangle, alpha, epsilonInflation, samplePointSing, samplePoint, fSamplePoint, jacSamplePoint)
-	#start = time.time()
-	slabs = findSlabs(hyperRectangle, maximalHyperWithNewton[1])
-	#end = time.time()
-	#print ("time taken to find slabls", end - start)
-	return (maximalHyperWithNewton[1], slabs)
-
-
-
-'''
-Use newton's method to find a solution in hyperrectangle hyper.
-If a solution exists then construct a hyperrectnagle with the 
-solution in center and contains hyper. Return the original hyper
-and the inflated hyper.
-@param model defines the problem
-@param hyper hyperRectangle
-@epsilonBounds defines how far away from the hyperrectangle hyper
-we can allow the newton solution to be to start the hyperrectangle 
-inflation process
-@return (hyper, inflatedHyper) if there is a Newton solution within
-epsilon bounds of hyper. Otherwise return (None, hyper)
-'''
-def newtonInflation(model, hyper, epsilonBounds):
-	numV = hyper.shape[0]
-	exampleVolt = (hyper[:,0] + hyper[:,1])/2.0
-	soln = newton(model,exampleVolt)
-	prevHyper = None
-	solnInHyper = True
-	if soln[0]:
-		# the new hyper must contain the solution in the middle and enclose old hyper
-		#print ("soln ", soln[1][0], soln[1][1], soln[1][2])
-		for sl in range(numV):
-			if (soln[1][sl] < hyper[sl][0] - epsilonBounds or
-				soln[1][sl] > hyper[sl][1] + epsilonBounds):
-				solnInHyper = False
-				break
-	if soln[0] and solnInHyper:
-		prevHyper = np.copy(hyper)
-		for si in range(numV):
-			maxDiff = max(abs(hyper[si,1] - soln[1][si]), abs(soln[1][si] - hyper[si,0]))
-			#print ("si", si, "maxDiff", maxDiff)
-			if maxDiff < epsilonBounds:
-				maxDiff = epsilonBounds
-			hyper[si,0] = soln[1][si] - maxDiff
-			hyper[si,1] = soln[1][si] + maxDiff
-
-	return (prevHyper, hyper)
-
 

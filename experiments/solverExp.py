@@ -236,18 +236,16 @@ def runInverterExperiment(timingFilename, modelType, inputVoltage, bisectType):
 
 if __name__ == '__main__':
 	timeout = 36000 # in seconds (10 hours)
-	#timingFilename = "../data/solver_time_main2.csv"
-	timingFilename = "../data/solver_time_mainLpDATE.csv"
+	timingFilename = "../data/solver_time_main.csv"
+	#timingFilename = "../data/solver_time_mainLpDATE.csv"
 	#timingFilename = "../data/solver_time_bisectTypeDATE.csv"
 	#timingFilename = "../data/solver_time_kAlphaDATE.csv"
 	#timingFilename = "../data/solver_time_epsilonVarDATE.csv"
-	#timingFilename = "../data/solver_time_dateFinalNoSlab.csv"
+	#timingFilename = "../data/solver_time_dateFinal.csv"
 
 	# Run rambus experiments
-	#modelTypesL = ["scMosfet"]
-	modelTypesL = ["lcMosfet"]
-	#numStagesL = [2, 4, 6]
-	numStagesL = [2, 4]
+	modelTypesL = ["tanh","lcMosfet","scMosfet"]
+	numStagesL = [2, 4, 6]
 	gccL = [4.0, 0.5]
 	for modelType in modelTypesL:
 		for numStages in numStagesL:
@@ -269,7 +267,7 @@ if __name__ == '__main__':
 					p.join()
 
 	# Run schmitt trigger experiments
-	'''modelTypesL = ["lcMosfet","scMosfet"]
+	modelTypesL = ["lcMosfet","scMosfet"]
 	inputVoltages = []
 	for modelType in modelTypesL:
 		if modelType == "lcMosfet":
@@ -292,10 +290,10 @@ if __name__ == '__main__':
 
 				# Terminate process
 				p.terminate()
-				p.join()'''
+				p.join()
 
 	# Run inverter experiments
-	'''modelTypesL = ["tanh","lcMosfet","scMosfet"]
+	modelTypesL = ["tanh","lcMosfet","scMosfet"]
 	inputVoltages = []
 	for modelType in modelTypesL:
 		if modelType == "tanh":
@@ -349,7 +347,7 @@ if __name__ == '__main__':
 
 				# Terminate process
 				p.terminate()
-				p.join()'''
+				p.join()
 
 
 	
